@@ -6,6 +6,7 @@ export type EngineEvent =
   | { type: "mic_in_use_started"; app: string; pid: number }
   | { type: "mic_in_use_stopped"; app: string; pid: number }
   | { type: "recording_started"; app: string; startedAt: string }
+  /** Both tracks are already aligned on host time: 16 kHz mono WAV files of equal length. */
   | { type: "tracks_ready"; micPath: string; systemPath: string }
   | { type: "error"; message: string };
 

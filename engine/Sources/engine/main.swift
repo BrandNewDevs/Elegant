@@ -1,5 +1,5 @@
 // The Meeting Recorder engine. Speaks the JSON-lines protocol on stdio; see app/src/engine/protocol.ts.
-// Walking skeleton: reports ready and obeys shutdown. Detection and capture arrive in later tickets.
+// Walking skeleton: reports ready and obeys shutdown. Detection and recording arrive in later tickets.
 import Foundation
 
 let version = "0.1.0"

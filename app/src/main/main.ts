@@ -7,7 +7,7 @@ import { ProcessEngine } from "../engine/process-engine.js";
 import { unimplementedPipeline } from "../pipeline/unimplemented.js";
 import { openStore } from "../store/store.js";
 import { DISPLAY_NAME } from "../config.js";
-import { statusSymbol, statusText } from "./status-label.js";
+import { STATUS_LABEL } from "./status-label.js";
 
 // Dev location of the engine built by `pnpm run build:engine`. Packaging will change this.
 const devEngine = fileURLToPath(new URL("../../../engine/.build/release/engine", import.meta.url));
@@ -17,11 +17,12 @@ let core: AppCore | undefined;
 
 function render(status: EngineStatus): void {
   if (!tray) return;
-  tray.setTitle(`${statusSymbol(status)}`);
-  tray.setToolTip(`${DISPLAY_NAME}: ${statusText(status)}`);
+  const { symbol, text } = STATUS_LABEL[status];
+  tray.setTitle(symbol);
+  tray.setToolTip(`${DISPLAY_NAME}: ${text}`);
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: statusText(status), enabled: false },
+      { label: text, enabled: false },
       { type: "separator" },
       { label: `Quit ${DISPLAY_NAME}`, role: "quit" },
     ]),

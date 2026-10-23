@@ -1,11 +1,12 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { until } from "../testing/until.js";
 import { ProcessEngine } from "./process-engine.js";
 import type { EngineEvent, EngineExit } from "./protocol.js";
 
 // Built by `pnpm run build:engine`, which `pnpm test` runs first.
-export const engineBinary = fileURLToPath(new URL("../../../engine/.build/release/engine", import.meta.url));
+const engineBinary = fileURLToPath(new URL("../../../engine/.build/release/engine", import.meta.url));
 
 describe("the real Swift engine", () => {
   it("reports ready, rejects commands it does not support yet, and exits on shutdown", async () => {
@@ -18,12 +19,11 @@ describe("the real Swift engine", () => {
     engine.onExit((x) => exits.push(x));
     engine.start();
 
-    const deadline = Date.now() + 5000;
-    while (events.length < 1 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 10));
+    await until(() => events.length >= 1);
     expect(events[0]).toEqual({ type: "ready", version: "0.1.0" });
 
     engine.send({ type: "stop_recording" });
-    while (events.length < 2 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 10));
+    await until(() => events.length >= 2);
     expect(events[1]).toMatchObject({ type: "error", message: expect.stringContaining("stop_recording") });
 
     await engine.stop();

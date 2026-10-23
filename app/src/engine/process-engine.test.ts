@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
+import { until } from "../testing/until.js";
 import { ProcessEngine } from "./process-engine.js";
 import type { EngineEvent, EngineExit } from "./protocol.js";
 
@@ -11,14 +12,6 @@ function watch(engine: ProcessEngine) {
   engine.onEvent((e) => events.push(e));
   engine.onExit((x) => exits.push(x));
   return { events, exits };
-}
-
-async function until(predicate: () => boolean, ms = 3000) {
-  const deadline = Date.now() + ms;
-  while (!predicate()) {
-    if (Date.now() > deadline) throw new Error("timed out waiting");
-    await new Promise((r) => setTimeout(r, 10));
-  }
 }
 
 describe("ProcessEngine", () => {

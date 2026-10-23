@@ -1,23 +1,8 @@
 import type { EngineStatus } from "../core/app-core.js";
 
-const SYMBOL: Record<EngineStatus, string> = {
-  starting: "◌",
-  running: "●",
-  stopped: "○",
-  crashed: "⚠︎",
+export const STATUS_LABEL: Record<EngineStatus, { symbol: string; text: string }> = {
+  starting: { symbol: "◌", text: "Engine starting…" },
+  running: { symbol: "●", text: "Engine running" },
+  stopped: { symbol: "○", text: "Engine stopped" },
+  crashed: { symbol: "⚠︎", text: "Engine stopped unexpectedly" },
 };
-
-const TEXT: Record<EngineStatus, string> = {
-  starting: "Engine starting…",
-  running: "Engine running",
-  stopped: "Engine stopped",
-  crashed: "Engine stopped unexpectedly",
-};
-
-export function statusSymbol(status: EngineStatus): string {
-  return SYMBOL[status];
-}
-
-export function statusText(status: EngineStatus): string {
-  return TEXT[status];
-}

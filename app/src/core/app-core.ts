@@ -28,6 +28,7 @@ export class AppCore {
           this.setStatus("running");
           break;
         case "recording_started":
+          this.abandonRecording("the recording was interrupted by a new one");
           this.recordingMeetingId = deps.store.createMeeting({ app: event.app, startedAt: event.startedAt });
           break;
         case "tracks_ready": {
@@ -42,6 +43,7 @@ export class AppCore {
       }
     });
     deps.engine.onExit(() => {
+      this.abandonRecording("the engine stopped during the recording");
       this.setStatus(this.stopping ? "stopped" : "crashed");
     });
   }
@@ -78,6 +80,14 @@ export class AppCore {
     this.deps.engine.send({ type: "shutdown" });
     await this.deps.engine.stop();
     this.setStatus("stopped");
+  }
+
+  /** A Recording that can no longer finish is marked failed, so no Meeting is left stuck as recording. */
+  private abandonRecording(reason: string): void {
+    const id = this.recordingMeetingId;
+    if (id === undefined) return;
+    this.recordingMeetingId = undefined;
+    this.deps.store.setMeetingState(id, "failed", reason);
   }
 
   private setStatus(status: EngineStatus): void {

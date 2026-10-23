@@ -112,6 +112,23 @@ describe("a recorded meeting", () => {
     expect(core.listMeetings().map((m) => m.app)).toEqual(["Slack", "zoom.us"]);
   });
 
+  it("marks the meeting failed when the engine exits in the middle of a recording", () => {
+    const { engine, core } = recording();
+    engine.exit({ code: 1, signal: null });
+
+    const meeting = core.getMeeting(core.listMeetings()[0]!.id)!;
+    expect(meeting.state).toBe("failed");
+    expect(meeting.error).toBe("the engine stopped during the recording");
+  });
+
+  it("marks an abandoned recording failed when a new one starts", () => {
+    const { engine, core } = recording();
+    engine.emit({ type: "recording_started", app: "Slack", startedAt: "2026-10-24T11:00:00.000Z" });
+
+    const byApp = Object.fromEntries(core.listMeetings().map((m) => [m.app, m.state]));
+    expect(byApp).toEqual({ "zoom.us": "failed", Slack: "recording" });
+  });
+
   it("ignores tracks that arrive when no recording is in progress", async () => {
     const { engine, core } = setup();
     core.start();
@@ -148,21 +165,6 @@ describe("persistence", () => {
     const [meeting] = core2.listMeetings();
     expect(meeting).toMatchObject({ app: "zoom.us", state: "done" });
     expect(core2.getMeeting(meeting!.id)!.summary).toEqual(fixtureSummary);
-    store2.close();
-  });
-
-  it("remembers settings across restarts", () => {
-    const dir = mkdtempSync(join(tmpdir(), "meeting-recorder-test-"));
-    dirs.push(dir);
-    const dbPath = join(dir, "meetings.db");
-
-    const store1 = openStore(dbPath);
-    store1.setSetting("keepAudio", "true");
-    store1.close();
-
-    const store2 = openStore(dbPath);
-    expect(store2.getSetting("keepAudio")).toBe("true");
-    expect(store2.getSetting("missing")).toBeUndefined();
     store2.close();
   });
 });

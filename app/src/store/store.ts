@@ -32,8 +32,6 @@ export interface Store {
   getMeeting(id: number): Meeting | undefined;
   /** Newest first. */
   listMeetings(): MeetingListItem[];
-  getSetting(key: string): string | undefined;
-  setSetting(key: string, value: string): void;
   close(): void;
 }
 
@@ -166,14 +164,6 @@ export function openStore(path: string): Store {
       return rows.map((r) => ({ id: r.id, app: r.app, startedAt: r.started_at, state: r.state }));
     },
 
-    getSetting(key) {
-      const r = db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
-      return r?.value;
-    },
-
-    setSetting(key, value) {
-      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, value);
-    },
 
     close() {
       db.close();
