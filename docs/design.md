@@ -27,10 +27,19 @@ A headless Swift engine (detection, two-track capture, WhisperKit, diarization) 
 
 Live captions, calendar integration, in-person meetings, languages other than English, any cloud processing.
 
+## Verified by the detection prototype
+
+From the `prototype/detection` branch (see `prototypes/detection/FINDINGS.md` there), on macOS 27.0.1:
+
+- Per-process microphone use can be read from CoreAudio process objects (PID, bundle id, input and output running). Reading them needs no permission. A test process produced exactly one start and one stop at a 100 ms poll, with no flapping.
+- Browsers and Electron apps run audio in helper processes, so the PID is not the app's. Detection maps the PID to the outermost `.app` in its executable path. This is untested against a real browser call.
+- Two-track Recording works: the microphone via AVAudioEngine, system audio via a Core Audio process tap.
+- **The two tracks must be aligned on host time, not on the start of the file.** The system track starts about 197 ms before the mic track, repeatably. The engine records each track's first-sample host time and the Transcript pipeline aligns on that.
+- A Swift helper embeds and runs inside an Electron bundle with identifier `dev.bnd.meetingrecorder`.
+
 ## Open risks
 
-- Does per-process microphone detection work reliably for each call app on the target macOS version?
-- Does a Swift helper embedded in the Electron bundle keep its microphone and system-audio permissions?
-- Is a 4B-class local model good enough to attribute statements to the right Participant in long Meetings?
-
-The first two are answered by a detection prototype; the third by the AI work described in [`ai-brief.md`](./ai-brief.md).
+- Which signal each call app produces (Zoom, Teams, a Slack huddle, FaceTime, Meet in a browser), how long the debounce should be, and which things cause false Detections (dictation, Siri, browser voice search). Needs real calls on the machine.
+- Whether the embedded helper keeps its microphone and system-audio permissions across relaunch and rebuild. Not yet tested: the bundle's own permission was never exercised, because it could not be launched through LaunchServices and no signing identity exists on the machine. With ad-hoc signing every rebuild probably changes the code requirement and re-prompts, so a stable signing identity is a prerequisite for building the real app.
+- Whether the mic and system tracks line up acoustically, not only by host time, and whether that holds on other devices such as Bluetooth headsets.
+- Whether a 4B-class local model is good enough to attribute statements to the right Participant in long Meetings. This one is answered by the AI work in [`ai-brief.md`](./ai-brief.md).
