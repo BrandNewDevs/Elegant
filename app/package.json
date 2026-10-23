@@ -1,0 +1,22 @@
+{
+  "name": "meeting-recorder",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Meeting Recorder: detects online calls, records, transcribes and summarises them locally.",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build:engine": "swift build -c release --package-path ../engine",
+    "build": "tsc -p tsconfig.build.json",
+    "pretest": "pnpm run build:engine",
+    "test": "vitest run",
+    "start": "pnpm run build && pnpm run build:engine && env -u ELECTRON_RUN_AS_NODE electron ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "electron": "^45.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
