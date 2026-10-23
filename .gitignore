@@ -1,0 +1,14 @@
+# Recordings of people never go in git
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+*.aac
+*.caf
+*.aiff
+*.mp4
+*.mov
+
+.env
+.DS_Store
