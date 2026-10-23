@@ -7,6 +7,7 @@ import { ProcessEngine } from "../engine/process-engine.js";
 import { unimplementedPipeline } from "../pipeline/unimplemented.js";
 import { openStore } from "../store/store.js";
 import { DISPLAY_NAME } from "../config.js";
+import { showPrompt } from "./prompt-window.js";
 import { STATUS_LABEL } from "./status-label.js";
 
 // Dev location of the engine built by `pnpm run build:engine`. Packaging will change this.
@@ -14,6 +15,7 @@ const devEngine = fileURLToPath(new URL("../../../engine/.build/release/engine",
 
 let tray: Tray | undefined;
 let core: AppCore | undefined;
+let prompt: { close(): void } | undefined;
 
 function render(status: EngineStatus): void {
   if (!tray) return;
@@ -40,6 +42,16 @@ app.whenReady().then(() => {
   core = new AppCore({ engine, store, pipeline: unimplementedPipeline });
 
   tray = new Tray(nativeImage.createEmpty());
+  core.onDetectedMeetingChange((meeting) => {
+    prompt?.close(); // the Meeting was answered, timed out or ended; the old overlay is stale
+    prompt = undefined;
+    if (!meeting) return;
+    console.log(`[detection] ${meeting.app}`);
+    prompt = showPrompt(meeting.app, {
+      record: () => core!.acceptPrompt(),
+      notNow: () => core!.declinePrompt(),
+    });
+  });
   core.onStatusChange(render);
   render(core.status);
   core.start();
