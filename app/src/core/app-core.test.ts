@@ -1,13 +1,14 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createSummariser } from "../pipeline/summariser.js";
 import { FakeEngine } from "../testing/fake-engine.js";
 import { FakeModel } from "../testing/fake-model.js";
 import { fakePipeline, fixtureSummary, fixtureTranscript } from "../testing/fake-pipeline.js";
 import { openStore } from "../store/store.js";
-import { AppCore } from "./app-core.js";
+import { AppCore, type DetectedMeeting } from "./app-core.js";
+import { DEFAULT_DETECTION } from "./detection.js";
 
 function setup(pipelineOpts?: Parameters<typeof fakePipeline>[0]) {
   const engine = new FakeEngine();
@@ -138,6 +139,184 @@ describe("a recorded meeting", () => {
     engine.emit(tracks);
     await core.idle();
     expect(core.listMeetings()).toEqual([]);
+  });
+});
+
+describe("detecting a meeting", () => {
+  const DEBOUNCE = DEFAULT_DETECTION.debounceMs;
+  const TIMEOUT = DEFAULT_DETECTION.promptTimeoutMs;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function running() {
+    const ctx = setup();
+    ctx.core.start();
+    ctx.engine.emit({ type: "ready", version: "0.1.0" });
+    const prompts: (DetectedMeeting | undefined)[] = [];
+    ctx.core.onDetectedMeetingChange((m) => prompts.push(m));
+    const micStarted = (app: string, pid = 100) => ctx.engine.emit({ type: "mic_in_use_started", app, pid });
+    const micStopped = (app: string, pid = 100) => ctx.engine.emit({ type: "mic_in_use_stopped", app, pid });
+    return { ...ctx, prompts, micStarted, micStopped };
+  }
+
+  function prompted(app = "zoom.us") {
+    const ctx = running();
+    ctx.micStarted(app);
+    vi.advanceTimersByTime(DEBOUNCE);
+    return ctx;
+  }
+
+  it("creates a detected meeting, and shows the Prompt, once a listed app has held the microphone for the debounce", () => {
+    const { core, prompts, micStarted } = running();
+    micStarted("zoom.us");
+
+    vi.advanceTimersByTime(DEBOUNCE - 1);
+    expect(core.detectedMeeting).toBeUndefined();
+
+    vi.advanceTimersByTime(1);
+    expect(core.detectedMeeting).toMatchObject({ app: "zoom.us", state: "detected" });
+    expect(prompts).toEqual([core.detectedMeeting]);
+  });
+
+  it("matches listed apps regardless of case", () => {
+    const { core, micStarted } = running();
+    micStarted("Google Chrome");
+    vi.advanceTimersByTime(DEBOUNCE);
+    expect(core.detectedMeeting?.app).toBe("Google Chrome");
+  });
+
+  it("shows no Prompt for an app that is not listed", () => {
+    const { core, prompts, micStarted } = running();
+    micStarted("Wispr Flow");
+    vi.advanceTimersByTime(60_000);
+    expect(core.detectedMeeting).toBeUndefined();
+    expect(prompts).toEqual([]);
+  });
+
+  it("shows no Prompt when the microphone is released before the debounce is over", () => {
+    const { core, micStarted, micStopped } = running();
+    micStarted("zoom.us");
+    vi.advanceTimersByTime(DEBOUNCE - 1);
+    micStopped("zoom.us");
+    vi.advanceTimersByTime(60_000);
+    expect(core.detectedMeeting).toBeUndefined();
+  });
+
+  it("detects an app once, however many of its helper processes use the microphone", () => {
+    const { prompts, micStarted } = running();
+    micStarted("Google Chrome", 1);
+    micStarted("Google Chrome", 2);
+    vi.advanceTimersByTime(DEBOUNCE);
+    expect(prompts).toHaveLength(1);
+  });
+
+  it("keeps the app detected while any helper process still holds the microphone", () => {
+    const { core, prompts, micStarted, micStopped } = prompted("Google Chrome");
+    micStarted("Google Chrome", 2);
+    micStopped("Google Chrome", 100);
+    expect(core.detectedMeeting).toBeDefined();
+    expect(prompts).toHaveLength(1);
+  });
+
+  it("starts the Recording when the user accepts, and stores the meeting only then", () => {
+    const { core, engine } = prompted();
+    expect(core.listMeetings()).toEqual([]);
+
+    core.acceptPrompt();
+    expect(engine.commands).toContainEqual({ type: "start_recording" });
+    expect(core.detectedMeeting).toBeUndefined();
+
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    expect(core.listMeetings()).toMatchObject([{ app: "zoom.us", state: "recording" }]);
+  });
+
+  it("discards the buffered audio and stores nothing when the user says not now", () => {
+    const { core, engine, prompts } = prompted();
+    core.declinePrompt();
+
+    expect(engine.commands).toContainEqual({ type: "discard_buffer" });
+    expect(engine.commands).not.toContainEqual({ type: "start_recording" });
+    expect(core.detectedMeeting).toBeUndefined();
+    expect(prompts.at(-1)).toBeUndefined();
+    expect(core.listMeetings()).toEqual([]);
+  });
+
+  it("treats an ignored Prompt as a decline once it times out", () => {
+    const { core, engine } = prompted();
+    vi.advanceTimersByTime(TIMEOUT - 1);
+    expect(core.detectedMeeting).toBeDefined();
+
+    vi.advanceTimersByTime(1);
+    expect(core.detectedMeeting).toBeUndefined();
+    expect(engine.commands).toContainEqual({ type: "discard_buffer" });
+    expect(engine.commands).not.toContainEqual({ type: "start_recording" });
+    expect(core.listMeetings()).toEqual([]);
+  });
+
+  it("does not time out once the user has answered", () => {
+    const { engine, core } = prompted();
+    core.acceptPrompt();
+    vi.advanceTimersByTime(TIMEOUT * 2);
+    expect(engine.commands.filter((c) => c.type === "discard_buffer")).toEqual([]);
+  });
+
+  it("withdraws the Prompt, leaving nothing stored, when the app releases the microphone unanswered", () => {
+    const { core, engine, micStopped } = prompted();
+    micStopped("zoom.us");
+    expect(core.detectedMeeting).toBeUndefined();
+    expect(engine.commands).toContainEqual({ type: "discard_buffer" });
+    expect(core.listMeetings()).toEqual([]);
+  });
+
+  it("does not ask again about the same call after a decline", () => {
+    const { core, prompts, micStarted } = prompted("Google Chrome");
+    core.declinePrompt();
+    micStarted("Google Chrome", 2);
+    vi.advanceTimersByTime(DEBOUNCE);
+    expect(prompts.filter(Boolean)).toHaveLength(1);
+  });
+
+  it("asks again when the app takes the microphone for a later call", () => {
+    const { core, prompts, micStarted, micStopped } = prompted();
+    core.declinePrompt();
+    micStopped("zoom.us");
+    micStarted("zoom.us");
+    vi.advanceTimersByTime(DEBOUNCE);
+    expect(prompts.filter(Boolean)).toHaveLength(2);
+    expect(core.detectedMeeting).toBeDefined();
+  });
+
+  it("does not prompt for a second app while a Prompt is showing or a Recording is in progress", () => {
+    const { core, engine, prompts, micStarted } = prompted();
+    micStarted("Slack", 200);
+    vi.advanceTimersByTime(DEBOUNCE);
+    expect(core.detectedMeeting?.app).toBe("zoom.us");
+
+    core.acceptPrompt();
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    micStarted("FaceTime", 300);
+    vi.advanceTimersByTime(DEBOUNCE);
+    expect(prompts.filter(Boolean)).toHaveLength(1);
+  });
+
+  it("drops a pending Prompt when the engine exits", () => {
+    const { core, engine } = prompted();
+    engine.exit();
+    expect(core.detectedMeeting).toBeUndefined();
+    vi.advanceTimersByTime(TIMEOUT);
+    expect(core.listMeetings()).toEqual([]);
+  });
+
+  it("ignores accept and decline when there is no Prompt", () => {
+    const { core, engine } = running();
+    core.acceptPrompt();
+    core.declinePrompt();
+    expect(engine.commands).toEqual([]);
   });
 });
 
