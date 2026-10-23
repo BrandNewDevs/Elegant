@@ -4,6 +4,8 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { AppCore, type EngineStatus } from "../core/app-core.js";
 import { ProcessEngine } from "../engine/process-engine.js";
+import { OllamaClient } from "../pipeline/ollama.js";
+import { createSummariser } from "../pipeline/summariser.js";
 import { unimplementedPipeline } from "../pipeline/unimplemented.js";
 import { openStore } from "../store/store.js";
 import { DISPLAY_NAME } from "../config.js";
@@ -42,7 +44,11 @@ app.whenReady().then(() => {
 
   const store = openStore(join(dataDir, "meetings.db"));
   const engine = new ProcessEngine({ command: process.env.MEETING_RECORDER_ENGINE ?? devEngine });
-  core = new AppCore({ engine, store, pipeline: unimplementedPipeline });
+  core = new AppCore({
+    engine,
+    store,
+    pipeline: { ...unimplementedPipeline, summarise: createSummariser({ model: new OllamaClient() }) },
+  });
 
   meetingsWindow = new MeetingsWindow(core);
 
