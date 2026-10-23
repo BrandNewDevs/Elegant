@@ -7,7 +7,7 @@ import { FakeEngine } from "../testing/fake-engine.js";
 import { FakeModel } from "../testing/fake-model.js";
 import { fakePipeline, fixtureSummary, fixtureTranscript } from "../testing/fake-pipeline.js";
 import { openStore } from "../store/store.js";
-import { AppCore, type DetectedMeeting } from "./app-core.js";
+import { AppCore, type ActiveRecording, type DetectedMeeting } from "./app-core.js";
 import { DEFAULT_DETECTION } from "./detection.js";
 
 function setup(pipelineOpts?: Parameters<typeof fakePipeline>[0]) {
@@ -62,7 +62,7 @@ describe("engine lifecycle", () => {
 
 describe("a recorded meeting", () => {
   const startedAt = "2026-10-24T10:00:00.000Z";
-  const tracks = { type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav" } as const;
+  const tracks = { type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav", micStartHostTime: 1000.197, systemStartHostTime: 1000 } as const;
 
   function recording(pipelineOpts?: Parameters<typeof fakePipeline>[0]) {
     const ctx = setup(pipelineOpts);
@@ -139,6 +139,150 @@ describe("a recorded meeting", () => {
     engine.emit(tracks);
     await core.idle();
     expect(core.listMeetings()).toEqual([]);
+  });
+});
+
+describe("recording and stopping", () => {
+  const startedAt = "2026-10-24T10:00:00.000Z";
+  const tracks = {
+    type: "tracks_ready",
+    micPath: "/tmp/mic.wav",
+    systemPath: "/tmp/system.wav",
+    micStartHostTime: 1000.197,
+    systemStartHostTime: 1000,
+  } as const;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function recording() {
+    const ctx = setup();
+    ctx.core.start();
+    ctx.engine.emit({ type: "ready", version: "0.1.0" });
+    ctx.engine.emit({ type: "mic_in_use_started", app: "zoom.us", pid: 100 });
+    vi.advanceTimersByTime(DEFAULT_DETECTION.debounceMs);
+    ctx.core.acceptPrompt();
+    ctx.engine.emit({ type: "recording_started", app: "zoom.us", startedAt });
+    const changes: (ActiveRecording | undefined)[] = [];
+    ctx.core.onRecordingChange((r) => changes.push(r));
+    const stopsSent = () => ctx.engine.commands.filter((c) => c.type === "stop_recording").length;
+    return { ...ctx, changes, stopsSent };
+  }
+
+  it("reports the Recording, with when it started, from the moment the engine starts it", () => {
+    const { core } = recording();
+    expect(core.recording).toEqual({ app: "zoom.us", startedAt });
+  });
+
+  it("tells listeners when the Recording starts and ends", () => {
+    const ctx = setup();
+    ctx.core.start();
+    const changes: (ActiveRecording | undefined)[] = [];
+    ctx.core.onRecordingChange((r) => changes.push(r));
+
+    ctx.engine.emit({ type: "recording_started", app: "zoom.us", startedAt });
+    ctx.core.stopRecording();
+    expect(changes).toEqual([{ app: "zoom.us", startedAt }, undefined]);
+  });
+
+  it("asks the engine to stop when the user presses Stop, and stops showing the Recording", () => {
+    const { core, engine, stopsSent } = recording();
+    core.stopRecording();
+
+    expect(engine.commands.at(-1)).toEqual({ type: "stop_recording" });
+    expect(stopsSent()).toBe(1);
+    expect(core.recording).toBeUndefined();
+  });
+
+  it("asks the engine to stop only once, however often Stop is pressed", () => {
+    const { core, stopsSent } = recording();
+    core.stopRecording();
+    core.stopRecording();
+    expect(stopsSent()).toBe(1);
+  });
+
+  it("ignores Stop when nothing is being recorded", () => {
+    const { core, engine } = setup();
+    core.stopRecording();
+    expect(engine.commands).toEqual([]);
+  });
+
+  it("moves the Meeting to processing with the tracks available once the engine hands them over", async () => {
+    const { core, engine } = recording();
+    core.stopRecording();
+    expect(core.listMeetings()[0]!.state).toBe("recording");
+
+    engine.emit(tracks);
+    expect(core.listMeetings()[0]!.state).toBe("processing");
+    await core.idle();
+    expect(core.listMeetings()[0]!.state).toBe("done");
+  });
+
+  it("hands the pipeline the aligned tracks", async () => {
+    const transcribed: unknown[] = [];
+    const engine = new FakeEngine();
+    const pipeline = fakePipeline();
+    const core = new AppCore({
+      engine,
+      store: openStore(":memory:"),
+      pipeline: { ...pipeline, transcribe: (t) => (transcribed.push(t), pipeline.transcribe(t)) },
+    });
+    core.start();
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt });
+    core.stopRecording();
+    engine.emit(tracks);
+    await core.idle();
+
+    expect(transcribed).toEqual([{ micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav" }]);
+  });
+
+  it("is not ended by the call app releasing the microphone", () => {
+    const { core, engine, stopsSent } = recording();
+    engine.emit({ type: "mic_in_use_stopped", app: "zoom.us", pid: 100 });
+    vi.advanceTimersByTime(60 * 60_000);
+
+    expect(stopsSent()).toBe(0);
+    expect(core.recording).toBeDefined();
+    expect(core.listMeetings()[0]!.state).toBe("recording");
+  });
+
+  it("is not ended by time passing, the Prompt timing out, or another app using the microphone", () => {
+    const { core, engine, stopsSent } = recording();
+    engine.emit({ type: "mic_in_use_started", app: "Slack", pid: 200 });
+    vi.advanceTimersByTime(DEFAULT_DETECTION.promptTimeoutMs + DEFAULT_DETECTION.debounceMs);
+    core.declinePrompt();
+    core.acceptPrompt();
+    vi.advanceTimersByTime(8 * 60 * 60_000);
+
+    expect(engine.commands.map((c) => c.type)).not.toContain("stop_recording");
+    expect(stopsSent()).toBe(0);
+    expect(core.recording).toBeDefined();
+    expect(core.listMeetings()[0]!.state).toBe("recording");
+  });
+
+  it("marks the Meeting failed, with the reason, when the engine reports the Recording cannot finish", () => {
+    const { core, engine } = recording();
+    core.stopRecording();
+    engine.emit({ type: "recording_failed", message: "the system audio track stopped" });
+
+    expect(core.getMeeting(core.listMeetings()[0]!.id)).toMatchObject({
+      state: "failed",
+      error: "the system audio track stopped",
+    });
+  });
+
+  it("stops showing a Recording the engine reports failed, and the engine exiting ends it too", () => {
+    const first = recording();
+    first.engine.emit({ type: "recording_failed", message: "no microphone" });
+    expect(first.core.recording).toBeUndefined();
+
+    const second = recording();
+    second.engine.exit();
+    expect(second.core.recording).toBeUndefined();
   });
 });
 
@@ -228,7 +372,7 @@ describe("detecting a meeting", () => {
     expect(core.listMeetings()).toEqual([]);
 
     core.acceptPrompt();
-    expect(engine.commands).toContainEqual({ type: "start_recording" });
+    expect(engine.commands).toContainEqual({ type: "start_recording", app: "zoom.us" });
     expect(core.detectedMeeting).toBeUndefined();
 
     engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
@@ -240,7 +384,7 @@ describe("detecting a meeting", () => {
     core.declinePrompt();
 
     expect(engine.commands).toContainEqual({ type: "discard_buffer" });
-    expect(engine.commands).not.toContainEqual({ type: "start_recording" });
+    expect(engine.commands).not.toContainEqual({ type: "start_recording", app: "zoom.us" });
     expect(core.detectedMeeting).toBeUndefined();
     expect(prompts.at(-1)).toBeUndefined();
     expect(core.listMeetings()).toEqual([]);
@@ -254,7 +398,7 @@ describe("detecting a meeting", () => {
     vi.advanceTimersByTime(1);
     expect(core.detectedMeeting).toBeUndefined();
     expect(engine.commands).toContainEqual({ type: "discard_buffer" });
-    expect(engine.commands).not.toContainEqual({ type: "start_recording" });
+    expect(engine.commands).not.toContainEqual({ type: "start_recording", app: "zoom.us" });
     expect(core.listMeetings()).toEqual([]);
   });
 
@@ -321,7 +465,7 @@ describe("detecting a meeting", () => {
 });
 
 describe("what the Meetings window sees", () => {
-  const tracks = { type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav" } as const;
+  const tracks = { type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav", micStartHostTime: 1000.197, systemStartHostTime: 1000 } as const;
 
   function started() {
     const ctx = setup();
@@ -427,7 +571,7 @@ describe("persistence", () => {
     core1.start();
     first.emit({ type: "ready", version: "0.1.0" });
     first.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
-    first.emit({ type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav" });
+    first.emit({ type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav", micStartHostTime: 1000.197, systemStartHostTime: 1000 });
     await core1.idle();
     store1.close();
 
@@ -441,7 +585,7 @@ describe("persistence", () => {
 });
 
 describe("summarising with a language model", () => {
-  const tracks = { type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav" } as const;
+  const tracks = { type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav", micStartHostTime: 1000.197, systemStartHostTime: 1000 } as const;
 
   const goodReply = {
     tldr: "Ship the skeleton first.",

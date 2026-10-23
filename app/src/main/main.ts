@@ -2,7 +2,8 @@ import { app, Menu, nativeImage, Tray } from "electron";
 import { fileURLToPath } from "node:url";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { AppCore, type EngineStatus } from "../core/app-core.js";
+import { AppCore } from "../core/app-core.js";
+import { formatElapsed } from "../core/elapsed.js";
 import { ProcessEngine } from "../engine/process-engine.js";
 import { OllamaClient } from "../pipeline/ollama.js";
 import { createSummariser } from "../pipeline/summariser.js";
@@ -13,6 +14,8 @@ import { showPrompt } from "./prompt-window.js";
 import { MeetingsWindow } from "./meetings-window.js";
 import { STATUS_LABEL } from "./status-label.js";
 
+const RECORDING_SYMBOL = "⏺";
+
 // Dev location of the engine built by `pnpm run build:engine`. Packaging will change this.
 const devEngine = fileURLToPath(new URL("../../../engine/.build/release/engine", import.meta.url));
 
@@ -21,20 +24,29 @@ let core: AppCore | undefined;
 let prompt: { close(): void } | undefined;
 let meetingsWindow: MeetingsWindow | undefined;
 
-function render(status: EngineStatus): void {
-  if (!tray) return;
-  const { symbol, text } = STATUS_LABEL[status];
-  tray.setTitle(symbol);
-  tray.setToolTip(`${DISPLAY_NAME}: ${text}`);
+let elapsedTimer: ReturnType<typeof setInterval> | undefined;
+
+function render(): void {
+  if (!tray || !core) return;
+  const { symbol, text } = STATUS_LABEL[core.status];
+  const recording = core.recording;
+  const elapsed = recording ? formatElapsed(recording.startedAt) : undefined;
+  tray.setTitle(recording ? `${RECORDING_SYMBOL} ${elapsed}` : symbol);
+  tray.setToolTip(recording ? `${DISPLAY_NAME}: recording ${recording.app}, ${elapsed}` : `${DISPLAY_NAME}: ${text}`);
   tray.setContextMenu(
     Menu.buildFromTemplate([
+      ...(recording
+        ? [
+            { label: `Recording ${recording.app}: ${elapsed}`, enabled: false },
+            { label: "Stop recording", click: () => core?.stopRecording() },
+          ]
+        : []),
       { label: text, enabled: false },
       { type: "separator" },
       { label: "Meetings…", click: () => meetingsWindow?.show() },
       { label: `Quit ${DISPLAY_NAME}`, role: "quit" },
     ]),
   );
-  console.log(`[status] ${status}`);
 }
 
 app.whenReady().then(() => {
@@ -63,8 +75,17 @@ app.whenReady().then(() => {
       notNow: () => core!.declinePrompt(),
     });
   });
-  core.onStatusChange(render);
-  render(core.status);
+  core.onStatusChange((status) => {
+    console.log(`[status] ${status}`);
+    render();
+  });
+  core.onRecordingChange((recording) => {
+    clearInterval(elapsedTimer);
+    // The tray shows elapsed seconds, so it redraws every second for as long as the Recording runs.
+    elapsedTimer = recording ? setInterval(render, 1000) : undefined;
+    render();
+  });
+  render();
   core.start();
 
   let quitting = false;

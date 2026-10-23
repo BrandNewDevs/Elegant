@@ -20,6 +20,12 @@ export interface DetectedMeeting {
   detectedAt: string;
 }
 
+/** The Recording in progress, until the user presses Stop. */
+export interface ActiveRecording {
+  app: string;
+  startedAt: string;
+}
+
 /** Owns the Meeting lifecycle: reacts to what the engine reports and drives the pipeline and the store. */
 export class AppCore {
   private _status: EngineStatus = "stopped";
@@ -34,6 +40,8 @@ export class AppCore {
   private promptTimer: ReturnType<typeof setTimeout> | undefined;
   private _detectedMeeting: DetectedMeeting | undefined;
   private detectedListeners: ((meeting: DetectedMeeting | undefined) => void)[] = [];
+  private _recording: ActiveRecording | undefined;
+  private recordingListeners: ((recording: ActiveRecording | undefined) => void)[] = [];
 
   private readonly store: Store;
 
@@ -62,14 +70,19 @@ export class AppCore {
         case "recording_started":
           this.abandonRecording("the recording was interrupted by a new one");
           this.recordingMeetingId = this.store.createMeeting({ app: event.app, startedAt: event.startedAt });
+          this.setRecording({ app: event.app, startedAt: event.startedAt });
           break;
         case "tracks_ready": {
           const id = this.recordingMeetingId;
           if (id === undefined) break;
           this.recordingMeetingId = undefined;
+          this.setRecording(undefined);
           this.track(this.runner.run(id, { micPath: event.micPath, systemPath: event.systemPath }));
           break;
         }
+        case "recording_failed":
+          this.abandonRecording(event.message);
+          break;
       }
     });
     deps.engine.onExit(() => {
@@ -99,14 +112,31 @@ export class AppCore {
 
   /** The user chose Record. */
   acceptPrompt(): void {
-    if (!this.clearDetectedMeeting()) return;
-    this.deps.engine.send({ type: "start_recording" });
+    const meeting = this._detectedMeeting;
+    if (!meeting || !this.clearDetectedMeeting()) return;
+    this.deps.engine.send({ type: "start_recording", app: meeting.app });
   }
 
   /** The user chose Not now, the Prompt timed out, or the call ended. Nothing about the Meeting is kept. */
   declinePrompt(): void {
     if (!this.clearDetectedMeeting()) return;
     this.deps.engine.send({ type: "discard_buffer" });
+  }
+
+  /** The Recording in progress, if any. It ends when the user presses Stop, and at no other time. */
+  get recording(): ActiveRecording | undefined {
+    return this._recording;
+  }
+
+  onRecordingChange(listener: (recording: ActiveRecording | undefined) => void): void {
+    this.recordingListeners.push(listener);
+  }
+
+  /** The user pressed Stop. The engine answers with the finished tracks. */
+  stopRecording(): void {
+    if (!this._recording) return;
+    this.setRecording(undefined);
+    this.deps.engine.send({ type: "stop_recording" });
   }
 
   /** Called whenever a Meeting appears or changes state, so a window can refresh. */
@@ -178,6 +208,7 @@ export class AppCore {
 
   /** A Recording that can no longer finish is marked failed, so no Meeting is left stuck as recording. */
   private abandonRecording(reason: string): void {
+    this.setRecording(undefined);
     const id = this.recordingMeetingId;
     if (id === undefined) return;
     this.recordingMeetingId = undefined;
@@ -207,6 +238,12 @@ export class AppCore {
         notify();
       },
     };
+  }
+
+  private setRecording(recording: ActiveRecording | undefined): void {
+    if (!this._recording && !recording) return;
+    this._recording = recording;
+    for (const l of this.recordingListeners) l(recording);
   }
 
   private setStatus(status: EngineStatus): void {

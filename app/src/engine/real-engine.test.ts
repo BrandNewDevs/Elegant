@@ -9,7 +9,7 @@ import type { EngineEvent, EngineExit } from "./protocol.js";
 const engineBinary = fileURLToPath(new URL("../../../engine/.build/release/engine", import.meta.url));
 
 describe("the real Swift engine", () => {
-  it("reports ready, rejects commands it does not support yet, and exits on shutdown", async () => {
+  it("reports ready, refuses to stop a recording that never started, and exits on shutdown", async () => {
     expect(existsSync(engineBinary), `engine not built; run: pnpm run build:engine`).toBe(true);
 
     const engine = new ProcessEngine({ command: engineBinary });
@@ -24,7 +24,7 @@ describe("the real Swift engine", () => {
 
     engine.send({ type: "stop_recording" });
     await until(() => events.length >= 2);
-    expect(events[1]).toMatchObject({ type: "error", message: expect.stringContaining("stop_recording") });
+    expect(events[1]).toMatchObject({ type: "error", message: expect.stringContaining("no recording is in progress") });
 
     await engine.stop();
     expect(exits).toEqual([{ code: 0, signal: null }]);
