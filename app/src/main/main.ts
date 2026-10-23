@@ -7,6 +7,7 @@ import { ProcessEngine } from "../engine/process-engine.js";
 import { unimplementedPipeline } from "../pipeline/unimplemented.js";
 import { openStore } from "../store/store.js";
 import { DISPLAY_NAME } from "../config.js";
+import { showPrompt } from "./prompt-window.js";
 import { MeetingsWindow } from "./meetings-window.js";
 import { STATUS_LABEL } from "./status-label.js";
 
@@ -15,6 +16,7 @@ const devEngine = fileURLToPath(new URL("../../../engine/.build/release/engine",
 
 let tray: Tray | undefined;
 let core: AppCore | undefined;
+let prompt: { close(): void } | undefined;
 let meetingsWindow: MeetingsWindow | undefined;
 
 function render(status: EngineStatus): void {
@@ -45,6 +47,16 @@ app.whenReady().then(() => {
   meetingsWindow = new MeetingsWindow(core);
 
   tray = new Tray(nativeImage.createEmpty());
+  core.onDetectedMeetingChange((meeting) => {
+    prompt?.close(); // the Meeting was answered, timed out or ended; the old overlay is stale
+    prompt = undefined;
+    if (!meeting) return;
+    console.log(`[detection] ${meeting.app}`);
+    prompt = showPrompt(meeting.app, {
+      record: () => core!.acceptPrompt(),
+      notNow: () => core!.declinePrompt(),
+    });
+  });
   core.onStatusChange(render);
   render(core.status);
   core.start();
