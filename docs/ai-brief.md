@@ -29,7 +29,7 @@ They are separate so Summarisation can be developed without any audio. The contr
 
 ### Stage 1: audio to Transcript
 
-Input: two WAV files, 16 kHz mono, starting at the same instant and the same length.
+Input: two WAV files, 16 kHz mono, starting at the same instant and the same length. The capture engine aligns the raw tracks by host time before handing them over (they start about 0.2 s apart as recorded), so you can treat them as already aligned.
 - `mic.wav`: you.
 - `system.wav`: everyone else, as one blended track.
 
