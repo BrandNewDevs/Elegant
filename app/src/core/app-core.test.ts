@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FakeEngine } from "../testing/fake-engine.js";
 import { fakePipeline, fixtureSummary, fixtureTranscript } from "../testing/fake-pipeline.js";
 import { openStore } from "../store/store.js";
@@ -136,6 +136,96 @@ describe("a recorded meeting", () => {
     engine.emit(tracks);
     await core.idle();
     expect(core.listMeetings()).toEqual([]);
+  });
+});
+
+describe("what the Meetings window sees", () => {
+  const tracks = { type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav" } as const;
+
+  function started() {
+    const ctx = setup();
+    ctx.core.start();
+    ctx.engine.emit({ type: "ready", version: "0.1.0" });
+    return ctx;
+  }
+
+  it("is told when a Meeting appears and each time its state changes", async () => {
+    const { engine, core } = started();
+    const seen: string[] = [];
+    core.onMeetingsChanged(() => seen.push(core.listMeetings()[0]?.state ?? "none"));
+
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    engine.emit(tracks);
+    await core.idle();
+
+    expect(seen).toEqual(["recording", "processing", "done"]);
+  });
+
+  it("keeps recording state changes even if a listener throws", async () => {
+    const { engine, core } = started();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    core.onMeetingsChanged(() => {
+      throw new Error("window is gone");
+    });
+
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    engine.emit(tracks);
+    await core.idle();
+
+    expect(core.listMeetings()[0]!.state).toBe("done");
+  });
+
+  it("is told when a Meeting fails, with the reason available", async () => {
+    const ctx = setup({ failTranscribe: "model missing" });
+    ctx.core.start();
+    ctx.engine.emit({ type: "ready", version: "0.1.0" });
+    let changes = 0;
+    ctx.core.onMeetingsChanged(() => changes++);
+
+    ctx.engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    ctx.engine.emit(tracks);
+    await ctx.core.idle();
+
+    expect(changes).toBe(3);
+    expect(ctx.core.getMeeting(ctx.core.listMeetings()[0]!.id)).toMatchObject({
+      state: "failed",
+      error: "model missing",
+    });
+  });
+
+  it("does not store a Meeting when the microphone was used but no Recording was started", () => {
+    const { engine, core } = started();
+    let changes = 0;
+    core.onMeetingsChanged(() => changes++);
+
+    engine.emit({ type: "mic_in_use_started", app: "zoom.us", pid: 4242 });
+    engine.emit({ type: "mic_in_use_stopped", app: "zoom.us", pid: 4242 });
+
+    expect(core.listMeetings()).toEqual([]);
+    expect(changes).toBe(0);
+  });
+
+  it("shows stored Meetings of every state, newest first, including ones from before this run", () => {
+    const store = openStore(":memory:");
+    const older = store.createMeeting({ app: "Slack", startedAt: "2026-10-23T09:00:00.000Z" });
+    store.saveTranscript(older, fixtureTranscript);
+    store.saveSummary(older, fixtureSummary);
+    store.setMeetingState(older, "done");
+    const middle = store.createMeeting({ app: "Teams", startedAt: "2026-10-24T09:00:00.000Z" });
+    store.setMeetingState(middle, "failed", "ollama is not running");
+    const newest = store.createMeeting({ app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    store.setMeetingState(newest, "processing");
+    const core = new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() });
+
+    expect(core.listMeetings().map((m) => [m.app, m.state])).toEqual([
+      ["zoom.us", "processing"],
+      ["Teams", "failed"],
+      ["Slack", "done"],
+    ]);
+    expect(core.getMeeting(older)).toMatchObject({
+      transcript: fixtureTranscript,
+      summary: fixtureSummary,
+    });
   });
 });
 

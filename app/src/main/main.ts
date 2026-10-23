@@ -7,6 +7,7 @@ import { ProcessEngine } from "../engine/process-engine.js";
 import { unimplementedPipeline } from "../pipeline/unimplemented.js";
 import { openStore } from "../store/store.js";
 import { DISPLAY_NAME } from "../config.js";
+import { MeetingsWindow } from "./meetings-window.js";
 import { STATUS_LABEL } from "./status-label.js";
 
 // Dev location of the engine built by `pnpm run build:engine`. Packaging will change this.
@@ -14,6 +15,7 @@ const devEngine = fileURLToPath(new URL("../../../engine/.build/release/engine",
 
 let tray: Tray | undefined;
 let core: AppCore | undefined;
+let meetingsWindow: MeetingsWindow | undefined;
 
 function render(status: EngineStatus): void {
   if (!tray) return;
@@ -24,6 +26,7 @@ function render(status: EngineStatus): void {
     Menu.buildFromTemplate([
       { label: text, enabled: false },
       { type: "separator" },
+      { label: "Meetings…", click: () => meetingsWindow?.show() },
       { label: `Quit ${DISPLAY_NAME}`, role: "quit" },
     ]),
   );
@@ -38,6 +41,8 @@ app.whenReady().then(() => {
   const store = openStore(join(dataDir, "meetings.db"));
   const engine = new ProcessEngine({ command: process.env.MEETING_RECORDER_ENGINE ?? devEngine });
   core = new AppCore({ engine, store, pipeline: unimplementedPipeline });
+
+  meetingsWindow = new MeetingsWindow(core);
 
   tray = new Tray(nativeImage.createEmpty());
   core.onStatusChange(render);
@@ -56,5 +61,5 @@ app.whenReady().then(() => {
   });
 });
 
-// No windows yet; the app lives in the menu bar until the user quits.
+// The app lives in the menu bar until the user quits, even with the Meetings window closed.
 app.on("window-all-closed", () => {});
