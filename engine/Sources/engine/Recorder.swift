@@ -36,6 +36,9 @@ final class TrackWriter {
 
     func append(_ buffer: AVAudioPCMBuffer, hostTime: UInt64) {
         guard failure == nil, buffer.frameLength > 0 else { return }
+        // Taken from the first buffer received, not the first one converted: the sample-rate converter can hold back its
+        // first output, and that must not push the track's start time later.
+        if firstSampleHostSeconds == nil { firstSampleHostSeconds = hostSeconds(hostTime) }
         if converter == nil { converter = AVAudioConverter(from: buffer.format, to: target) }
         guard let converter else { failure = "cannot convert \(buffer.format) to 16 kHz mono"; return }
         let capacity = AVAudioFrameCount(Double(buffer.frameLength) * target.sampleRate / buffer.format.sampleRate) + 64
@@ -50,7 +53,6 @@ final class TrackWriter {
         }
         if let error { failure = error.localizedDescription; return }
         guard out.frameLength > 0, let samples = out.int16ChannelData?[0] else { return }
-        if firstSampleHostSeconds == nil { firstSampleHostSeconds = hostSeconds(hostTime) }
         let data = Data(bytes: samples, count: Int(out.frameLength) * 2)
         do {
             try handle.write(contentsOf: data)

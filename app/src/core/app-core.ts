@@ -113,7 +113,8 @@ export class AppCore {
   /** The user chose Record. */
   acceptPrompt(): void {
     const meeting = this._detectedMeeting;
-    if (!meeting || !this.clearDetectedMeeting()) return;
+    if (!meeting) return;
+    this.clearDetectedMeeting();
     this.deps.engine.send({ type: "start_recording", app: meeting.app });
   }
 
