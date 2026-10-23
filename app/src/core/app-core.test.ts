@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FakeEngine } from "../testing/fake-engine.js";
 import { fakePipeline, fixtureSummary, fixtureTranscript } from "../testing/fake-pipeline.js";
 import { openStore } from "../store/store.js";
@@ -161,6 +161,20 @@ describe("what the Meetings window sees", () => {
     expect(seen).toEqual(["recording", "processing", "done"]);
   });
 
+  it("keeps recording state changes even if a listener throws", async () => {
+    const { engine, core } = started();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    core.onMeetingsChanged(() => {
+      throw new Error("window is gone");
+    });
+
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    engine.emit(tracks);
+    await core.idle();
+
+    expect(core.listMeetings()[0]!.state).toBe("done");
+  });
+
   it("is told when a Meeting fails, with the reason available", async () => {
     const ctx = setup({ failTranscribe: "model missing" });
     ctx.core.start();
@@ -179,7 +193,7 @@ describe("what the Meetings window sees", () => {
     });
   });
 
-  it("never shows a Meeting whose Recording was declined", () => {
+  it("does not store a Meeting when the microphone was used but no Recording was started", () => {
     const { engine, core } = started();
     let changes = 0;
     core.onMeetingsChanged(() => changes++);

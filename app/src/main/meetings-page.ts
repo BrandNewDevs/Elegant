@@ -10,6 +10,14 @@ const STATE_TEXT: Record<MeetingState, string> = {
   failed: "Failed",
 };
 
+/** Links in the page select a Meeting; the window reads them back with `meetingIdFromLink`. */
+const meetingLink = (id: number): string => `meeting:${id}`;
+
+export function meetingIdFromLink(url: string): number | undefined {
+  const match = /^meeting:(\d+)$/.exec(url);
+  return match ? Number(match[1]) : undefined;
+}
+
 const clock = (seconds: number): string => {
   const s = Math.floor(seconds);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -19,7 +27,7 @@ const when = (iso: string): string => new Date(iso).toLocaleString();
 
 function listItem(m: MeetingListItem, selectedId: number | undefined): string {
   const selected = m.id === selectedId ? " selected" : "";
-  return `<li><a class="item${selected}" href="meeting:${m.id}">
+  return `<li><a class="item${selected}" href="${meetingLink(m.id)}">
     <span class="app">${esc(m.app)}</span>
     <span class="when">${esc(when(m.startedAt))}</span>
     <span class="state ${m.state}">${STATE_TEXT[m.state]}</span>
@@ -31,13 +39,13 @@ function detail(m: Meeting): string {
   let body: string;
   switch (m.state) {
     case "recording":
-      body = `<p class="banner recording">This Meeting is being recorded.</p>`;
+      body = `<p class="notice recording">This Meeting is being recorded.</p>`;
       break;
     case "processing":
-      body = `<p class="banner processing">Transcribing and summarising this Meeting…</p>`;
+      body = `<p class="notice processing">Transcribing and summarising this Meeting…</p>`;
       break;
     case "failed":
-      body = `<p class="banner failed">Processing failed: ${esc(m.error ?? "unknown error")}</p>`;
+      body = `<p class="notice failed">Processing failed: ${esc(m.error ?? "unknown error")}</p>`;
       break;
     case "done":
       body = "";
@@ -72,15 +80,15 @@ const STYLE = `
   .state { font-size: 11px; }
   .state.failed { color: #c4001a; }
   .state.recording, .state.processing { color: #b25f00; }
-  .banner { padding: 8px 12px; border-radius: 6px; }
-  .banner.failed { background: #ffe5e8; color: #c4001a; }
-  .banner.recording, .banner.processing { background: #fff1d6; color: #7a4500; }
+  .notice { padding: 8px 12px; border-radius: 6px; }
+  .notice.failed { background: #ffe5e8; color: #c4001a; }
+  .notice.recording, .notice.processing { background: #fff1d6; color: #7a4500; }
   .segment { margin: 4px 0; }
   .time { color: #6e6e73; font-variant-numeric: tabular-nums; }
   .empty { color: #6e6e73; padding: 16px; }
 `;
 
-/** The whole Meetings window as one HTML page. Links of the form `meeting:<id>` select a Meeting. */
+/** The whole Meetings window as one HTML page. */
 export function renderMeetingsPage(meetings: MeetingListItem[], selected: Meeting | undefined): string {
   const list = meetings.length
     ? `<ul class="meetings">${meetings.map((m) => listItem(m, selected?.id)).join("")}</ul>`

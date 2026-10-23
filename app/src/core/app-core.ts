@@ -101,7 +101,14 @@ export class AppCore {
 
   private notifyingStore(store: Store): Store {
     const notify = () => {
-      for (const l of this.meetingsListeners) l();
+      for (const listener of this.meetingsListeners) {
+        // A broken window must not stop a Meeting's state from being recorded.
+        try {
+          listener();
+        } catch (err) {
+          console.error("[meetings] listener failed", err);
+        }
+      }
     };
     return {
       ...store,
