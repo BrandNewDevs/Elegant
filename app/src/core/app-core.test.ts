@@ -2,7 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { createSummariser } from "../pipeline/summariser.js";
 import { FakeEngine } from "../testing/fake-engine.js";
+import { FakeModel } from "../testing/fake-model.js";
 import { fakePipeline, fixtureSummary, fixtureTranscript } from "../testing/fake-pipeline.js";
 import { openStore } from "../store/store.js";
 import { AppCore } from "./app-core.js";
@@ -166,5 +168,81 @@ describe("persistence", () => {
     expect(meeting).toMatchObject({ app: "zoom.us", state: "done" });
     expect(core2.getMeeting(meeting!.id)!.summary).toEqual(fixtureSummary);
     store2.close();
+  });
+});
+
+describe("summarising with a language model", () => {
+  const tracks = { type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav" } as const;
+
+  const goodReply = {
+    tldr: "Ship the skeleton first.",
+    participants: [{ speaker: "You", said: ["Ship the walking skeleton first."] }],
+  };
+
+  /** A model that fails until `recover()` is called. */
+  function flakyModel() {
+    let up = false;
+    const model = new FakeModel(() => {
+      if (!up) throw new Error("Ollama is not running at http://127.0.0.1:11434");
+      return goodReply;
+    });
+    return { model, recover: () => (up = true) };
+  }
+
+  function recordedWith(model: FakeModel) {
+    const engine = new FakeEngine();
+    const store = openStore(":memory:");
+    const pipeline = { transcribe: fakePipeline().transcribe, summarise: createSummariser({ model }) };
+    const core = new AppCore({ engine, store, pipeline });
+    core.start();
+    engine.emit({ type: "ready", version: "0.1.0" });
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    engine.emit(tracks);
+    return core;
+  }
+
+  it("stores the Summary against its Meeting", async () => {
+    const core = recordedWith(new FakeModel(() => goodReply));
+    await core.idle();
+    expect(core.getMeeting(core.listMeetings()[0]!.id)).toMatchObject({ state: "done", summary: goodReply });
+  });
+
+  it("marks the Meeting failed, keeping its Transcript, when the model is unavailable", async () => {
+    const { model } = flakyModel();
+    const core = recordedWith(model);
+    await core.idle();
+
+    const meeting = core.getMeeting(core.listMeetings()[0]!.id)!;
+    expect(meeting).toMatchObject({ state: "failed", error: "Ollama is not running at http://127.0.0.1:11434", summary: null });
+    expect(meeting.transcript.segments).toEqual(fixtureTranscript.segments);
+  });
+
+  it("can be retried from the stored Transcript once the model is back", async () => {
+    const { model, recover } = flakyModel();
+    const core = recordedWith(model);
+    await core.idle();
+    const id = core.listMeetings()[0]!.id;
+
+    recover();
+    await core.retrySummary(id);
+
+    expect(core.getMeeting(id)).toMatchObject({ state: "done", error: null, summary: goodReply });
+  });
+
+  it("fails again, still retryable, when the retry meets the same problem", async () => {
+    const { model } = flakyModel();
+    const core = recordedWith(model);
+    await core.idle();
+    const id = core.listMeetings()[0]!.id;
+
+    await core.retrySummary(id);
+    expect(core.getMeeting(id)!.state).toBe("failed");
+  });
+
+  it("refuses to retry a Meeting that did not fail or has no Transcript", async () => {
+    const core = recordedWith(new FakeModel(() => goodReply));
+    await core.idle();
+    await expect(core.retrySummary(core.listMeetings()[0]!.id)).rejects.toThrow(/failed/);
+    await expect(core.retrySummary(999)).rejects.toThrow(/no such Meeting/);
   });
 });

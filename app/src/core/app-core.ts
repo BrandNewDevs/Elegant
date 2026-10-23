@@ -35,9 +35,7 @@ export class AppCore {
           const id = this.recordingMeetingId;
           if (id === undefined) break;
           this.recordingMeetingId = undefined;
-          const job = this.runner.run(id, { micPath: event.micPath, systemPath: event.systemPath });
-          this.inFlight.add(job);
-          void job.finally(() => this.inFlight.delete(job));
+          this.track(this.runner.run(id, { micPath: event.micPath, systemPath: event.systemPath }));
           break;
         }
       }
@@ -64,6 +62,15 @@ export class AppCore {
     return this.deps.store.getMeeting(id);
   }
 
+  /** Summarises a failed Meeting again from its stored Transcript, e.g. once Ollama is running. */
+  async retrySummary(id: number): Promise<void> {
+    const meeting = this.deps.store.getMeeting(id);
+    if (!meeting) throw new Error(`no such Meeting: ${id}`);
+    if (meeting.state !== "failed") throw new Error(`only a failed Meeting can be retried, and this one is ${meeting.state}`);
+    if (meeting.transcript.segments.length === 0) throw new Error("this Meeting has no Transcript to summarise");
+    await this.track(this.runner.resummarise(id, meeting.transcript));
+  }
+
   /** Resolves when no Recording is being processed. */
   async idle(): Promise<void> {
     while (this.inFlight.size > 0) await Promise.all([...this.inFlight]);
@@ -80,6 +87,12 @@ export class AppCore {
     this.deps.engine.send({ type: "shutdown" });
     await this.deps.engine.stop();
     this.setStatus("stopped");
+  }
+
+  private track(job: Promise<void>): Promise<void> {
+    this.inFlight.add(job);
+    void job.finally(() => this.inFlight.delete(job));
+    return job;
   }
 
   /** A Recording that can no longer finish is marked failed, so no Meeting is left stuck as recording. */
