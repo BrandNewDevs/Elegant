@@ -16,12 +16,16 @@ export class AppCore {
   private _status: EngineStatus = "stopped";
   private stopping = false;
   private statusListeners: ((status: EngineStatus) => void)[] = [];
+  private meetingsListeners: (() => void)[] = [];
   private readonly runner: PipelineRunner;
   private recordingMeetingId: number | undefined;
   private readonly inFlight = new Set<Promise<void>>();
 
+  private readonly store: Store;
+
   constructor(private readonly deps: AppCoreDeps) {
-    this.runner = new PipelineRunner(deps.pipeline, deps.store);
+    this.store = this.notifyingStore(deps.store);
+    this.runner = new PipelineRunner(deps.pipeline, this.store);
     deps.engine.onEvent((event) => {
       switch (event.type) {
         case "ready":
@@ -29,7 +33,7 @@ export class AppCore {
           break;
         case "recording_started":
           this.abandonRecording("the recording was interrupted by a new one");
-          this.recordingMeetingId = deps.store.createMeeting({ app: event.app, startedAt: event.startedAt });
+          this.recordingMeetingId = this.store.createMeeting({ app: event.app, startedAt: event.startedAt });
           break;
         case "tracks_ready": {
           const id = this.recordingMeetingId;
@@ -56,12 +60,17 @@ export class AppCore {
     this.statusListeners.push(listener);
   }
 
+  /** Called whenever a Meeting appears or changes state, so a window can refresh. */
+  onMeetingsChanged(listener: () => void): void {
+    this.meetingsListeners.push(listener);
+  }
+
   listMeetings(): MeetingListItem[] {
-    return this.deps.store.listMeetings();
+    return this.store.listMeetings();
   }
 
   getMeeting(id: number): Meeting | undefined {
-    return this.deps.store.getMeeting(id);
+    return this.store.getMeeting(id);
   }
 
   /** Resolves when no Recording is being processed. */
@@ -87,7 +96,25 @@ export class AppCore {
     const id = this.recordingMeetingId;
     if (id === undefined) return;
     this.recordingMeetingId = undefined;
-    this.deps.store.setMeetingState(id, "failed", reason);
+    this.store.setMeetingState(id, "failed", reason);
+  }
+
+  private notifyingStore(store: Store): Store {
+    const notify = () => {
+      for (const l of this.meetingsListeners) l();
+    };
+    return {
+      ...store,
+      createMeeting: (input) => {
+        const id = store.createMeeting(input);
+        notify();
+        return id;
+      },
+      setMeetingState: (id, state, error) => {
+        store.setMeetingState(id, state, error);
+        notify();
+      },
+    };
   }
 
   private setStatus(status: EngineStatus): void {
