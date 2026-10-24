@@ -107,8 +107,11 @@ final class Recorder {
     /// Stops both captures and writes the aligned tracks.
     func finish() throws -> FinishedRecording {
         teardown()
+        var wrote = false
         defer {
             for name in ["mic.raw", "system.raw"] { try? FileManager.default.removeItem(at: directory.appendingPathComponent(name)) }
+            // A failed Recording leaves nothing behind.
+            if !wrote { try? FileManager.default.removeItem(at: directory) }
         }
         let micTrack = mic.finish()
         let systemTrack = system.finish()
@@ -119,6 +122,7 @@ final class Recorder {
         let micOut = directory.appendingPathComponent("mic.wav")
         let systemOut = directory.appendingPathComponent("system.wav")
         _ = try writeAligned(mic: micTrack, system: systemTrack, micOut: micOut, systemOut: systemOut)
+        wrote = true
         return FinishedRecording(
             micPath: micOut.path,
             systemPath: systemOut.path,

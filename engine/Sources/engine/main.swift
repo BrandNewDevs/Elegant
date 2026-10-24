@@ -41,13 +41,13 @@ func startRecording(app: String) {
         recorder = try Recorder()
         send(["type": "recording_started", "app": app, "startedAt": isoFormatter.string(from: Date())])
     } catch {
-        send(["type": "error", "message": "cannot start recording: \(error)"])
+        send(["type": "recording_failed", "message": "cannot start recording: \(error)"])
     }
 }
 
 func stopRecording() {
     guard let active = recorder else {
-        send(["type": "error", "message": "stop_recording: no recording is in progress"])
+        send(["type": "recording_failed", "message": "stop_recording: no recording is in progress"])
         return
     }
     recorder = nil

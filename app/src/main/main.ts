@@ -1,4 +1,4 @@
-import { app, Menu, nativeImage, Tray } from "electron";
+import { app, Menu, nativeImage, Notification, Tray } from "electron";
 import { fileURLToPath } from "node:url";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -78,6 +78,10 @@ app.whenReady().then(() => {
   core.onStatusChange((status) => {
     console.log(`[status] ${status}`);
     render();
+  });
+  core.onRecordingFailed((message) => {
+    console.error(`[recording] ${message}`);
+    new Notification({ title: `${DISPLAY_NAME} could not record`, body: message }).show();
   });
   core.onRecordingChange((recording) => {
     clearInterval(elapsedTimer);

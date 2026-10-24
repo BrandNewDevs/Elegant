@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,7 +7,7 @@ import { FakeEngine } from "../testing/fake-engine.js";
 import { FakeModel } from "../testing/fake-model.js";
 import { fakePipeline, fixtureSummary, fixtureTranscript } from "../testing/fake-pipeline.js";
 import { openStore } from "../store/store.js";
-import { AppCore, type ActiveRecording, type DetectedMeeting } from "./app-core.js";
+import { AppCore, DEFAULT_STOP_TIMEOUT_MS, type ActiveRecording, type DetectedMeeting } from "./app-core.js";
 import { DEFAULT_DETECTION } from "./detection.js";
 
 function setup(pipelineOpts?: Parameters<typeof fakePipeline>[0]) {
@@ -152,6 +152,8 @@ describe("recording and stopping", () => {
     systemStartHostTime: 1000,
   } as const;
 
+  const STOP_TIMEOUT = DEFAULT_STOP_TIMEOUT_MS;
+
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -275,6 +277,92 @@ describe("recording and stopping", () => {
     });
   });
 
+  it("tells listeners, and stores nothing, when the engine cannot start the Recording", () => {
+    const ctx = setup();
+    ctx.core.start();
+    const problems: string[] = [];
+    ctx.core.onRecordingFailed((message) => problems.push(message));
+
+    ctx.engine.emit({ type: "recording_failed", message: "cannot start recording: microphone access is denied" });
+
+    expect(problems).toEqual(["cannot start recording: microphone access is denied"]);
+    expect(ctx.core.recording).toBeUndefined();
+    expect(ctx.core.listMeetings()).toEqual([]);
+  });
+
+  it("tells listeners when a Recording that was running cannot finish", () => {
+    const { core, engine } = recording();
+    const problems: string[] = [];
+    core.onRecordingFailed((message) => problems.push(message));
+    engine.emit({ type: "recording_failed", message: "no audio was captured on the system audio track" });
+    expect(problems).toEqual(["no audio was captured on the system audio track"]);
+  });
+
+  it("marks the Meeting failed when the engine never hands over the tracks after Stop", () => {
+    const { core } = recording();
+    core.stopRecording();
+    vi.advanceTimersByTime(STOP_TIMEOUT - 1);
+    expect(core.listMeetings()[0]!.state).toBe("recording");
+
+    vi.advanceTimersByTime(1);
+    expect(core.getMeeting(core.listMeetings()[0]!.id)).toMatchObject({
+      state: "failed",
+      error: "the engine did not hand over the tracks after Stop",
+    });
+  });
+
+  it("does not time out once the tracks have arrived", async () => {
+    const { core, engine } = recording();
+    core.stopRecording();
+    engine.emit(tracks);
+    await core.idle();
+    vi.advanceTimersByTime(STOP_TIMEOUT * 2);
+    expect(core.listMeetings()[0]!.state).toBe("done");
+  });
+
+  describe("quitting the app", () => {
+    it("stops a Recording in progress before shutting the engine down, so the audio is kept", async () => {
+      const { core, engine } = recording();
+      const quit = core.stop();
+      expect(engine.commands.map((c) => c.type).slice(-1)).toEqual(["stop_recording"]);
+      expect(engine.commands).not.toContainEqual({ type: "shutdown" });
+
+      engine.emit(tracks);
+      await quit;
+
+      expect(engine.commands.map((c) => c.type).slice(-2)).toEqual(["stop_recording", "shutdown"]);
+      expect(core.getMeeting(core.listMeetings()[0]!.id)).toMatchObject({
+        state: "failed",
+        error: "the app quit before this Recording was processed; the audio is in /tmp",
+      });
+    });
+
+    it("does not wait forever for an engine that never answers", async () => {
+      const { core, engine } = recording();
+      const quit = core.stop();
+      vi.advanceTimersByTime(STOP_TIMEOUT);
+      await quit;
+
+      expect(engine.commands).toContainEqual({ type: "shutdown" });
+      expect(core.listMeetings()[0]!.state).toBe("failed");
+    });
+
+    it("waits for a Recording already stopped but not yet handed over", async () => {
+      const { core, engine } = recording();
+      core.stopRecording();
+      const quit = core.stop();
+      engine.emit(tracks);
+      await quit;
+      expect(core.listMeetings()[0]!.state).toBe("failed");
+    });
+
+    it("shuts down at once when nothing is being recorded", async () => {
+      const { core, engine } = setup();
+      await core.stop();
+      expect(engine.commands).toEqual([{ type: "shutdown" }]);
+    });
+  });
+
   it("stops showing a Recording the engine reports failed, and the engine exiting ends it too", () => {
     const first = recording();
     first.engine.emit({ type: "recording_failed", message: "no microphone" });
@@ -283,6 +371,82 @@ describe("recording and stopping", () => {
     const second = recording();
     second.engine.exit();
     expect(second.core.recording).toBeUndefined();
+  });
+});
+
+describe("the audio of a Recording", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+
+  /** Records a Meeting whose two tracks are real files in a directory of their own, as the engine leaves them. */
+  async function recordedWithAudio(opts: { pipeline?: Parameters<typeof fakePipeline>[0]; keepAudio?: boolean } = {}) {
+    const dir = mkdtempSync(join(tmpdir(), "meeting-recorder-audio-"));
+    dirs.push(dir);
+    const micPath = join(dir, "mic.wav");
+    const systemPath = join(dir, "system.wav");
+    writeFileSync(micPath, "mic");
+    writeFileSync(systemPath, "system");
+
+    const engine = new FakeEngine();
+    const core = new AppCore({
+      engine,
+      store: openStore(":memory:"),
+      pipeline: fakePipeline(opts.pipeline),
+      keepAudio: opts.keepAudio,
+    });
+    core.start();
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    core.stopRecording();
+    engine.emit({ type: "tracks_ready", micPath, systemPath, micStartHostTime: 1000.197, systemStartHostTime: 1000 });
+    await core.idle();
+    return { dir, core };
+  }
+
+  it("is deleted once it has been transcribed", async () => {
+    const { dir } = await recordedWithAudio();
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it("is deleted once it has been transcribed, even if the Summary then fails", async () => {
+    const { dir, core } = await recordedWithAudio({ pipeline: { failSummarise: "ollama is not running" } });
+    expect(core.listMeetings()[0]!.state).toBe("failed");
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it("is kept when transcription fails, so it can be transcribed again", async () => {
+    const { dir } = await recordedWithAudio({ pipeline: { failTranscribe: "model missing" } });
+    expect(existsSync(join(dir, "mic.wav"))).toBe(true);
+    expect(existsSync(join(dir, "system.wav"))).toBe(true);
+  });
+
+  it("is kept when the keep-audio setting is on", async () => {
+    const { dir } = await recordedWithAudio({ keepAudio: true });
+    expect(existsSync(join(dir, "mic.wav"))).toBe(true);
+  });
+
+  it("leaves other files in its directory alone", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "meeting-recorder-audio-"));
+    dirs.push(dir);
+    writeFileSync(join(dir, "mic.wav"), "mic");
+    writeFileSync(join(dir, "system.wav"), "system");
+    writeFileSync(join(dir, "notes.txt"), "keep me");
+    const engine = new FakeEngine();
+    const core = new AppCore({ engine, store: openStore(":memory:"), pipeline: fakePipeline() });
+    core.start();
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    engine.emit({
+      type: "tracks_ready",
+      micPath: join(dir, "mic.wav"),
+      systemPath: join(dir, "system.wav"),
+      micStartHostTime: 1,
+      systemStartHostTime: 1,
+    });
+    await core.idle();
+
+    expect(existsSync(join(dir, "mic.wav"))).toBe(false);
+    expect(existsSync(join(dir, "notes.txt"))).toBe(true);
   });
 });
 
