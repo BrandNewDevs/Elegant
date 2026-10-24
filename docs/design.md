@@ -35,7 +35,7 @@ From the `prototype/detection` branch (see `prototypes/detection/FINDINGS.md` th
 - Per-process microphone use can be read from CoreAudio process objects (PID, bundle id, input and output running). Reading them needs no permission. A test process produced exactly one start and one stop at a 100 ms poll, with no flapping.
 - Browsers and Electron apps run audio in helper processes, so the PID is not the app's. Detection maps the PID to the outermost `.app` in its executable path. This is untested against a real browser call.
 - Two-track Recording works: the microphone via AVAudioEngine, system audio via a Core Audio process tap.
-- **The two tracks must be aligned on host time, not on the start of the file.** The system track starts about 197 ms before the mic track, repeatably. The engine records each track's first-sample host time and the Transcript pipeline aligns on that.
+- **The two tracks must be aligned on host time, not on the start of the file.** The system track starts about 197 ms before the mic track, repeatably. The engine records each track's first-sample host time and aligns on that before it writes the files: the later track gets leading silence, and both are cut to the same length. `tracks_ready` carries the two start times for reference.
 - A Swift helper embeds and runs inside an Electron bundle with identifier `dev.bnd.meetingrecorder`.
 
 ## Open risks

@@ -1,8 +1,12 @@
+import { dirname } from "node:path";
 import type { Engine } from "../engine/protocol.js";
 import type { PipelineStages } from "../pipeline/pipeline.js";
 import { DEFAULT_DETECTION, MicWatcher, type DetectionSettings } from "./detection.js";
 import { PipelineRunner } from "../pipeline/runner.js";
 import type { Meeting, MeetingListItem, Store } from "../store/store.js";
+
+/** How long to wait for the engine to hand over the tracks after Stop before giving up on the Recording. */
+export const DEFAULT_STOP_TIMEOUT_MS = 30_000;
 
 export type EngineStatus = "starting" | "running" | "stopped" | "crashed";
 
@@ -11,6 +15,9 @@ export interface AppCoreDeps {
   store: Store;
   pipeline: PipelineStages;
   detection?: Partial<DetectionSettings>;
+  /** Keep a Recording's audio after it is transcribed. Off by default: the audio is deleted. */
+  keepAudio?: boolean;
+  stopTimeoutMs?: number;
 }
 
 /** A Meeting the app has noticed but not yet been told to record. It lives in memory only; nothing is stored for it. */
@@ -18,6 +25,12 @@ export interface DetectedMeeting {
   state: "detected";
   app: string;
   detectedAt: string;
+}
+
+/** The Recording in progress, until the user presses Stop. */
+export interface ActiveRecording {
+  app: string;
+  startedAt: string;
 }
 
 /** Owns the Meeting lifecycle: reacts to what the engine reports and drives the pipeline and the store. */
@@ -34,12 +47,17 @@ export class AppCore {
   private promptTimer: ReturnType<typeof setTimeout> | undefined;
   private _detectedMeeting: DetectedMeeting | undefined;
   private detectedListeners: ((meeting: DetectedMeeting | undefined) => void)[] = [];
+  private _recording: ActiveRecording | undefined;
+  private recordingListeners: ((recording: ActiveRecording | undefined) => void)[] = [];
+  private recordingFailedListeners: ((message: string) => void)[] = [];
+  private recordingSettledWaiters: (() => void)[] = [];
+  private stopTimer: ReturnType<typeof setTimeout> | undefined;
 
   private readonly store: Store;
 
   constructor(private readonly deps: AppCoreDeps) {
     this.store = this.notifyingStore(deps.store);
-    this.runner = new PipelineRunner(deps.pipeline, this.store);
+    this.runner = new PipelineRunner(deps.pipeline, this.store, { keepAudio: deps.keepAudio });
     const detection = { ...DEFAULT_DETECTION, ...deps.detection };
     this.promptTimeoutMs = detection.promptTimeoutMs;
     this.micWatcher = new MicWatcher(detection, {
@@ -62,14 +80,27 @@ export class AppCore {
         case "recording_started":
           this.abandonRecording("the recording was interrupted by a new one");
           this.recordingMeetingId = this.store.createMeeting({ app: event.app, startedAt: event.startedAt });
+          this.setRecording({ app: event.app, startedAt: event.startedAt });
           break;
         case "tracks_ready": {
           const id = this.recordingMeetingId;
           if (id === undefined) break;
           this.recordingMeetingId = undefined;
-          this.track(this.runner.run(id, { micPath: event.micPath, systemPath: event.systemPath }));
+          this.setRecording(undefined);
+          this.settleRecording();
+          if (this.stopping) {
+            // The app is quitting, so the pipeline would be cut off. Keep the audio and say where it is.
+            const where = dirname(event.micPath);
+            this.store.setMeetingState(id, "failed", `the app quit before this Recording was processed; the audio is in ${where}`);
+          } else {
+            this.track(this.runner.run(id, { micPath: event.micPath, systemPath: event.systemPath }));
+          }
           break;
         }
+        case "recording_failed":
+          this.abandonRecording(event.message);
+          for (const l of this.recordingFailedListeners) l(event.message);
+          break;
       }
     });
     deps.engine.onExit(() => {
@@ -99,14 +130,42 @@ export class AppCore {
 
   /** The user chose Record. */
   acceptPrompt(): void {
-    if (!this.clearDetectedMeeting()) return;
-    this.deps.engine.send({ type: "start_recording" });
+    const meeting = this._detectedMeeting;
+    if (!meeting) return;
+    this.clearDetectedMeeting();
+    this.deps.engine.send({ type: "start_recording", app: meeting.app });
   }
 
   /** The user chose Not now, the Prompt timed out, or the call ended. Nothing about the Meeting is kept. */
   declinePrompt(): void {
     if (!this.clearDetectedMeeting()) return;
     this.deps.engine.send({ type: "discard_buffer" });
+  }
+
+  /** The Recording in progress, if any. It ends when the user presses Stop, and at no other time. */
+  get recording(): ActiveRecording | undefined {
+    return this._recording;
+  }
+
+  onRecordingChange(listener: (recording: ActiveRecording | undefined) => void): void {
+    this.recordingListeners.push(listener);
+  }
+
+  /** Called with the reason when a Recording cannot start or cannot finish. */
+  onRecordingFailed(listener: (message: string) => void): void {
+    this.recordingFailedListeners.push(listener);
+  }
+
+  /** The user pressed Stop. The engine answers with the finished tracks. */
+  stopRecording(): void {
+    if (!this._recording) return;
+    this.setRecording(undefined);
+    this.deps.engine.send({ type: "stop_recording" });
+    // If the engine never answers, the Meeting must not stay "recording" for ever.
+    this.stopTimer = setTimeout(
+      () => this.abandonRecording("the engine did not hand over the tracks after Stop"),
+      this.deps.stopTimeoutMs ?? DEFAULT_STOP_TIMEOUT_MS,
+    );
   }
 
   /** Called whenever a Meeting appears or changes state, so a window can refresh. */
@@ -144,6 +203,9 @@ export class AppCore {
 
   async stop(): Promise<void> {
     this.stopping = true;
+    // A Recording in progress is finished first, so its audio is kept rather than lost with the engine.
+    this.stopRecording();
+    await this.recordingSettled();
     this.deps.engine.send({ type: "shutdown" });
     await this.deps.engine.stop();
     this.setStatus("stopped");
@@ -178,10 +240,23 @@ export class AppCore {
 
   /** A Recording that can no longer finish is marked failed, so no Meeting is left stuck as recording. */
   private abandonRecording(reason: string): void {
+    this.setRecording(undefined);
     const id = this.recordingMeetingId;
     if (id === undefined) return;
     this.recordingMeetingId = undefined;
     this.store.setMeetingState(id, "failed", reason);
+    this.settleRecording();
+  }
+
+  /** Resolves once no Recording is waiting on the engine: its tracks arrived, or it failed. */
+  private recordingSettled(): Promise<void> {
+    if (this.recordingMeetingId === undefined) return Promise.resolve();
+    return new Promise((resolve) => this.recordingSettledWaiters.push(resolve));
+  }
+
+  private settleRecording(): void {
+    clearTimeout(this.stopTimer);
+    for (const resolve of this.recordingSettledWaiters.splice(0)) resolve();
   }
 
   private notifyingStore(store: Store): Store {
@@ -207,6 +282,12 @@ export class AppCore {
         notify();
       },
     };
+  }
+
+  private setRecording(recording: ActiveRecording | undefined): void {
+    if (!this._recording && !recording) return;
+    this._recording = recording;
+    for (const l of this.recordingListeners) l(recording);
   }
 
   private setStatus(status: EngineStatus): void {
