@@ -16,11 +16,11 @@ export const fixtureSummary: Summary = {
 };
 
 /** Deterministic stand-in for the real pipeline. Either stage can be told to fail. */
-export function fakePipeline(opts: { failTranscribe?: string; failSummarise?: string } = {}): PipelineStages {
+export function fakePipeline(opts: { failTranscribe?: string; failSummarise?: string; silent?: boolean } = {}): PipelineStages {
   return {
     async transcribe() {
       if (opts.failTranscribe) throw new Error(opts.failTranscribe);
-      return fixtureTranscript;
+      return opts.silent ? { segments: [] } : fixtureTranscript;
     },
     async summarise() {
       if (opts.failSummarise) throw new Error(opts.failSummarise);

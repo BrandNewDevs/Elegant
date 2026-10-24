@@ -90,6 +90,16 @@ describe("a recorded meeting", () => {
     expect(meeting.participants.map((p) => p.label)).toEqual(["You", "Others"]);
   });
 
+  it("is done, with no Summary and no failure, when the Recording has no speech", async () => {
+    const { engine, core } = recording({ silent: true, failSummarise: "must not be asked to summarise nothing" });
+    engine.emit(tracks);
+    await core.idle();
+
+    const meeting = core.getMeeting(core.listMeetings()[0]!.id)!;
+    expect(meeting).toMatchObject({ state: "done", error: null, summary: null });
+    expect(meeting.transcript.segments).toEqual([]);
+  });
+
   it("is marked processing while the pipeline runs", async () => {
     const { engine, core } = recording();
     engine.emit(tracks);

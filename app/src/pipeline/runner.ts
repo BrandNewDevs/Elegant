@@ -23,7 +23,9 @@ export class PipelineRunner {
       const transcript = await this.stages.transcribe(tracks);
       this.sink.saveTranscript(meetingId, transcript);
       if (!this.options.keepAudio) await discardAudio(tracks);
-      await this.summarise(meetingId, transcript);
+      // A call with no speech is a finished Meeting with nothing to summarise, not a failure.
+      if (transcript.segments.length === 0) this.sink.setMeetingState(meetingId, "done");
+      else await this.summarise(meetingId, transcript);
     } catch (err) {
       this.fail(meetingId, err);
     }
