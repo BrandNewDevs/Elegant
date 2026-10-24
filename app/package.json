@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "build:engine": "swift build -c release --package-path ../engine",
     "build": "tsc -p tsconfig.build.json",
-    "pretest": "pnpm run build:engine",
+    "test:engine": "swift test --package-path ../engine -Xswiftc -plugin-path -Xswiftc \"$(dirname \"$(xcrun -f swiftc)\")/../lib/swift/host/plugins/testing\"",
+    "pretest": "pnpm run build:engine && pnpm run test:engine",
     "test": "vitest run",
     "start": "pnpm run build && pnpm run build:engine && env -u ELECTRON_RUN_AS_NODE electron ."
   },

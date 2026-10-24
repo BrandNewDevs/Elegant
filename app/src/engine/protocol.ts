@@ -6,13 +6,19 @@ export type EngineEvent =
   | { type: "mic_in_use_started"; app: string; pid: number }
   | { type: "mic_in_use_stopped"; app: string; pid: number }
   | { type: "recording_started"; app: string; startedAt: string }
-  /** Both tracks are already aligned on host time: 16 kHz mono WAV files of equal length. */
-  | { type: "tracks_ready"; micPath: string; systemPath: string }
+  /**
+   * Both tracks are already aligned on host time: 16 kHz mono WAV files of equal length, starting at the same
+   * instant. The start times are each track's first-sample time on the host clock, in seconds, from before alignment.
+   */
+  | { type: "tracks_ready"; micPath: string; systemPath: string; micStartHostTime: number; systemStartHostTime: number }
+  /** The Recording cannot finish; nothing usable was written. */
+  | { type: "recording_failed"; message: string }
   | { type: "error"; message: string };
 
 /** Commands the app sends down to the engine. */
 export type EngineCommand =
-  | { type: "start_recording" }
+  /** `app` is the call app being recorded; the engine echoes it back in `recording_started`. */
+  | { type: "start_recording"; app: string }
   | { type: "discard_buffer" }
   | { type: "stop_recording" }
   | { type: "shutdown" };
@@ -36,7 +42,8 @@ const EVENT_FIELDS: Record<EngineEvent["type"], Record<string, "string" | "numbe
   mic_in_use_started: { app: "string", pid: "number" },
   mic_in_use_stopped: { app: "string", pid: "number" },
   recording_started: { app: "string", startedAt: "string" },
-  tracks_ready: { micPath: "string", systemPath: "string" },
+  tracks_ready: { micPath: "string", systemPath: "string", micStartHostTime: "number", systemStartHostTime: "number" },
+  recording_failed: { message: "string" },
   error: { message: "string" },
 };
 
