@@ -4,6 +4,7 @@ export interface EvaluationFixture {
   id: string;
   split: "tuning" | "reserved";
   synthetic: boolean;
+  expectationsPrepared?: boolean;
   transcript: Transcript;
   points: { id: string; text: string; speaker: string; refs: number[]; critical: boolean }[];
   questions: { id: string; question: string; answer: string | null; refs: number[]; followUpTo?: string; critical: boolean }[];
@@ -46,6 +47,7 @@ export function validateFixture(value: unknown): EvaluationFixture {
   const fixture = value as EvaluationFixture;
   if (!fixture || typeof fixture.id !== "string" || !["tuning", "reserved"].includes(fixture.split) || typeof fixture.synthetic !== "boolean"
       || !Array.isArray(fixture.transcript?.segments) || !Array.isArray(fixture.points) || !Array.isArray(fixture.questions)) throw new Error("Invalid evaluation fixture");
+  if (fixture.expectationsPrepared === false) throw new Error("Prepare and review expected points, decisions and questions before evaluating this private draft; then set expectationsPrepared to true");
   const nonempty = (s: unknown): s is string => typeof s === "string" && s.trim().length > 0;
   let previousStart = -Infinity;
   fixture.transcript.segments.forEach(s => {
