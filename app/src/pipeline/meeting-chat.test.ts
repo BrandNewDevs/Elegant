@@ -31,7 +31,7 @@ function fake(reply: (request: TextRequest, call: number) => unknown, options: {
     const resolving = "question" in (request.schema as { properties: object }).properties;
     const auditing = "supported" in (request.schema as { properties: object }).properties;
     const result = resolving ? options.resolve?.(request, requests.length) ?? { question: "When will You finish the permission guide?" }
-      : auditing ? options.audit?.(request, requests.length) ?? { supported: true } : reply(request, requests.length);
+      : auditing ? options.audit?.(request, requests.length) ?? { supported: true, sourceIds: contents(request).data.sources!.map(source => source.id) } : reply(request, requests.length);
     return { text: typeof result === "string" ? result : JSON.stringify(result), metadata: { model: "local:test", elapsedMs: 1, promptTokens: 10, outputTokens: 4 } };
   } };
 }
@@ -175,7 +175,7 @@ describe("grounded Meeting chat", () => {
         expect(payload).not.toHaveProperty("summary");
         expect(payload.sources!.map(source => source.id)).toEqual(["0:0"]);
         expect(payload.sources![0]!.text).toBe(transcript.segments[0]!.text);
-        return { supported: audits > 1 };
+        return { supported: audits > 1, sourceIds: audits > 1 ? payload.sources!.map(source => source.id) : [] };
       },
     });
     const result = await createMeetingChat({ store, model })(input(id, expectedRevision));
@@ -186,9 +186,64 @@ describe("grounded Meeting chat", () => {
     expect(result.generation.calls).toBe(4);
   });
 
+  it("publishes only the minimal audited citation subset without changing the answer's claims", async () => {
+    const { store, id, expectedRevision } = setup();
+    const model = fake(() => ({ ...positive, sourceIds: ["0:0", "1:0"] }), { audit: request => {
+      const schema = request.schema as { properties: { sourceIds: { items: { enum: string[] } } } };
+      expect(schema.properties.sourceIds.items.enum).toEqual(["0:0", "1:0"]);
+      expect(contents(request).instruction).toContain("collectively supports EVERY factual claim");
+      expect(contents(request).instruction).toContain("Do not rewrite or silently drop facts");
+      return { supported: true, sourceIds: ["0:0"] };
+    } });
+    const result = await createMeetingChat({ store, model })(input(id, expectedRevision));
+    expect(result.answer).toEqual({ text: positive.text, refs: [0], sufficient: true });
+    expect(result.generation.calls).toBe(2);
+    expect(model.requests).toHaveLength(2);
+  });
+
+  it("retains multiple citations when all are needed to support the answer collectively", async () => {
+    const { store, id, expectedRevision } = setup();
+    const text = "You will write the permission guide by Thursday; Speaker 1 proposed Friday for launch, but no launch date was agreed.";
+    let generations = 0;
+    const model = fake(() => ({ text, sufficient: true, sourceIds: ++generations === 1 ? ["0:0"] : ["0:0", "1:0"] }), {
+      audit: request => {
+        const ids = contents(request).data.sources!.map(source => source.id);
+        // The first candidate claims two facts while citing only the first fact's passage.
+        return ids.includes("1:0") ? { supported: true, sourceIds: ["1:0", "0:0", "1:0"] } : { supported: false, sourceIds: [] };
+      },
+    });
+    const result = await createMeetingChat({ store, model })(input(id, expectedRevision));
+    expect(result.answer).toEqual({ text, refs: [0, 1], sufficient: true });
+    expect(generations).toBe(2);
+    expect(result.generation.calls).toBe(4);
+  });
+
+  it("never accepts an empty, unknown or non-candidate citation set from a positive audit", async () => {
+    const { store, id, expectedRevision } = setup();
+    const invalid = [
+      { supported: true, sourceIds: [] },
+      { supported: true, sourceIds: ["unknown:0"] },
+      { supported: true, sourceIds: ["1:0"] }, // Real Transcript source, but not in the candidate's audited evidence.
+      { supported: true },
+      { supported: true, sourceIds: null },
+      { supported: true, sourceIds: "0:0" },
+      { supported: true, sourceIds: [0] },
+    ];
+    for (const value of invalid) {
+      const model = fake(() => positive, { audit: request => {
+        const schema = request.schema as { properties: { sourceIds: { items: { enum: string[] } } } };
+        expect(schema.properties.sourceIds.items.enum).toEqual(["0:0"]);
+        return value;
+      } });
+      await expect(createMeetingChat({ store, model })(input(id, expectedRevision))).rejects.toThrow("three attempts");
+      expect(model.requests.filter(isAnswer)).toHaveLength(3);
+      expect(model.requests).toHaveLength(6);
+    }
+  });
+
   it("keeps unsupported answers failed after three generation-and-audit attempts", async () => {
     const { store, id, expectedRevision } = setup();
-    const model = fake(() => positive, { audit: () => ({ supported: false }) });
+    const model = fake(() => positive, { audit: () => ({ supported: false, sourceIds: [] }) });
     await expect(createMeetingChat({ store, model })(input(id, expectedRevision))).rejects.toThrow("three attempts");
     expect(model.requests.filter(isAnswer)).toHaveLength(3);
     expect(model.requests.filter(request => "supported" in (request.schema as { properties: object }).properties)).toHaveLength(3);
@@ -203,7 +258,7 @@ describe("grounded Meeting chat", () => {
       expect(payload.question).toBe("When will You finish the permission guide?");
       expect(payload.priorUserQuestion).toBe(question);
       expect(JSON.stringify(request)).not.toContain("PRIVATE EARLIER ASSISTANT DETOUR");
-      return { supported: true };
+      return { supported: true, sourceIds: payload.sources!.map(source => source.id) };
     } });
     await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "When will they finish it?", history });
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
@@ -223,7 +278,7 @@ describe("grounded Meeting chat", () => {
     const failed = fake(() => positive, { audit: () => { throw new Error("Audit model is unavailable"); } });
     await expect(createMeetingChat({ store, model: failed })(input(id, expectedRevision))).rejects.toThrow("Audit model is unavailable");
     const controller = new AbortController();
-    const cancelled = fake(() => positive, { audit: () => { controller.abort(); return { supported: true }; } });
+    const cancelled = fake(() => positive, { audit: () => { controller.abort(); return { supported: true, sourceIds: ["0:0"] }; } });
     await expect(createMeetingChat({ store, model: cancelled })({ ...input(id, expectedRevision), signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
   });
 
