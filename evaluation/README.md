@@ -18,4 +18,6 @@ The runner calls the original public Summary implementation frozen from `1ee9d82
 
 At `1ee9d82`, typechecking and the production app build passed on Linux. App and renderer tests: 209 passed. The three native-engine integration tests require the built macOS engine and fail here; `pnpm test` stops at `swift: not found`. They are now a distinct Vitest project, still included by `pnpm test`. CI runs them on macOS, with app tests separately on Linux.
 
+The first macOS CI run also exposed a pre-existing Swift type-check timeout in the WAV header expression. Splitting the expression preserves its bytes and makes the compiler work bounded.
+
 The default `gemma3:4b` tag was not installed. The explicitly selected installed tag is recorded rather than silently substituted. Real 5/10/20/60-minute Recordings and M4 measurements remain outstanding; no private examples are invented or committed.
