@@ -8,7 +8,7 @@ const goodReply = {
   tldr: "They agreed to ship the walking skeleton first.",
   participants: [
     { speaker: "You", said: ["Ship the walking skeleton first."] },
-    { speaker: "Others", said: ["Fan out to detection and the window afterwards."] },
+    { speaker: "Speaker 1", said: ["Fan out to detection and the window afterwards."] },
   ],
 };
 

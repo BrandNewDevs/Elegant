@@ -31,6 +31,8 @@ export interface Store {
   setMeetingState(id: number, state: MeetingState, error?: string): void;
   saveTranscript(id: number, transcript: Transcript): void;
   saveSummary(id: number, summary: Summary): void;
+  /** Sets the name shown for a Participant in this Meeting; null clears it. Throws if the Meeting has no such label. */
+  renameParticipant(id: number, label: string, name: string | null): void;
   saveAudio(id: number, tracks: Tracks): void;
   clearAudio(id: number): void;
   /** Removes the Meeting and everything stored for it: Participants, Transcript segments and Summary. */
@@ -189,6 +191,11 @@ export function openStore(path: string): Store {
         "INSERT OR REPLACE INTO summaries (meeting_id, tldr, participants_json) VALUES (?, ?, ?)",
       ).run(id, summary.tldr, JSON.stringify(summary.participants));
       reindex(id);
+    },
+
+    renameParticipant(id, label, name) {
+      const r = db.prepare("UPDATE participants SET name = ? WHERE meeting_id = ? AND label = ?").run(name, id, label);
+      if (r.changes === 0) throw new Error(`Meeting ${id} has no Participant "${label}"`);
     },
 
     saveAudio(id, tracks) {

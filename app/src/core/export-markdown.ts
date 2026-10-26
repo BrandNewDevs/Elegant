@@ -1,3 +1,4 @@
+import { applyNames } from "./participants.js";
 import type { Meeting } from "../store/store.js";
 
 const clock = (seconds: number): string => {
@@ -13,21 +14,20 @@ export function exportFileName(meeting: Pick<Meeting, "app" | "startedAt">): str
 
 /** One Meeting as Markdown: the Summary, then the Transcript. Renamed Participants appear by name. */
 export function meetingToMarkdown(meeting: Meeting): string {
-  const names = new Map(meeting.participants.flatMap((p) => (p.name ? [[p.label, p.name] as const] : [])));
-  const nameOf = (label: string): string => names.get(label) ?? label;
+  meeting = applyNames(meeting);
 
   const lines = [`# ${meeting.app}`, "", `Recorded ${meeting.startedAt}`];
 
   if (meeting.summary) {
     lines.push("", "## Summary", "", meeting.summary.tldr);
     for (const p of meeting.summary.participants) {
-      lines.push("", `### ${nameOf(p.speaker)}`, "", ...p.said.map((s) => `- ${s}`));
+      lines.push("", `### ${p.speaker}`, "", ...p.said.map((s) => `- ${s}`));
     }
   }
 
   if (meeting.transcript.segments.length > 0) {
     lines.push("", "## Transcript", "");
-    for (const s of meeting.transcript.segments) lines.push(`**${nameOf(s.speaker)}** (${clock(s.start)}): ${s.text}`, "");
+    for (const s of meeting.transcript.segments) lines.push(`**${s.speaker}** (${clock(s.start)}): ${s.text}`, "");
     lines.pop();
   }
 

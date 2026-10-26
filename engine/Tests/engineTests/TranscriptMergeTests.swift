@@ -7,9 +7,9 @@ private func seg(_ start: Double, _ end: Double, _ text: String, ratio: Double =
 }
 
 @Suite struct TranscriptMergeTests {
-    @Test func micWordsAreYouAndSystemWordsAreOthers() {
+    @Test func micWordsAreYouAndSystemWordsAreSpeakers() {
         let merged = mergeTracks(mic: [seg(0, 2, "Hello")], system: [seg(3, 5, "Hi there")])
-        #expect(merged.map(\.speaker) == ["You", "Others"])
+        #expect(merged.map(\.speaker) == ["You", "Speaker 1"])
     }
 
     @Test func segmentsAreOrderedByStartAcrossBothTracks() {
@@ -28,9 +28,9 @@ private func seg(_ start: Double, _ end: Double, _ text: String, ratio: Double =
 
     @Test func tiesOnStartAndEndPutYouFirst() {
         let merged = mergeTracks(mic: [seg(1, 2, "mine")], system: [seg(1, 2, "theirs")])
-        #expect(merged.map(\.speaker) == ["You", "Others"])
+        #expect(merged.map(\.speaker) == ["You", "Speaker 1"])
         let swapped = mergeTracks(mic: [seg(1, 2, "mine")], system: [seg(1, 1.5, "theirs")])
-        #expect(swapped.map(\.speaker) == ["Others", "You"])
+        #expect(swapped.map(\.speaker) == ["Speaker 1", "You"])
     }
 
     @Test func textIsTrimmedAndEmptySegmentsAreDropped() {
@@ -58,7 +58,7 @@ private func seg(_ start: Double, _ end: Double, _ text: String, ratio: Double =
     }
 
     @Test func aTrackWithNoSpeechContributesNothingAndBothEmptyIsAnEmptyTranscript() {
-        #expect(mergeTracks(mic: [], system: [seg(0, 1, "hi")]).map(\.speaker) == ["Others"])
+        #expect(mergeTracks(mic: [], system: [seg(0, 1, "hi")]).map(\.speaker) == ["Speaker 1"])
         #expect(mergeTracks(mic: [], system: []).isEmpty)
     }
 
