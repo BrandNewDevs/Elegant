@@ -1,4 +1,4 @@
-/** Apps whose use of the microphone means "probably a Meeting". Hard-coded for the demo; becomes a settings file later. */
+/** Apps whose use of the microphone means "probably a Meeting" until the user edits the known-apps file, which starts out as this list. */
 export const KNOWN_CALL_APPS = [
   "zoom.us",
   "Microsoft Teams",
@@ -33,25 +33,23 @@ export const DEFAULT_DETECTION: DetectionSettings = {
  * processes of one app are folded together, and the app must hold the microphone for the debounce first.
  */
 export class MicWatcher {
-  private readonly known: Set<string>;
   /** Processes currently on the microphone, per app. */
   private readonly holders = new Map<string, Set<number>>();
   private readonly pending = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(
-    private readonly settings: Pick<DetectionSettings, "debounceMs" | "knownApps">,
+    private readonly settings: { debounceMs: number; knownApps: () => readonly string[] },
     private readonly handlers: {
       /** The app has held the microphone for the debounce. */
       detected(app: string): void;
       /** The last process of the app let go of the microphone. */
       released(app: string): void;
     },
-  ) {
-    this.known = new Set(settings.knownApps.map((a) => a.toLowerCase()));
-  }
+  ) {}
 
   micStarted(app: string, pid: number): void {
-    if (!this.known.has(app.toLowerCase())) return;
+    const name = app.toLowerCase();
+    if (!this.settings.knownApps().some((known) => known.toLowerCase() === name)) return;
     const holders = this.holders.get(app) ?? new Set<number>();
     this.holders.set(app, holders);
     const first = holders.size === 0;

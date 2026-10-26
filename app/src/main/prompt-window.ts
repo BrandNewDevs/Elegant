@@ -1,12 +1,12 @@
 import { BrowserWindow, screen } from "electron";
-import { NOT_NOW_URL, RECORD_URL, promptHtml } from "./prompt-html.js";
+import { NEVER_URL, NOT_NOW_URL, RECORD_URL, promptHtml } from "./prompt-html.js";
 import { promptPosition } from "./prompt-position.js";
 
 /** Shows the Prompt overlay at the bottom centre of the screen. Closing it without answering counts as Not now. */
-export function showPrompt(app: string, handlers: { record(): void; notNow(): void }): { close(): void } {
+export function showPrompt(app: string, handlers: { record(): void; notNow(): void; never(): void }): { close(): void } {
   const { workArea } = screen.getPrimaryDisplay();
   // The height is a first guess; the window is resized to its content before it is shown.
-  const size = { width: 560, height: 72 };
+  const size = { width: 640, height: 72 };
   const win = new BrowserWindow({
     ...size,
     ...promptPosition(workArea, size),
@@ -38,6 +38,7 @@ export function showPrompt(app: string, handlers: { record(): void; notNow(): vo
     event.preventDefault();
     if (url === RECORD_URL) answer(handlers.record);
     else if (url === NOT_NOW_URL) answer(handlers.notNow);
+    else if (url === NEVER_URL) answer(handlers.never);
   });
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   win.on("closed", () => answer(handlers.notNow));
