@@ -71,6 +71,15 @@ describe("evidence-backed Summary generation", () => {
     expect(model.requests[1]!.messages[0]!.content).toContain("previous output failed validation");
   });
 
+  it("reports the last static rejection reason and reserves its retry budget", async () => {
+    const model = fake(() => ({ ...good, points: [{ speaker: "Invented", text: "Private generated prose", refs: [0] }] }));
+    await expect(createGroundedSummariser({ model })(transcript)).rejects.toThrow("Attribute each point to a supplied speaker");
+    expect(model.requests).toHaveLength(3);
+    expect(model.requests[1]!.messages[0]!.content).toContain("Attribute each point to a supplied speaker");
+    expect(model.requests[1]!.messages[0]!.content).not.toContain("Private generated prose");
+    expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
   it("rejects unknown references, blank points and evidence from a different speaker", async () => {
     const invalid = [
       { ...good, tldrRefs: [99] },
