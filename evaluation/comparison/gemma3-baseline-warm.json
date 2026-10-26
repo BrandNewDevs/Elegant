@@ -1,0 +1,65 @@
+{
+  "implementation": "baseline-1ee9d82",
+  "promptVersion": "baseline-v1",
+  "model": {
+    "name": "gemma3:4b-it-q4_K_M",
+    "model": "gemma3:4b-it-q4_K_M",
+    "modified_at": "2026-10-05T05:47:50.046802317+05:30",
+    "size": 3338801804,
+    "digest": "a2af6cc3eb7fa8be8504abaf9b04e88f17a119ec3f04a3addf55f92841195f5a",
+    "details": {
+      "parent_model": "",
+      "format": "gguf",
+      "family": "gemma3",
+      "families": [
+        "gemma3"
+      ],
+      "parameter_size": "4.3B",
+      "quantization_level": "Q4_K_M"
+    },
+    "capabilities": [
+      "completion"
+    ]
+  },
+  "ollama": {
+    "version": "0.34.0"
+  },
+  "settings": {
+    "numCtx": 8192,
+    "temperature": 0,
+    "maxChunkChars": 12000
+  },
+  "hardware": {
+    "platform": "linux",
+    "release": "7.0.0-38-generic",
+    "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+    "memoryBytes": 15950888960,
+    "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU, 4096 MiB"
+  },
+  "elapsedMs": 5817.736117,
+  "calls": 1,
+  "processPeakRssKiB": 64120,
+  "memoryScope": "Node process only; model and engine memory require separate device observation",
+  "summary": {
+    "tldr": "The meeting focused on determining a launch date for the offline app. Friday was initially proposed, but the completion of permission tests was a prerequisite. The launch date was deferred until tomorrow after the tests are run.",
+    "participants": [
+      {
+        "speaker": "You",
+        "said": [
+          "We need to choose a launch date for the offline app.",
+          "Then no launch date is agreed.",
+          "I will run the permission tests tomorrow."
+        ]
+      },
+      {
+        "speaker": "Speaker 1",
+        "said": [
+          "I suggest Friday, but we still need the permission tests."
+        ]
+      }
+    ]
+  },
+  "runCondition": "warm",
+  "conditionMethod": "Cold: verified Ollama /api/ps empty after unloading. Warm: immediate second identical run, model verified resident.",
+  "recordedAt": "2026-10-26T22:31:58Z"
+}
