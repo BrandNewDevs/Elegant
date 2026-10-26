@@ -67,6 +67,7 @@ export class AIJobQueue {
 
   cancel(id: string): boolean {
     if (this.active?.job.id === id) {
+      if (this.active.controller.signal.aborted) return true;
       this.abort(this.active);
       this.notify();
       return true;
@@ -115,17 +116,17 @@ export class AIJobQueue {
       next.controller.signal.throwIfAborted();
       return next.task(next.controller.signal);
     }).then(
-      value => this.finish(next, undefined, value),
-      error => this.finish(next, error),
+      value => this.finish(next, { ok: true, value }),
+      error => this.finish(next, { ok: false, error }),
     );
   }
 
-  private finish(entry: Entry, error: unknown, value?: unknown): void {
+  private finish(entry: Entry, outcome: { ok: true; value: unknown } | { ok: false; error: unknown }): void {
     if (!entry.callerSettled) {
       entry.callerSettled = true;
       if (entry.controller.signal.aborted) entry.reject(cancelled());
-      else if (error !== undefined) entry.reject(error);
-      else entry.resolve(value);
+      else if (!outcome.ok) entry.reject(outcome.error);
+      else entry.resolve(outcome.value);
     }
     this.active = undefined;
     this.pump();
