@@ -53,6 +53,17 @@ describe("evidence-backed Summary generation", () => {
     expect(requestBytes(model.requests[0]!)).toBeLessThanOrEqual(5500);
   });
 
+  it("asks the model to generate grounded source points before TLDR text and citations", async () => {
+    const model = fake(() => good);
+    await createGroundedSummariser({ model })(transcript);
+    const schema = model.requests[0]!.schema as { properties: object; required: string[] };
+    expect(Object.keys(schema.properties)).toEqual(["points", "tldr", "tldrRefs"]);
+    expect(schema.required).toEqual(["points", "tldr", "tldrRefs"]);
+    const instruction = (JSON.parse(model.requests[0]!.messages.at(-1)!.content) as { instruction: string }).instruction;
+    expect(instruction.indexOf("First write per-speaker points")).toBeLessThan(instruction.indexOf("Write a concise TLDR"));
+    expect(payload(model.requests[0]!).sources!.map(source => source.text)).toEqual(transcript.segments.map(segment => segment.text));
+  });
+
   it("groups multiple points by exact speaker labels without duplicate Participant entries", async () => {
     const model = fake(() => ({ ...good, points: [...good.points, { speaker: "You", text: "No launch date is agreed.", refs: [0, 1] }] }));
     const result = await createGroundedSummariser({ model })(transcript);

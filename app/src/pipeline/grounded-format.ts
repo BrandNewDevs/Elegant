@@ -11,9 +11,10 @@ const refsSchema = { type: "array", items: { type: "integer" }, minItems: 1, uni
 const pointProperties = { speaker: { type: "string" }, text: { type: "string" }, refs: refsSchema };
 export const GROUNDED_SCHEMA = {
   type: "object", properties: {
-    tldr: { type: "string" }, tldrRefs: refsSchema,
+    // Generate grounded points before compressing them into the TLDR.
     points: { type: "array", items: { type: "object", properties: pointProperties, required: ["speaker", "text", "refs"] } },
-  }, required: ["tldr", "tldrRefs", "points"],
+    tldr: { type: "string" }, tldrRefs: refsSchema,
+  }, required: ["points", "tldr", "tldrRefs"],
 };
 export const FACTS_SCHEMA = {
   type: "object", properties: { facts: { type: "array", items: {
