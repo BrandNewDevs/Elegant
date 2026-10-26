@@ -105,6 +105,7 @@ app.whenReady().then(() => {
 
   meetingsWindow = new MeetingsWindow(core);
   const setup = new Setup(engine, store, {
+    jobs: core.jobs,
     speechModel: SPEECH_MODEL,
     modelsDirectory: join(dataDir, "models"),
     checkOllama: () => checkOllama(),

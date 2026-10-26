@@ -21,7 +21,9 @@ export interface Tracks {
   systemPath: string;
 }
 
+export interface PipelineContext { signal?: AbortSignal }
+
 export interface PipelineStages {
-  transcribe(tracks: Tracks): Promise<Transcript>;
-  summarise(transcript: Transcript): Promise<Summary>;
+  transcribe(tracks: Tracks, context?: PipelineContext): Promise<Transcript>;
+  summarise(transcript: Transcript, context?: PipelineContext): Promise<Summary>;
 }

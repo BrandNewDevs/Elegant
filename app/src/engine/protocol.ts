@@ -19,11 +19,14 @@ export type EngineEvent =
   | { type: "transcript_ready"; id: string; segments: TranscriptSegment[] }
   /** The `transcribe` command with this id failed; the audio is untouched. */
   | { type: "transcription_failed"; id: string; message: string }
+  /** Native speech models were unloaded; downloads remain on disk. */
+  | { type: "models_released"; id: string }
+  | { type: "model_release_failed"; id: string; message: string }
   /** The answer to `request_permission`: whether macOS now lets the engine capture that audio. */
   | { type: "permission_result"; permission: Permission; granted: boolean }
   /** How far a `download_models` command has got, as a fraction from 0 to 1. */
   | { type: "model_download_progress"; model: string; fraction: number }
-  /** Every model of a `download_models` command is downloaded and loads. */
+  /** Every model was downloaded, checked by loading, and released from memory. */
   | { type: "models_ready" }
   /** The `download_models` command failed; models already downloaded are kept. */
   | { type: "model_download_failed"; message: string }
@@ -66,6 +69,8 @@ export type EngineCommand =
    * `model_download_failed`.
    */
   | { type: "download_models"; model: string; modelsDirectory: string }
+  /** Release idle speech models before text generation; answered by models_released or model_release_failed. */
+  | { type: "release_models"; id: string }
   | { type: "shutdown" };
 
 export interface EngineExit {
@@ -94,6 +99,8 @@ const EVENT_FIELDS: Record<EngineEvent["type"], Record<string, "string" | "numbe
   model_download_failed: { message: "string" },
   transcript_ready: { id: "string", segments: "array" },
   transcription_failed: { id: "string", message: "string" },
+  models_released: { id: "string" },
+  model_release_failed: { id: "string", message: "string" },
   recording_failed: { message: "string" },
   error: { message: "string" },
 };
@@ -113,6 +120,11 @@ export function parseEngineEvent(line: string): EngineEvent {
   for (const [name, kind] of Object.entries(fields)) {
     const ok = kind === "array" ? Array.isArray(obj[name]) : typeof obj[name] === kind;
     if (!ok) throw new Error(`engine event "${obj.type}" is missing ${kind} field "${name}"`);
+  }
+  if (["transcript_ready", "transcription_failed", "models_released", "model_release_failed"].includes(String(obj.type))) {
+    if (typeof obj.id !== "string" || obj.id.length === 0 || Buffer.byteLength(obj.id, "utf8") > 128) {
+      throw new Error(`engine event "${obj.type}" has an invalid request id`);
+    }
   }
   if (obj.type === "transcript_ready") checkSegments(obj.segments as unknown[]);
   return obj as EngineEvent;

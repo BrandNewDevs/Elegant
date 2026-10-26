@@ -110,7 +110,24 @@ func transcribe(_ command: [String: Any]) {
                 "segments": segments.map { ["start": $0.start, "end": $0.end, "speaker": $0.speaker, "text": $0.text] },
             ])
         } catch {
+            // Unload partially loaded models after a failed attempt, too. Busy operations reject this safely.
+            try? await transcriber.releaseModels()
             send(["type": "transcription_failed", "id": id, "message": "\(error)"])
+        }
+    }
+}
+
+func releaseModels(_ command: [String: Any]) {
+    guard let id = command["id"] as? String, !id.isEmpty, id.utf8.count <= 128 else {
+        send(["type": "error", "message": "malformed release_models command"])
+        return
+    }
+    Task {
+        do {
+            try await transcriber.releaseModels()
+            send(["type": "models_released", "id": id])
+        } catch {
+            send(["type": "model_release_failed", "id": id, "message": "\(error)"])
         }
     }
 }
@@ -154,8 +171,11 @@ func downloadModels(_ command: [String: Any]) {
                     send(["type": "model_download_progress", "model": model, "fraction": fraction])
                 }
             }
+            try await transcriber.releaseModels()
             send(["type": "models_ready"])
         } catch {
+            // A partially prepared model must not remain resident after a failed preparation.
+            try? await transcriber.releaseModels()
             send(["type": "model_download_failed", "message": "\(error)"])
         }
     }
@@ -183,6 +203,8 @@ func handle(command line: String) {
         checkPermission(command)
     case "download_models":
         downloadModels(command)
+    case "release_models":
+        releaseModels(command)
     case "start_buffer":
         startBuffer()
     case "discard_buffer":

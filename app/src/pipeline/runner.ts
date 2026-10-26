@@ -1,7 +1,7 @@
 import { rm, rmdir } from "node:fs/promises";
 import { basename, dirname } from "node:path";
 import type { Store } from "../store/store.js";
-import type { PipelineStages, Tracks, Transcript } from "./pipeline.js";
+import type { PipelineContext, PipelineStages, Tracks, Transcript } from "./pipeline.js";
 
 /** What the runner needs from the store, so it does not depend on the whole thing. */
 export type PipelineSink = Pick<Store, "saveTranscript" | "saveSummary" | "setMeetingState" | "saveAudio" | "clearAudio">;
@@ -19,12 +19,13 @@ export class PipelineRunner {
   ) {}
 
   /** Transcribes and summarises a Recording. Also the retry for a Meeting whose transcription failed: its audio is still there. */
-  async run(meetingId: number, tracks: Tracks): Promise<void> {
+  async run(meetingId: number, tracks: Tracks, context: PipelineContext = {}): Promise<void> {
     this.sink.setMeetingState(meetingId, "processing");
     // Remembered until the audio is deleted, so a failure can be retried without re-recording.
     this.sink.saveAudio(meetingId, tracks);
     try {
-      const transcript = await this.stages.transcribe(tracks);
+      const transcript = await this.stages.transcribe(tracks, context);
+      context.signal?.throwIfAborted();
       this.sink.saveTranscript(meetingId, transcript);
       if (!this.options.keepAudio?.()) {
         await discardAudio(tracks);
@@ -32,24 +33,25 @@ export class PipelineRunner {
       }
       // A call with no speech is a finished Meeting with nothing to summarise, not a failure.
       if (transcript.segments.length === 0) this.sink.setMeetingState(meetingId, "done");
-      else await this.summarise(meetingId, transcript);
+      else await this.summarise(meetingId, transcript, context);
     } catch (err) {
       this.fail(meetingId, err);
     }
   }
 
   /** Summarises an already stored Transcript, for retrying a Meeting that failed at that stage. */
-  async resummarise(meetingId: number, transcript: Transcript): Promise<void> {
+  async resummarise(meetingId: number, transcript: Transcript, context: PipelineContext = {}): Promise<void> {
     this.sink.setMeetingState(meetingId, "processing");
     try {
-      await this.summarise(meetingId, transcript);
+      await this.summarise(meetingId, transcript, context);
     } catch (err) {
       this.fail(meetingId, err);
     }
   }
 
-  private async summarise(meetingId: number, transcript: Transcript): Promise<void> {
-    const summary = await this.stages.summarise(transcript);
+  private async summarise(meetingId: number, transcript: Transcript, context: PipelineContext): Promise<void> {
+    const summary = await this.stages.summarise(transcript, context);
+    context.signal?.throwIfAborted();
     this.sink.saveSummary(meetingId, summary);
     this.sink.setMeetingState(meetingId, "done");
   }
