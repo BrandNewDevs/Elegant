@@ -3,10 +3,14 @@ import { AIJobQueue } from "../pipeline/job-queue.js";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Engine } from "../engine/protocol.js";
-import type { PipelineStages } from "../pipeline/pipeline.js";
+import type { PipelineContext, PipelineStages } from "../pipeline/pipeline.js";
 import { exportFileName, meetingToMarkdown } from "./export-markdown.js";
 import { DEFAULT_DETECTION, MicWatcher, type DetectionSettings } from "./detection.js";
 import { applyNames } from "./participants.js";
+import { MeetingChatController } from "./meeting-chat-controller.js";
+import type { MeetingChatGenerator } from "../pipeline/meeting-chat.js";
+import type { ChatRecord } from "../shared/meeting-chat.js";
+import { resolveReference, transcriptRevision, type TranscriptReference } from "../pipeline/evidence.js";
 import { discardAudio, PipelineRunner } from "../pipeline/runner.js";
 import type { Meeting, MeetingListItem, Store } from "../store/store.js";
 
@@ -30,6 +34,7 @@ export interface AppCoreDeps {
   extraIgnoredApps?: () => readonly string[];
   stopTimeoutMs?: number;
   jobs?: AIJobQueue;
+  chat?: MeetingChatGenerator;
 }
 
 /** A Meeting the app has noticed but not yet been told to record. It lives in memory only; nothing is stored for it. */
@@ -49,6 +54,7 @@ export interface ActiveRecording {
 export class AppCore {
   private _status: EngineStatus = "stopped";
   private stopping = false;
+  private recoverOnStart = true;
   private statusListeners: ((status: EngineStatus) => void)[] = [];
   private meetingsListeners: (() => void)[] = [];
   private readonly runner: PipelineRunner;
@@ -68,11 +74,23 @@ export class AppCore {
 
   private readonly store: Store;
   readonly jobs: AIJobQueue;
+  private readonly chatController: MeetingChatController;
 
   constructor(private readonly deps: AppCoreDeps) {
     this.store = this.notifyingStore(deps.store);
     this.jobs = deps.jobs ?? new AIJobQueue();
     this.runner = new PipelineRunner(deps.pipeline, this.store, { keepAudio: () => this.keepAudio });
+    this.chatController = new MeetingChatController({ store: this.store, jobs: this.jobs, generate: deps.chat,
+      isAvailable: id => this.isChatAvailable(id) });
+    let previousOwners = new Set<string>();
+    this.jobs.onChange(state => {
+      const currentOwners = new Set(state.map(job => job.owner));
+      for (const owner of new Set([...previousOwners, ...currentOwners])) {
+        const match = /^(?:meeting|chat):(\d+)$/.exec(owner);
+        if (match) this.chatController.refresh(Number(match[1]));
+      }
+      previousOwners = currentOwners;
+    });
     const detection = { ...DEFAULT_DETECTION, ...deps.detection };
     this.promptTimeoutMs = detection.promptTimeoutMs;
     const extraIgnoredApps = deps.extraIgnoredApps ?? (() => []);
@@ -114,7 +132,7 @@ export class AppCore {
             this.store.saveAudio(id, { micPath: event.micPath, systemPath: event.systemPath });
             this.store.setMeetingState(id, "failed", `the app quit before this Recording was processed; the audio is in ${where}`);
           } else {
-            this.pipelineJob(id, "transcription-and-summary", signal => this.runner.run(id, { micPath: event.micPath, systemPath: event.systemPath }, { signal }));
+            this.pipelineJob(id, "transcription-and-summary", context => this.runner.run(id, { micPath: event.micPath, systemPath: event.systemPath }, context));
           }
           break;
         }
@@ -254,6 +272,7 @@ export class AppCore {
    */
   renameParticipant(meetingId: number, label: string, name: string): void {
     this.store.renameParticipant(meetingId, label, name.trim() || null);
+    this.chatController.refresh(meetingId);
   }
 
   /** Whether a Recording's audio is kept after it is transcribed. Off by default: the audio is deleted. */
@@ -274,6 +293,7 @@ export class AppCore {
     if (meeting.state === "recording" || meeting.state === "processing") {
       throw new Error(`a Meeting that is ${meeting.state} cannot be deleted yet`);
     }
+    this.chatController.clear(id);
     if (meeting.audio) await discardAudio(meeting.audio);
     this.store.deleteMeeting(id);
   }
@@ -284,7 +304,7 @@ export class AppCore {
     if (!meeting) throw new Error(`no such Meeting: ${id}`);
     if (meeting.state !== "failed") throw new Error(`only a failed Meeting can be retried, and this one is ${meeting.state}`);
     if (meeting.transcript.segments.length === 0) throw new Error("this Meeting has no Transcript to summarise");
-    await this.pipelineJob(id, "summary", signal => this.runner.resummarise(id, meeting.transcript, { signal }));
+    await this.pipelineJob(id, "summary", context => this.runner.resummarise(id, meeting.transcript, context));
   }
 
   /**
@@ -298,7 +318,7 @@ export class AppCore {
       throw new Error(`a Meeting that is ${meeting.state} cannot be summarised again yet`);
     }
     if (meeting.transcript.segments.length === 0) throw new Error("this Meeting has no Transcript to summarise");
-    await this.pipelineJob(id, "summary", signal => this.runner.resummarise(id, meeting.transcript, { signal }));
+    await this.pipelineJob(id, "summary", context => this.runner.resummarise(id, meeting.transcript, context));
   }
 
   /** Transcribes a failed Meeting again from its kept audio, without re-recording. */
@@ -310,15 +330,61 @@ export class AppCore {
     for (const path of [meeting.audio.micPath, meeting.audio.systemPath]) {
       if (!existsSync(path)) throw new Error(`the audio is no longer there: ${path}`);
     }
-    await this.pipelineJob(id, "transcription-and-summary", signal => this.runner.run(id, meeting.audio!, { signal }));
+    this.chatController.clear(id);
+    await this.pipelineJob(id, "transcription-and-summary", context => this.runner.run(id, meeting.audio!, context));
   }
 
-  /** Resolves when no Recording is being processed. */
+  getChatHistory(id: number): ChatRecord[] { return this.chatController.history(id); }
+
+  getChatHistoryForDisplay(id: number): ChatRecord[] { return this.chatController.historyForDisplay(id); }
+
+  sendQuestion(meetingId: number, requestId: string, question: string): ChatRecord {
+    return this.chatController.send(meetingId, requestId, question);
+  }
+
+  cancelQuestion(meetingId: number, requestId: string): void { this.chatController.cancel(meetingId, requestId); }
+
+  clearChat(meetingId: number): void { this.chatController.clear(meetingId); }
+
+  onChatChanged(listener: (meetingId: number) => void): () => void { return this.chatController.onChange(listener); }
+
+  getTranscriptRevision(id: number): string {
+    const meeting = this.store.getMeeting(id);
+    if (!meeting) throw new Error("This Meeting no longer exists");
+    return transcriptRevision(meeting.transcript);
+  }
+
+  openReference(meetingId: number, reference: TranscriptReference): number[] {
+    const meeting = this.store.getMeeting(meetingId);
+    if (!meeting) throw new Error("This Meeting no longer exists");
+    return resolveReference(meeting.transcript, reference).map(source => source.ref);
+  }
+
+  isChatAvailable(id: number): boolean {
+    const meeting = this.store.getMeeting(id);
+    if (this.stopping || !this.deps.chat || !meeting || !meeting.transcript.segments.length || meeting.state === "recording") return false;
+    const pipelineJobs = this.jobs.snapshot.filter(job => job.owner === `meeting:${id}`);
+    if (pipelineJobs.some(job => job.kind !== "summary")) return false;
+    return meeting.state !== "processing" || (pipelineJobs.length > 0 && pipelineJobs.every(job => job.kind === "summary"));
+  }
+
+  /** Resolves when managed AI work and its underlying native tasks have settled. */
   async idle(): Promise<void> {
     while (this.inFlight.size > 0) await Promise.all([...this.inFlight]);
+    await this.jobs.idle();
   }
 
   start(): void {
+    if (this.recoverOnStart) {
+      this.recoverOnStart = false;
+      // No native processing from a previous app process can survive this engine launch.
+      for (const meeting of this.store.listMeetings()) {
+        if ((meeting.state === "recording" || meeting.state === "processing")
+          && !this.jobs.snapshot.some(job => job.owner === `meeting:${meeting.id}`)) {
+          this.store.setMeetingState(meeting.id, "failed", "The app stopped before this Meeting finished processing. Retry from its saved audio or Transcript.");
+        }
+      }
+    }
     this.stopping = false;
     this.setStatus("starting");
     this.deps.engine.start();
@@ -337,9 +403,12 @@ export class AppCore {
     this.setStatus("stopped");
   }
 
-  private pipelineJob(id: number, kind: string, task: (signal: AbortSignal) => Promise<void>): Promise<void> {
+  private pipelineJob(id: number, kind: string, task: (context: PipelineContext) => Promise<void>): Promise<void> {
     this.store.setMeetingState(id, "processing");
-    const work = this.jobs.enqueue({ id: randomUUID(), owner: `meeting:${id}`, kind }, task).catch(error => {
+    const queueId = randomUUID();
+    const work = this.jobs.enqueue({ id: queueId, owner: `meeting:${id}`, kind }, signal => task({ signal,
+      onStage: stage => this.jobs.updateKind(queueId, stage === "summarising" ? "summary" : "transcription"),
+    })).catch(error => {
       if (this.store.getMeeting(id)) this.store.setMeetingState(id, "failed", error instanceof Error ? error.message : "AI work cancelled");
     });
     return this.track(work);
@@ -396,17 +465,14 @@ export class AppCore {
     for (const resolve of this.recordingSettledWaiters.splice(0)) resolve();
   }
 
+  private notifyMeetings(): void {
+    for (const listener of this.meetingsListeners) {
+      try { listener(); } catch { /* A closed view cannot interrupt Meeting persistence. */ }
+    }
+  }
+
   private notifyingStore(store: Store): Store {
-    const notify = () => {
-      for (const listener of this.meetingsListeners) {
-        // A broken window must not stop a Meeting's state from being recorded.
-        try {
-          listener();
-        } catch (err) {
-          console.error("[meetings] listener failed", err);
-        }
-      }
-    };
+    const notify = () => this.notifyMeetings();
     return {
       ...store,
       createMeeting: (input) => {

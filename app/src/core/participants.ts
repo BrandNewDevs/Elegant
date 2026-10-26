@@ -50,8 +50,7 @@ export function canonicaliseParticipantMentions(text: string, participants: Part
     aliases.set(key, entry);
   }
   if (!aliases.size) return text;
-  const escaped = [...aliases.values()].map(alias => alias.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-    .sort((a, b) => b.length - a.length);
+  const escaped = [...aliases.values()].map((p) => p.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).sort((a, b) => b.length - a.length);
   const expression = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${escaped.join("|")})(?![\\p{L}\\p{N}_])`, "giu");
   return text.replace(expression, name => {
     const entry = aliases.get(name.toLowerCase())!;
