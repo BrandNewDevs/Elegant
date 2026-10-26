@@ -85,6 +85,21 @@ describe("renaming a Participant", () => {
     expect(shown.summary!.tldr).toBe("Speaker 2 says the launch is nearly there while Sam waits on legal. Speaker 10 is not here.");
   });
 
+  it("uses the displayed names in exported Summary prose without chaining labels", async () => {
+    const { core, id } = await recordedMeeting();
+    core.renameParticipant(id, "Speaker 1", "Speaker 2");
+    core.renameParticipant(id, "Speaker 2", "Sam");
+
+    await core.regenerateSummary(id);
+    const { markdown } = core.exportMeeting(id);
+    expect(markdown).toContain("Speaker 2 says the launch is nearly there while Sam waits on legal.");
+    expect(markdown).toContain("### Speaker 2");
+    expect(markdown).toContain("### Sam");
+    expect(markdown).toContain("- Sam should chase legal.");
+    expect(markdown).toContain("**Speaker 2** (0:02): Nearly there.");
+    expect(core.getMeeting(id)!.summary).toEqual(summary);
+  });
+
   it("can be changed, and cleared with a blank name", async () => {
     const { core, id } = await recordedMeeting();
     core.renameParticipant(id, "Speaker 1", "  Priya ");
