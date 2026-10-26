@@ -61,6 +61,68 @@ describe("evidence-backed Summary generation", () => {
     expect(result.evidence!.participants[0]!.said).toEqual([[0], [0, 1]]);
   });
 
+  it("does not refine seven distinct straightforward points merely because speakers have several points", async () => {
+    const source: Transcript = { segments: [
+      { start: 0, end: 8, speaker: "You", text: "The desktop settings screen is ready. I will write the permission guide by Thursday." },
+      { start: 10, end: 18, speaker: "Speaker 1", text: "I completed the search tests. I will review your permission guide on Friday." },
+      { start: 20, end: 28, speaker: "You", text: "We agree to keep the first release English only. We are not adding calendar integration." },
+      { start: 30, end: 38, speaker: "Speaker 1", text: "Agreed. The release date is still undecided." },
+    ] };
+    const points = [
+      { speaker: "You", text: "The desktop settings screen is ready.", refs: [0] },
+      { speaker: "You", text: "I will write the permission guide by Thursday.", refs: [0] },
+      { speaker: "You", text: "We agree to keep the first release English only.", refs: [2] },
+      { speaker: "You", text: "We are not adding calendar integration.", refs: [2] },
+      { speaker: "Speaker 1", text: "I completed the search tests.", refs: [1] },
+      { speaker: "Speaker 1", text: "I will review your permission guide on Friday.", refs: [1] },
+      { speaker: "Speaker 1", text: "The release date is still undecided.", refs: [3] },
+    ];
+    const model = fake(() => ({ tldr: "The scope and commitments were discussed; no release date is agreed.", tldrRefs: [0, 1, 2, 3], points }));
+    const result = await createGroundedSummariser({ model })(source);
+    expect(model.requests).toHaveLength(1);
+    expect(result.participants.flatMap(participant => participant.said)).toEqual(points.map(point => point.text));
+  });
+
+  it("does not treat a shared deadline or source segment as evidence that distinct tasks repeat", async () => {
+    const source = { segments: [{ start: 0, end: 20, speaker: "You", text: "I will write the permission guide and run the permission tests by Thursday." }] };
+    const points = [
+      { speaker: "You", text: "Will write the permission guide by Thursday.", refs: [0] },
+      { speaker: "You", text: "Will run the permission tests by Thursday.", refs: [0] },
+    ];
+    const model = fake(() => ({ tldr: "Two distinct tasks are due Thursday.", tldrRefs: [0], points }));
+    const result = await createGroundedSummariser({ model })(source);
+    expect(model.requests).toHaveLength(1);
+    expect(result.participants[0]!.said).toEqual(points.map(point => point.text));
+  });
+
+  it("schedules permission-flow and export repetitions without automatically merging case-sensitive tasks", async () => {
+    const source: Transcript = { segments: [
+      { start: 0, end: 10, speaker: "You", text: "I will test the permission flow by Thursday. This is still the same permission flow test." },
+      { start: 10, end: 20, speaker: "Speaker 1", text: "I will review the Markdown export on Friday. I repeat the Markdown export review." },
+      { start: 20, end: 30, speaker: "You", text: "Deploy Branch Alpha and deploy Branch alpha separately." },
+    ] };
+    const points = [
+      { speaker: "You", text: "Will test the permission flow by Thursday.", refs: [0] },
+      { speaker: "You", text: "The permission flow test remains the Thursday task.", refs: [0] },
+      { speaker: "Speaker 1", text: "Will review the Markdown export on Friday.", refs: [1] },
+      { speaker: "Speaker 1", text: "The Markdown export review is on Friday.", refs: [1] },
+      { speaker: "You", text: "Deploy Branch Alpha.", refs: [2] },
+      { speaker: "You", text: "Deploy Branch alpha.", refs: [2] },
+    ];
+    const model = fake(request => payload(request).draft ? { points: [
+      { speaker: "You", text: points[0]!.text, covers: [0, 1] },
+      { speaker: "Speaker 1", text: points[2]!.text, covers: [2, 3] },
+      { speaker: "You", text: points[4]!.text, covers: [4] },
+      { speaker: "You", text: points[5]!.text, covers: [5] },
+    ] } : { tldr: "The test and export review are due; the case-sensitive branches remain separate.", tldrRefs: [0, 1, 2], points });
+    const result = await createGroundedSummariser({ model })(source);
+    expect(model.requests).toHaveLength(2);
+    expect(result.participants.find(participant => participant.speaker === "You")!.said).toEqual([
+      points[0]!.text, points[4]!.text, points[5]!.text,
+    ]);
+    expect(result.participants.find(participant => participant.speaker === "Speaker 1")!.said).toEqual([points[2]!.text]);
+  });
+
   it("refines repeated short-Meeting points with original evidence in one bounded additional pass", async () => {
     const repeated = { ...good, points: [good.points[0], { ...good.points[0], text: "The permission guide will be written by Thursday." }, good.points[1]] };
     const model = fake(request => payload(request).draft ? { points: [
@@ -105,14 +167,15 @@ describe("evidence-backed Summary generation", () => {
   it("preserves the validated draft after bounded refinement attempts lose a distinct commitment or speaker", async () => {
     const source = { segments: [...transcript.segments, { start: 10, end: 15, speaker: "You", text: "I will run the permission tests by Friday." }] };
     const testPoint = { speaker: "You", text: "Will run the permission tests by Friday.", refs: [2] };
-    const draft = { ...good, points: [...good.points, testPoint] };
+    const repeatedGuide = { ...good.points[0]!, text: "Write the permission guide by Thursday." };
+    const draft = { ...good, points: [...good.points, testPoint, repeatedGuide] };
     for (const revised of [{ points: [
       { speaker: "You", text: good.points[0]!.text, covers: [0] },
       { speaker: "Speaker 1", text: good.points[1]!.text, covers: [1] },
     ] }, { points: [{ speaker: "You", text: testPoint.text, covers: [2] }] }]) {
       const model = fake(request => payload(request).draft ? revised : draft);
       const result = await createGroundedSummariser({ model })(source);
-      expect(result.participants[0]!.said).toEqual([good.points[0]!.text, testPoint.text]);
+      expect(result.participants[0]!.said).toEqual([good.points[0]!.text, testPoint.text, repeatedGuide.text]);
       expect(result.participants[1]!.speaker).toBe("Speaker 1");
       expect(model.requests).toHaveLength(4);
     }
