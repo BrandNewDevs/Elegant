@@ -61,6 +61,13 @@ export function refinementSchema(points: SupportedPoint[]) {
 
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const problem = (message: string): never => { throw new InvalidSummaryError(message); };
+/** Diagnostics contain only local IDs and original speaker labels, never candidate or Transcript prose. */
+function coverageReason(prefix: string, ids: number[], points: { speaker: string }[]): string {
+  const listed = ids.slice(0, 4).map(id => `${id}(${points[id]!.speaker})`).join(", ");
+  const more = ids.length > 4 ? ` +${ids.length - 4} more` : "";
+  return `${prefix}: ${listed}${more}. Cover every required ID once under its original speaker.`
+    .replace(/[^\x20-\x7e]|["\\]/g, " ").slice(0, 160);
+}
 function object(json: string): Record<string, unknown> {
   let value: unknown;
   try { value = JSON.parse(json); } catch { return problem("Output must be a JSON object"); }
@@ -96,11 +103,12 @@ export function parseRefinedPoints(json: string, draft: SupportedPoint[]): Suppo
     const speaker = text(value.speaker);
     if (!Array.isArray(value.covers) || !value.covers.length || !value.covers.every(id => Number.isInteger(id) && id >= 0 && id < draft.length)) return problem("Use the supplied draft point IDs in covers");
     const ids = [...new Set(value.covers)] as number[];
-    if (ids.some(id => draft[id]!.speaker !== speaker)) return problem("A refined point may cover only draft points by the same speaker");
+    const wrongSpeaker = ids.filter(id => draft[id]!.speaker !== speaker);
+    if (wrongSpeaker.length) return problem(coverageReason("Wrong speaker for draft IDs", wrongSpeaker, draft));
     ids.forEach(id => covered.add(id));
     return { speaker, text: text(value.text), refs: [...new Set(ids.flatMap(id => draft[id]!.refs))].sort((a, b) => a - b) };
   });
-  if (covered.size !== draft.length) return problem("Every original draft point must be covered by a refined point");
+  if (covered.size !== draft.length) return problem(coverageReason("Missing draft IDs", draft.map((_, id) => id).filter(id => !covered.has(id)), draft));
   return points;
 }
 
@@ -124,14 +132,14 @@ export function parseReducedFacts(json: string, sources: SourcePiece[], candidat
   const covered = new Set<number>();
   (value.facts as unknown[]).forEach((raw, index) => {
     if (!record(raw) || !Array.isArray(raw.covers) || !raw.covers.length
-        || !raw.covers.every(id => Number.isInteger(id) && id >= 0 && id < candidates.length)) return problem("Use the supplied candidate IDs in covers");
+        || !raw.covers.every(id => Number.isInteger(id) && id >= 0 && id < candidates.length)) return problem(`Use candidate IDs 0..${candidates.length - 1} from requiredCoverage, each exactly once in covers`);
     for (const id of new Set(raw.covers as number[])) {
-      if (covered.has(id)) return problem("Every candidate must be covered exactly once");
-      if (candidates[id]!.speaker !== facts[index]!.speaker) return problem("Cover only candidates by the same speaker; other speakers' sources may clarify corrections");
+      if (covered.has(id)) return problem(coverageReason("Duplicate candidate IDs", [id], candidates));
+      if (candidates[id]!.speaker !== facts[index]!.speaker) return problem(coverageReason("Wrong speaker for candidate IDs", [id], candidates));
       covered.add(id);
     }
   });
-  if (covered.size !== candidates.length) return problem("Every input candidate must be represented in covers; do not discard distinct facts");
+  if (covered.size !== candidates.length) return problem(coverageReason("Missing candidate IDs", candidates.map((_, id) => id).filter(id => !covered.has(id)), candidates));
   return facts;
 }
 export function parseTldrSources(json: string, sources: SourcePiece[]): { tldr: string; tldrRefs: number[] } {

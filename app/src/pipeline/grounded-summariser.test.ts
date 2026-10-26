@@ -181,6 +181,30 @@ describe("evidence-backed Summary generation", () => {
     }
   });
 
+  it("identifies a missing draft point for bounded refinement repair without exposing its prose", async () => {
+    const source = { segments: [...transcript.segments, { start: 10, end: 15, speaker: "You", text: "I will run permission tests by Friday." }] };
+    const testPoint = { speaker: "You", text: "Will run permission tests by Friday.", refs: [2] };
+    const duplicate = { ...good.points[0]!, text: "Write the permission guide by Thursday." };
+    const draft = { ...good, points: [...good.points, testPoint, duplicate] };
+    const model = fake(request => {
+      if (!payload(request).draft) return draft;
+      const instruction = (JSON.parse(request.messages.at(-1)!.content) as { instruction: string }).instruction;
+      const points = [
+        { speaker: "You", text: good.points[0]!.text, covers: [0, 3] },
+        { speaker: "Speaker 1", text: good.points[1]!.text, covers: [1] },
+      ];
+      if (instruction.includes("Missing draft IDs: 2(You)")) points.push({ speaker: "You", text: testPoint.text, covers: [2] });
+      return { points };
+    });
+    const result = await createGroundedSummariser({ model })(source);
+    expect(result.participants[0]!.said).toEqual([good.points[0]!.text, testPoint.text]);
+    expect(model.requests).toHaveLength(3);
+    const feedback = (JSON.parse(model.requests[2]!.messages.at(-1)!.content) as { instruction: string }).instruction;
+    expect(feedback).toContain("Missing draft IDs: 2(You)");
+    expect(feedback).not.toContain(testPoint.text);
+    expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
   it("merges repeated draft points with different original ordinals and derives their union refs", async () => {
     const source = { segments: Array.from({ length: 5 }, (_, index) => ({ start: index, end: index + 1, speaker: index % 2 ? "Speaker 1" : "You", text: "We reviewed the same permission task." })) };
     const draft = { ...good, points: [0, 2, 4].map(ref => ({ speaker: "You", text: "Will finish the permission tests by Thursday.", refs: [ref] })) };

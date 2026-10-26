@@ -6,14 +6,14 @@ import type { TextModel, TextRequest } from "./language-model.js";
 
 interface Piece { id: string; ref: number; part: number; speaker: string; text: string }
 interface Fact { id: number; speaker: string; text: string; kind: string; sourceIds: string[]; covers?: number[] }
-interface Payload { primary?: Piece[]; sources?: Piece[]; candidates?: Fact[]; totalFacts?: number; otherFactsRetained?: number }
+interface Payload { requiredCoverage?: Record<string, number[]>; primary?: Piece[]; sources?: Piece[]; candidates?: Fact[]; totalFacts?: number; otherFactsRetained?: number }
 const data = (request: TextRequest): Payload => (JSON.parse(request.messages.at(-1)!.content) as { data: Payload }).data;
 const prefix = (text: string) => text.split(" | ")[0]!;
 function original(text: string) { return `${text} | ` + "The surrounding discussion is original evidence and remains available without being shortened. ".repeat(9); }
 function uniqueCommitments(): Transcript { return { segments: Array.from({ length: 9 }, (_, index) => ({
   start: index * 30, end: index * 30 + 20, speaker: "You", text: original(`I will complete Task_${index} by day ${index + 1}.`),
 })) }; }
-function adapter(reduce: (facts: Fact[], sources: Piece[]) => Fact[] = facts => facts.map(fact => ({ ...fact, covers: [fact.id] }))) {
+function adapter(reduce: (facts: Fact[], sources: Piece[], request: TextRequest) => Fact[] = facts => facts.map(fact => ({ ...fact, covers: [fact.id] }))) {
   const requests: TextRequest[] = [];
   const model: TextModel = { async complete(request) {
     requests.push(request);
@@ -22,7 +22,7 @@ function adapter(reduce: (facts: Fact[], sources: Piece[]) => Fact[] = facts => 
     if (input.primary) output = { facts: input.primary.filter(piece => piece.part === 0).map(piece => ({
       speaker: piece.speaker, text: prefix(piece.text), kind: /propose|suggest/i.test(piece.text) ? "proposal" : /final decision/i.test(piece.text) ? "decision" : "commitment", sourceIds: [piece.id],
     })) };
-    else if ("facts" in (request.schema as { properties: object }).properties) output = { facts: reduce(input.candidates!, input.sources!) };
+    else if ("facts" in (request.schema as { properties: object }).properties) output = { facts: reduce(input.candidates!, input.sources!, request) };
     else output = { tldr: "The selected commitments and final decisions remain supported by the original discussion.", sourceIds: input.sources!.map(piece => piece.id) };
     return { text: JSON.stringify(output), metadata: { model: "coverage:test", elapsedMs: 1 } };
   } };
@@ -87,8 +87,32 @@ describe("complete long Summary coverage", () => {
 
   it("rejects missing candidate coverage rather than publishing a shortened partial Summary", async () => {
     const { model, requests } = adapter(facts => facts.slice(0, -1).map(fact => ({ ...fact, covers: [fact.id] })));
-    await expect(createGroundedSummariser({ model, attempts: 2 })(uniqueCommitments())).rejects.toThrow("Every input candidate must be represented");
+    await expect(createGroundedSummariser({ model, attempts: 2 })(uniqueCommitments())).rejects.toThrow("Missing candidate IDs");
     expect(requests.every(request => !((request.schema as { properties: object }).properties && "tldr" in (request.schema as { properties: object }).properties))).toBe(true);
+  });
+
+  it("repairs an omitted candidate only when retry feedback names its ID and original speaker", async () => {
+    let repaired = 0;
+    const { model, requests } = adapter((facts, _sources, request) => {
+      const missing = facts.at(-1)!;
+      const instruction = (JSON.parse(request.messages.at(-1)!.content) as { instruction: string }).instruction;
+      const required = data(request).requiredCoverage!;
+      expect(required[missing.speaker]).toContain(missing.id);
+      if (instruction.includes(`Missing candidate IDs: ${missing.id}(${missing.speaker})`)) {
+        repaired++;
+        return facts.map(fact => ({ ...fact, covers: [fact.id] }));
+      }
+      return facts.slice(0, -1).map(fact => ({ ...fact, covers: [fact.id] }));
+    });
+    const result = await createGroundedSummariser({ model })(uniqueCommitments());
+    expect(repaired).toBeGreaterThan(0);
+    expect(result.participants[0]!.said).toHaveLength(9);
+    expect(result.evidence!.participants[0]!.said).toEqual(Array.from({ length: 9 }, (_, ref) => [ref]));
+    expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+    for (const request of requests.filter(request => data(request).candidates && "facts" in (request.schema as { properties: object }).properties)) {
+      const instruction = (JSON.parse(request.messages.at(-1)!.content) as { instruction: string }).instruction;
+      if (instruction.includes("Missing candidate IDs:")) expect(instruction).not.toContain("I will complete Task_");
+    }
   });
 
   it("never publishes a partially compared round after the deadline", async () => {
