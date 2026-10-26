@@ -36,6 +36,23 @@ it("upgrades a version 1 database, keeping its Meetings", () => {
   store.close();
 });
 
+it("indexes the Meetings of a database from before search existed", () => {
+  const path = join(dir, "meetings.db");
+  const first = openStore(path);
+  const id = first.createMeeting({ app: "zoom.us", startedAt: "2026-10-01T09:00:00.000Z" });
+  first.saveTranscript(id, { segments: [{ start: 0, end: 1, speaker: "You", text: "remember the milk" }] });
+  first.saveSummary(id, { tldr: "Buy dairy.", participants: [] });
+  first.close();
+  const old = new DatabaseSync(path);
+  old.exec("DROP TABLE search_index");
+  old.close();
+
+  const store = openStore(path);
+  expect(store.searchMeetings("milk").map((m) => m.id)).toEqual([id]);
+  expect(store.searchMeetings("dairy").map((m) => m.id)).toEqual([id]);
+  store.close();
+});
+
 it("deletes a Meeting with its Participants, Transcript and Summary, and no other", () => {
   const store = openStore(":memory:");
   const keep = store.createMeeting({ app: "Slack", startedAt: "2026-10-01T08:00:00.000Z" });

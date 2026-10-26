@@ -1186,3 +1186,100 @@ describe("retrying a failed transcription", () => {
     await expect(core.retryTranscription(id)).rejects.toThrow(/failed/);
   });
 });
+
+describe("searching Meetings", () => {
+  /** Stores a finished Meeting whose Transcript and Summary say the given things. */
+  function stored(store: ReturnType<typeof openStore>, app: string, startedAt: string, said: string, summarised: string) {
+    const id = store.createMeeting({ app, startedAt });
+    store.saveTranscript(id, { segments: [{ start: 0, end: 2, speaker: "You", text: said }] });
+    store.saveSummary(id, { tldr: summarised, participants: [{ speaker: "You", said: [summarised] }] });
+    store.setMeetingState(id, "done");
+    return id;
+  }
+
+  function withMeetings() {
+    const store = openStore(":memory:");
+    const budget = stored(store, "Slack", "2026-10-23T09:00:00.000Z", "The budget needs another review.", "Review the budget.");
+    const launch = stored(store, "zoom.us", "2026-10-24T09:00:00.000Z", "We launch on Friday.", "Launch is planned.");
+    const core = new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() });
+    return { store, core, budget, launch };
+  }
+
+  it("finds a Meeting by a word in its Transcript", () => {
+    const { core, budget } = withMeetings();
+    expect(core.searchMeetings("another").map((m) => m.id)).toEqual([budget]);
+  });
+
+  it("finds a Meeting by a word only its Summary has", () => {
+    const { core, launch } = withMeetings();
+    expect(core.searchMeetings("planned").map((m) => m.id)).toEqual([launch]);
+  });
+
+  it("returns the Meeting's list entry, so a result can open its detail view", () => {
+    const { core, launch } = withMeetings();
+    expect(core.searchMeetings("friday")).toEqual([
+      { id: launch, app: "zoom.us", startedAt: "2026-10-24T09:00:00.000Z", state: "done" },
+    ]);
+    expect(core.getMeeting(launch)).toMatchObject({ transcript: { segments: [{ text: "We launch on Friday." }] } });
+  });
+
+  it("ignores case, matches word forms and the start of a word, and needs every word", () => {
+    const { core, budget, launch } = withMeetings();
+    expect(core.searchMeetings("BUDGET").map((m) => m.id)).toEqual([budget]);
+    expect(core.searchMeetings("launching").map((m) => m.id)).toEqual([launch]);
+    expect(core.searchMeetings("budg").map((m) => m.id)).toEqual([budget]);
+    expect(core.searchMeetings("budget friday")).toEqual([]);
+  });
+
+  it("lists matches newest first", () => {
+    const { store, core, budget, launch } = withMeetings();
+    const newest = stored(store, "Teams", "2026-10-25T09:00:00.000Z", "Back to the budget.", "Budget again.");
+    expect(core.searchMeetings("budget").map((m) => m.id)).toEqual([newest, budget]);
+    expect(core.searchMeetings("launch").map((m) => m.id)).toEqual([launch]);
+  });
+
+  it("matches nothing for a query with no words, and does not choke on search syntax", () => {
+    const { core } = withMeetings();
+    expect(core.searchMeetings("")).toEqual([]);
+    expect(core.searchMeetings("   ")).toEqual([]);
+    expect(core.searchMeetings('" OR * ( NEAR')).toEqual([]);
+    expect(core.searchMeetings("budget's")).toEqual([]);
+  });
+
+  it("does not match the words that structure a Summary", () => {
+    const { core } = withMeetings();
+    expect(core.searchMeetings("said")).toEqual([]);
+    expect(core.searchMeetings("speaker")).toEqual([]);
+  });
+
+  it("finds a Meeting once its Transcript and Summary have been produced by a Recording", async () => {
+    const engine = new FakeEngine();
+    const core = new AppCore({ engine, store: openStore(":memory:"), pipeline: fakePipeline() });
+    core.start();
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    expect(core.searchMeetings("skeleton")).toEqual([]);
+    core.stopRecording();
+    engine.emit({ type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav", micStartHostTime: 1, systemStartHostTime: 1 });
+    await core.idle();
+
+    expect(core.searchMeetings("skeleton").map((m) => m.app)).toEqual(["zoom.us"]);
+    expect(core.searchMeetings("detection")).toHaveLength(1);
+  });
+
+  it("follows a regenerated Summary: the old text no longer matches", () => {
+    const { store, core, launch } = withMeetings();
+    store.saveSummary(launch, { tldr: "Shipping soon.", participants: [] });
+    expect(core.searchMeetings("planned")).toEqual([]);
+    expect(core.searchMeetings("shipping").map((m) => m.id)).toEqual([launch]);
+    expect(core.searchMeetings("friday").map((m) => m.id)).toEqual([launch]);
+  });
+
+  it("no longer returns a Meeting once it is deleted", async () => {
+    const { core, budget, launch } = withMeetings();
+    await core.deleteMeeting(budget);
+
+    expect(core.searchMeetings("budget")).toEqual([]);
+    expect(core.searchMeetings("review")).toEqual([]);
+    expect(core.searchMeetings("launch").map((m) => m.id)).toEqual([launch]);
+  });
+});

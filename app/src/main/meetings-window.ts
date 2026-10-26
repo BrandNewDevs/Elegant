@@ -1,12 +1,13 @@
 import { BrowserWindow } from "electron";
 import type { AppCore } from "../core/app-core.js";
 import { DISPLAY_NAME } from "../config.js";
-import { meetingIdFromLink, renderMeetingsPage } from "./meetings-page.js";
+import { meetingIdFromLink, renderMeetingsPage, searchFromLink } from "./meetings-page.js";
 
 /** The Meetings window: a list on the left, the selected Meeting on the right. Redraws when Meetings change. */
 export class MeetingsWindow {
   private window: BrowserWindow | undefined;
   private selectedId: number | undefined;
+  private query = "";
 
   constructor(private readonly core: AppCore) {
     core.onMeetingsChanged(() => this.draw());
@@ -20,6 +21,12 @@ export class MeetingsWindow {
       // The page is plain HTML; clicking a Meeting navigates to its link, which we turn into a selection.
       window.webContents.on("will-navigate", (event, url) => {
         event.preventDefault();
+        const query = searchFromLink(url);
+        if (query !== undefined) {
+          this.query = query;
+          this.draw();
+          return;
+        }
         const id = meetingIdFromLink(url);
         if (id === undefined) return;
         this.selectedId = id;
@@ -36,7 +43,7 @@ export class MeetingsWindow {
   private draw(): void {
     if (!this.window) return;
     const selected = this.selectedId === undefined ? undefined : this.core.getMeeting(this.selectedId);
-    const html = renderMeetingsPage(this.core.listMeetings(), selected);
+    const html = renderMeetingsPage(this.query.trim() ? this.core.searchMeetings(this.query) : this.core.listMeetings(), selected, this.query);
     void this.window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
   }
 }

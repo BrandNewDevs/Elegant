@@ -190,6 +190,11 @@ export class AppCore {
     return this.store.listMeetings();
   }
 
+  /** The Meetings whose Transcript or Summary matches the query, newest first. */
+  searchMeetings(query: string): MeetingListItem[] {
+    return this.store.searchMeetings(query);
+  }
+
   getMeeting(id: number): Meeting | undefined {
     return this.store.getMeeting(id);
   }
