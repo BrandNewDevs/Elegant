@@ -1,7 +1,8 @@
-import { BrowserWindow } from "electron";
+import { BrowserWindow, dialog } from "electron";
+import { writeFile } from "node:fs/promises";
 import type { AppCore } from "../core/app-core.js";
 import { DISPLAY_NAME } from "../config.js";
-import { meetingIdFromLink, renderMeetingsPage } from "./meetings-page.js";
+import { exportIdFromLink, meetingIdFromLink, renderMeetingsPage } from "./meetings-page.js";
 
 /** The Meetings window: a list on the left, the selected Meeting on the right. Redraws when Meetings change. */
 export class MeetingsWindow {
@@ -20,6 +21,11 @@ export class MeetingsWindow {
       // The page is plain HTML; clicking a Meeting navigates to its link, which we turn into a selection.
       window.webContents.on("will-navigate", (event, url) => {
         event.preventDefault();
+        const exportId = exportIdFromLink(url);
+        if (exportId !== undefined) {
+          void this.export(exportId);
+          return;
+        }
         const id = meetingIdFromLink(url);
         if (id === undefined) return;
         this.selectedId = id;
@@ -31,6 +37,20 @@ export class MeetingsWindow {
     }
     this.window.show();
     this.window.focus();
+  }
+
+  private async export(id: number): Promise<void> {
+    if (!this.window) return;
+    try {
+      const { fileName, markdown } = this.core.exportMeeting(id);
+      const { canceled, filePath } = await dialog.showSaveDialog(this.window, {
+        defaultPath: fileName,
+        filters: [{ name: "Markdown", extensions: ["md"] }],
+      });
+      if (!canceled && filePath) await writeFile(filePath, markdown);
+    } catch (err) {
+      dialog.showErrorBox("Could not export the Meeting", err instanceof Error ? err.message : String(err));
+    }
   }
 
   private draw(): void {

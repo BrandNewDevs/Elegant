@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Engine } from "../engine/protocol.js";
 import type { PipelineStages } from "../pipeline/pipeline.js";
+import { exportFileName, meetingToMarkdown } from "./export-markdown.js";
 import { DEFAULT_DETECTION, MicWatcher, type DetectionSettings } from "./detection.js";
 import { discardAudio, PipelineRunner } from "../pipeline/runner.js";
 import type { Meeting, MeetingListItem, Store } from "../store/store.js";
@@ -192,6 +193,13 @@ export class AppCore {
 
   getMeeting(id: number): Meeting | undefined {
     return this.store.getMeeting(id);
+  }
+
+  /** One Meeting as Markdown, with a suggested file name. */
+  exportMeeting(id: number): { fileName: string; markdown: string } {
+    const meeting = this.store.getMeeting(id);
+    if (!meeting) throw new Error(`no such Meeting: ${id}`);
+    return { fileName: exportFileName(meeting), markdown: meetingToMarkdown(meeting) };
   }
 
   /** Whether a Recording's audio is kept after it is transcribed. Off by default: the audio is deleted. */
