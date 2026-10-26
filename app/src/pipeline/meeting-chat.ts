@@ -20,6 +20,7 @@ export const CHAT_PROMPT_VERSION = "meeting-chat-v2";
 export const CHAT_ABSENT = "Not established in the available Transcript.";
 export const CHAT_INCOMPLETE = "I could not review enough of the Transcript to answer reliably. Please ask a narrower question.";
 const MAX_CALLS = 128;
+const UNRESOLVED_REFERENCE = /\b(it|that|they|their|this|those|them|he|she|his|her|same)\b/i;
 const FOLLOW_UP = /\b(it|that|they|their|this|those|them|he|she|his|her|same)\b|^\s*(and\b|what about\b)/i;
 const RESOLVE_TASK = "Rewrite the current question as one standalone English question, preserving exactly what the user is asking. "
   + "Explicitly name the referenced task or topic and the person when known. Do not use referential pronouns such as it, they, their, that, this, he or she. "
@@ -130,7 +131,7 @@ export function createMeetingChat({ store, model, modelName = AI_SETTINGS.model,
           reason = "question must be a non-empty string of at most 2000 characters"; continue;
         }
         const rewritten = (value as { question: string }).question.trim();
-        if (FOLLOW_UP.test(rewritten)) {
+        if (UNRESOLVED_REFERENCE.test(rewritten)) {
           reason = "Name the task or person from priorUserQuestion explicitly; remove unresolved pronouns such as it, they, their, that, this, he or she";
           continue;
         }

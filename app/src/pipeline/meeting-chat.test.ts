@@ -123,6 +123,20 @@ describe("grounded Meeting chat", () => {
     expect(invalid.requests).toHaveLength(3);
   });
 
+  it.each(["And when will You finish the permission guide?", "What about the permission guide deadline?"])(
+    "accepts a standalone rewrite with explicit nouns despite its follow-up prefix: %s", async rewritten => {
+      const { store, id, expectedRevision } = setup();
+      const model = fake(request => {
+        expect(contents(request).data.question).toBe(rewritten);
+        return positive;
+      }, { resolve: () => ({ question: rewritten }) });
+      const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "And their deadline?",
+        history: [{ question, answer: "You will write the guide." }] });
+      expect(result.answer.refs).toEqual([0]);
+      expect(model.requests.filter(request => "question" in (request.schema as { properties: object }).properties)).toHaveLength(1);
+      expect(result.generation.calls).toBe(3);
+    });
+
   it("rejects unresolved follow-up pronouns and corrects them without a large grammar repetition bound", async () => {
     const { store, id, expectedRevision } = setup();
     let rewrites = 0;
