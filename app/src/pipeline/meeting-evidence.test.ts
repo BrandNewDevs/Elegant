@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 import { openStore, type Store } from "../store/store.js";
 import type { Transcript } from "./pipeline.js";
@@ -258,5 +259,78 @@ describe("Meeting-specific evidence retrieval", () => {
     const result = await createMeetingEvidence({ store, model: local })({ meetingId: id, question: "語".repeat(2000), fits: byCount(1) });
     expect(result).toMatchObject({ exhaustive: false, sufficient: false, sources: [], calls: 0 });
     expect(result.reason).toContain("budget");
+  });
+});
+
+
+describe("focused lexical evidence selection", () => {
+  it.each(["Who will update the demo guide?", "Who is updating the demo guide?"])("shortlists the late guide commitment with Porter matching: %s", async question => {
+    const fixture = JSON.parse(readFileSync(new URL("../../../evaluation/fixtures/long-discussion.json", import.meta.url), "utf8")) as { transcript: Transcript };
+    const { store, id } = meeting(fixture.transcript);
+    const queries: string[] = [];
+    const scopedStore = { ...store, searchPassages: (meetingId: number, revision: string, query: string, limit?: number) => {
+      queries.push(query);
+      return store.searchPassages(meetingId, revision, query, limit);
+    } };
+    const local = model(request => {
+      const direct = data(request).sources!.filter(source => source.ref === 181);
+      return { sourceIds: direct.map(source => source.id), sufficient: direct.length > 0 };
+    });
+    const result = await createMeetingEvidence({ store: scopedStore, model: local })({
+      meetingId: id, question, fits: byCount(1),
+    });
+    expect(queries[0]).toBe(question.includes("updating") ? "updating demo guide" : "update demo guide");
+    expect(queries).toContain("correction actually instead revised replaced superseded changed cancelled final");
+    expect(result).toMatchObject({ mode: "fts", exhaustive: false, sufficient: true });
+    expect(result.sources.map(source => source.ref)).toEqual([181]);
+    expect(local.requests.length).toBeLessThanOrEqual(4);
+    expect(local.requests.flatMap(request => data(request).sources ?? []).every(source => source.ref >= 171)).toBe(true);
+    expect(local.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it("keeps a later single-marker correction even when another correction matches more markers", async () => {
+    const source = long();
+    for (let index = 8; index < 10; index++) source.segments.push({ ...source.segments[0]!, start: index * 30, end: index * 30 + 25 });
+    source.segments[2]!.text = "Actually the launch was revised, replaced and superseded: Thursday. " + source.segments[2]!.text;
+    source.segments[6]!.text = "Changed to Monday. " + source.segments[6]!.text;
+    const { store, id, passages } = meeting(source);
+    const correctionQuery = "correction actually instead revised replaced superseded changed cancelled final";
+    const scopedStore = { ...fixedHits(store, []), searchPassages: (_meeting: number, _revision: string, query: string) => {
+      if (query === correctionQuery) return [passages[2]!, passages[6]!];
+      if (query === "launch") return [passages[0]!];
+      if (query === "changed") return [passages[6]!];
+      if (correctionQuery.split(" ").includes(query)) return [passages[2]!];
+      return [];
+    } };
+    const local = model(() => { throw new Error("The complete candidate context should fit"); });
+    const result = await createMeetingEvidence({ store: scopedStore, model: local })({ meetingId: id, question: "When is launch?", fits: byCount(8) });
+    expect(result).toMatchObject({ mode: "fts", exhaustive: false, sufficient: true });
+    expect(result.sources.some(source => source.ref === 6 && source.text.startsWith("Changed to Monday."))).toBe(true);
+    expect(local.requests).toHaveLength(0);
+  });
+
+  it("preserves canonical speaker labels, negation and dates in lexical lookup", async () => {
+    const { store, id, passages } = meeting(long());
+    const queries: string[] = [];
+    const scopedStore = { ...fixedHits(store, []), searchPassages: (_meeting: number, _revision: string, query: string) => {
+      queries.push(query);
+      return query.startsWith("correction") ? [] : [passages[2]!];
+    } };
+    await createMeetingEvidence({ store: scopedStore, model: model(selection) })({
+      meetingId: id, question: "Who will You and Speaker 1 not assign on May 12?", fits: byCount(4),
+    });
+    expect(queries[0]).toBe("You Speaker 1 not assign May 12");
+  });
+
+  it("does not run a match-all lexical query when only question grammar remains", async () => {
+    const { store, id } = meeting(long());
+    const queries: string[] = [];
+    const scopedStore = { ...store, searchPassages: (_meeting: number, _revision: string, query: string) => { queries.push(query); return []; } };
+    const local = model(request => instruction(request).startsWith("Rewrite") ? { query: "the and" } : { sourceIds: [], sufficient: false });
+    const result = await createMeetingEvidence({ store: scopedStore, model: local })({ meetingId: id, question: "Who will the?", fits: byCount(1) });
+    expect(queries).toEqual([]);
+    expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: false });
+    const visited = new Set(local.requests.flatMap(request => data(request).sources ?? []).map(source => source.id));
+    expect(visited.size).toBe(long().segments.length);
   });
 });

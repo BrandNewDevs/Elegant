@@ -220,12 +220,27 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
       if (!all.length) { mode = "full"; return complete([], true, false, "This Meeting has no Transcript passages"); }
       if (answerFits(all)) { mode = "full"; return complete(all, true, true); }
       const byId = new Map(passages.map(passage => [passage.id, passage]));
-      const safeHits = (question: string) => {
+      const lookup = (query: string) => store.searchPassages(input.meetingId, revision, query, 8)
+        .filter(passage => passage.meetingId === input.meetingId && passage.revision === revision && byId.has(passage.id))
+        .map(passage => byId.get(passage.id)!);
+      const safeHits = (question: string, focus = true) => {
         const query = lexicalQuery(question);
         if (!query) return [];
-        return store.searchPassages(input.meetingId, revision, query, 8)
-          .filter(passage => passage.meetingId === input.meetingId && passage.revision === revision && byId.has(passage.id))
-          .map(passage => byId.get(passage.id)!);
+        const ranked = lookup(query);
+        if (!focus) return ranked;
+        // Porter handles inflections. A frequent task-adjacent word must not make eight unrelated
+        // OR hits look as specific as the passage matching the complete requested subject.
+        const scores = new Map<number, number>();
+        const candidates = new Map(ranked.map(passage => [passage.id, passage]));
+        for (const term of new Set(query.toLowerCase().split(/\s+/))) {
+          check();
+          for (const passage of lookup(term)) {
+            candidates.set(passage.id, passage);
+            scores.set(passage.id, (scores.get(passage.id) ?? 0) + 1);
+          }
+        }
+        const best = Math.max(0, ...scores.values());
+        return best ? [...candidates.values()].filter(passage => scores.get(passage.id) === best) : ranked;
       };
       let hits = safeHits(input.question);
       if (!input.skipRewrite && (!hits.length || followUp(input.question, history))) {
@@ -240,7 +255,7 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
       if (!input.forceScan && !broad(input.question) && hits.length) {
         // A later correction can say "actually Monday" without repeating the original topic's search terms.
         const firstHit = Math.min(...hits.map(hit => hit.index));
-        const corrections = safeHits("correction actually instead revised replaced superseded changed cancelled final").filter(hit => hit.index >= firstHit);
+        const corrections = safeHits("correction actually instead revised replaced superseded changed cancelled final", false).filter(hit => hit.index >= firstHit);
         hits = [...new Map([...hits, ...corrections].map(passage => [passage.id, passage])).values()];
         const indices = new Set<number>([passages.at(-1)!.index]);
         for (const hit of hits) for (const index of [hit.index - 1, hit.index, hit.index + 1]) indices.add(index);
