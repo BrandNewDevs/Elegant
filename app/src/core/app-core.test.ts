@@ -1186,3 +1186,65 @@ describe("retrying a failed transcription", () => {
     await expect(core.retryTranscription(id)).rejects.toThrow(/failed/);
   });
 });
+
+describe("exporting a Meeting to Markdown", () => {
+  function seeded() {
+    const dir = mkdtempSync(join(tmpdir(), "export-"));
+    const path = join(dir, "meetings.db");
+    const store = openStore(path);
+    const id = store.createMeeting({ app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    store.saveTranscript(id, fixtureTranscript);
+    store.saveSummary(id, fixtureSummary);
+    store.setMeetingState(id, "done");
+    const core = new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() });
+    return { id, core, path, dir };
+  }
+
+  it("has the Summary and the Transcript", () => {
+    const { id, core, dir } = seeded();
+    const { markdown, fileName } = core.exportMeeting(id);
+    rmSync(dir, { recursive: true });
+
+    expect(fileName).toBe("zoom.us 2026-10-24 10-00.md");
+    expect(markdown).toContain("## Summary");
+    expect(markdown).toContain(fixtureSummary.tldr);
+    expect(markdown).toContain("- Fan out to detection and the window afterwards.");
+    expect(markdown).toContain("## Transcript");
+    expect(markdown).toContain("**You** (0:00): Let's ship the walking skeleton first.");
+    expect(markdown).toContain("**Others** (0:03): Agreed, then fan out to detection and the window.");
+  });
+
+  it("shows a renamed Participant by name in the Summary and the Transcript, and leaves the others as labelled", async () => {
+    const { id, core, path, dir } = seeded();
+    // Stand-in for the rename feature: the name is stored per Meeting, and the Summary keeps labels.
+    const { DatabaseSync } = await import("node:sqlite");
+    const db = new DatabaseSync(path);
+    db.prepare("UPDATE participants SET name = 'Priya' WHERE label = 'Others'").run();
+    db.close();
+
+    const { markdown } = core.exportMeeting(id);
+    rmSync(dir, { recursive: true });
+
+    expect(markdown).toContain("### Priya");
+    expect(markdown).toContain("**Priya** (0:03): Agreed");
+    expect(markdown).not.toContain("Others");
+    expect(markdown).toContain("### You");
+  });
+
+  it("exports a Meeting that has no Summary yet, with just its Transcript", () => {
+    const store = openStore(":memory:");
+    const id = store.createMeeting({ app: "Slack", startedAt: "2026-10-24T10:00:00.000Z" });
+    store.saveTranscript(id, fixtureTranscript);
+    store.setMeetingState(id, "failed", "ollama is not running");
+    const core = new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() });
+
+    const { markdown } = core.exportMeeting(id);
+    expect(markdown).not.toContain("## Summary");
+    expect(markdown).toContain("## Transcript");
+  });
+
+  it("refuses a Meeting that does not exist", () => {
+    const { core } = setup();
+    expect(() => core.exportMeeting(99)).toThrow(/no such Meeting/);
+  });
+});
