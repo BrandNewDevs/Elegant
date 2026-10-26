@@ -24,7 +24,7 @@ function fake(reply: (request: TextRequest, call: number) => unknown): TextModel
 }
 interface Piece { id: string; ref: number; part: number; speaker: string; text: string }
 interface Fact { speaker: string; text: string; refs: number[]; sourceIds: string[]; kind: string }
-interface Payload { sources?: Piece[]; primary?: Piece[]; context?: Piece[]; candidates?: Fact[] }
+interface Payload { sources?: Piece[]; primary?: Piece[]; context?: Piece[]; candidates?: Fact[]; draft?: unknown }
 const payload = (request: TextRequest): Payload => JSON.parse(request.messages[1]!.content) as Payload;
 
 /** A deterministic adapter exercises orchestration, budgets and provenance, not factual model quality. */
@@ -60,6 +60,19 @@ describe("evidence-backed Summary generation", () => {
     expect(result.participants).toHaveLength(2);
     expect(result.participants[0]!.said).toHaveLength(2);
     expect(result.evidence!.participants[0]!.said).toEqual([[0], [0, 1]]);
+  });
+
+  it("refines repeated short-Meeting points with original evidence in one bounded additional pass", async () => {
+    const repeated = { ...good, points: [good.points[0], { ...good.points[0], text: "The permission guide will be written by Thursday." }, good.points[1]] };
+    const model = fake(request => payload(request).draft ? good : repeated);
+    const result = await createGroundedSummariser({ model })(transcript);
+    expect(model.requests).toHaveLength(2);
+    expect(result.participants[0]!.said).toEqual([good.points[0]!.text]);
+    expect(payload(model.requests[1]!).sources).toEqual(payload(model.requests[0]!).sources);
+    expect(payload(model.requests[1]!).draft).toEqual(repeated);
+    expect(model.requests[1]!.messages[0]!.content).toContain("original sources as truth");
+    expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+    expect(result.generation!.calls).toBe(2);
   });
 
   it("retries invalid JSON or attribution at most three total attempts", async () => {
