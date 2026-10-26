@@ -405,8 +405,8 @@ describe("the audio of a Recording", () => {
       engine,
       store: openStore(":memory:"),
       pipeline: fakePipeline(opts.pipeline),
-      keepAudio: opts.keepAudio,
     });
+    core.setKeepAudio(opts.keepAudio ?? false);
     core.start();
     engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
     core.stopRecording();
@@ -636,6 +636,282 @@ describe("detecting a meeting", () => {
     core.acceptPrompt();
     core.declinePrompt();
     expect(engine.commands).toEqual([]);
+  });
+});
+
+describe("holding audio from Detection", () => {
+  const DEBOUNCE = DEFAULT_DETECTION.debounceMs;
+  const TIMEOUT = DEFAULT_DETECTION.promptTimeoutMs;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function running() {
+    const ctx = setup();
+    ctx.core.start();
+    ctx.engine.emit({ type: "ready", version: "0.1.0" });
+    const micStarted = (app: string, pid = 100) => ctx.engine.emit({ type: "mic_in_use_started", app, pid });
+    return { ...ctx, micStarted };
+  }
+
+  it("asks the engine to hold audio from the moment of Detection, not before", () => {
+    const { engine, micStarted } = running();
+    micStarted("zoom.us");
+    vi.advanceTimersByTime(DEBOUNCE - 1);
+    expect(engine.commands).toEqual([]);
+
+    vi.advanceTimersByTime(1);
+    expect(engine.commands).toEqual([{ type: "start_buffer", app: "zoom.us" }]);
+  });
+
+  it("asks for nothing when an app that is not listed uses the microphone", () => {
+    const { engine, micStarted } = running();
+    micStarted("Wispr Flow");
+    vi.advanceTimersByTime(60_000);
+    expect(engine.commands).toEqual([]);
+  });
+
+  it("keeps the buffer when the user accepts late: the engine is told to record, not to discard", () => {
+    const { core, engine, micStarted } = running();
+    micStarted("zoom.us");
+    vi.advanceTimersByTime(DEBOUNCE + TIMEOUT - 1);
+    core.acceptPrompt();
+    expect(engine.commands).toEqual([
+      { type: "start_buffer", app: "zoom.us" },
+      { type: "start_recording", app: "zoom.us" },
+    ]);
+  });
+
+  it("discards the buffer when the user declines", () => {
+    const { core, engine, micStarted } = running();
+    micStarted("zoom.us");
+    vi.advanceTimersByTime(DEBOUNCE);
+    core.declinePrompt();
+    expect(engine.commands).toEqual([{ type: "start_buffer", app: "zoom.us" }, { type: "discard_buffer" }]);
+    expect(core.listMeetings()).toEqual([]);
+  });
+
+  it("discards the buffer when the Prompt is ignored", () => {
+    const { core, engine, micStarted } = running();
+    micStarted("zoom.us");
+    vi.advanceTimersByTime(DEBOUNCE + TIMEOUT);
+    expect(engine.commands).toEqual([{ type: "start_buffer", app: "zoom.us" }, { type: "discard_buffer" }]);
+    expect(core.listMeetings()).toEqual([]);
+  });
+
+  it("discards the buffer when the call ends before the user answers", () => {
+    const { engine, micStarted } = running();
+    micStarted("zoom.us");
+    vi.advanceTimersByTime(DEBOUNCE);
+    engine.emit({ type: "mic_in_use_stopped", app: "zoom.us", pid: 100 });
+    expect(engine.commands).toEqual([{ type: "start_buffer", app: "zoom.us" }, { type: "discard_buffer" }]);
+  });
+
+  it("holds audio for one Meeting at a time", () => {
+    const { engine, micStarted } = running();
+    micStarted("zoom.us");
+    vi.advanceTimersByTime(DEBOUNCE);
+    micStarted("Slack", 200);
+    vi.advanceTimersByTime(DEBOUNCE);
+    expect(engine.commands).toEqual([{ type: "start_buffer", app: "zoom.us" }]);
+  });
+});
+
+describe("nudging the user to stop", () => {
+  const DEBOUNCE = DEFAULT_DETECTION.debounceMs;
+  const startedAt = "2026-10-24T10:00:00.000Z";
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function inACall(app = "zoom.us") {
+    const ctx = setup();
+    ctx.core.start();
+    ctx.engine.emit({ type: "ready", version: "0.1.0" });
+    ctx.engine.emit({ type: "mic_in_use_started", app, pid: 100 });
+    vi.advanceTimersByTime(DEBOUNCE);
+    const nudges: string[] = [];
+    ctx.core.onStopNudge((a) => nudges.push(a));
+    const micStopped = (a = app, pid = 100) => ctx.engine.emit({ type: "mic_in_use_stopped", app: a, pid });
+    const record = () => {
+      ctx.core.acceptPrompt();
+      ctx.engine.emit({ type: "recording_started", app, startedAt });
+    };
+    return { ...ctx, nudges, micStopped, record };
+  }
+
+  it("nudges when the call app releases the microphone during a Recording", () => {
+    const { nudges, micStopped, record } = inACall();
+    record();
+    micStopped();
+    expect(nudges).toEqual(["zoom.us"]);
+  });
+
+  it("leaves the Recording running, however long the nudge is ignored", () => {
+    const { core, engine, nudges, micStopped, record } = inACall();
+    record();
+    micStopped();
+    vi.advanceTimersByTime(8 * 60 * 60 * 1000);
+    expect(nudges).toHaveLength(1);
+    expect(core.recording).toEqual({ app: "zoom.us", startedAt });
+    expect(core.listMeetings()).toMatchObject([{ state: "recording" }]);
+    expect(engine.commands.filter((c) => c.type === "stop_recording")).toEqual([]);
+  });
+
+  it("waits for the last helper process of the call app to let go", () => {
+    const ctx = setup();
+    ctx.core.start();
+    ctx.engine.emit({ type: "mic_in_use_started", app: "Google Chrome", pid: 1 });
+    ctx.engine.emit({ type: "mic_in_use_started", app: "Google Chrome", pid: 2 });
+    vi.advanceTimersByTime(DEBOUNCE);
+    const nudges: string[] = [];
+    ctx.core.onStopNudge((a) => nudges.push(a));
+    ctx.core.acceptPrompt();
+    ctx.engine.emit({ type: "recording_started", app: "Google Chrome", startedAt });
+
+    ctx.engine.emit({ type: "mic_in_use_stopped", app: "Google Chrome", pid: 1 });
+    expect(nudges).toEqual([]);
+    ctx.engine.emit({ type: "mic_in_use_stopped", app: "Google Chrome", pid: 2 });
+    expect(nudges).toEqual(["Google Chrome"]);
+  });
+
+  it("does not nudge when no Recording is in progress", () => {
+    const { nudges, micStopped } = inACall();
+    micStopped(); // the Prompt is still open: it is withdrawn, not nudged
+    expect(nudges).toEqual([]);
+  });
+
+  it("does not nudge once the Recording has been stopped", () => {
+    const { core, nudges, micStopped, record } = inACall();
+    record();
+    core.stopRecording();
+    micStopped();
+    expect(nudges).toEqual([]);
+  });
+
+  it("does not nudge for an app that is not the one being recorded", () => {
+    const { engine, nudges, record } = inACall();
+    record();
+    engine.emit({ type: "mic_in_use_started", app: "Slack", pid: 200 });
+    engine.emit({ type: "mic_in_use_stopped", app: "Slack", pid: 200 });
+    expect(nudges).toEqual([]);
+  });
+});
+
+describe("the keep-audio setting and deleting a Meeting", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+
+  /** Makes the two tracks the engine would leave, in a directory of their own. */
+  function tracksOnDisk() {
+    const dir = mkdtempSync(join(tmpdir(), "meeting-recorder-audio-"));
+    dirs.push(dir);
+    const micPath = join(dir, "mic.wav");
+    const systemPath = join(dir, "system.wav");
+    writeFileSync(micPath, "mic");
+    writeFileSync(systemPath, "system");
+    return { dir, micPath, systemPath };
+  }
+
+  async function record(core: AppCore, engine: FakeEngine, pipelineDone = true) {
+    const files = tracksOnDisk();
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    core.stopRecording();
+    engine.emit({ type: "tracks_ready", micPath: files.micPath, systemPath: files.systemPath, micStartHostTime: 1, systemStartHostTime: 1 });
+    if (pipelineDone) await core.idle();
+    return files;
+  }
+
+  it("is off until the user turns it on", () => {
+    const { core } = setup();
+    expect(core.keepAudio).toBe(false);
+    core.setKeepAudio(true);
+    expect(core.keepAudio).toBe(true);
+    core.setKeepAudio(false);
+    expect(core.keepAudio).toBe(false);
+  });
+
+  it("is remembered by the store, so it survives a restart", () => {
+    const store = openStore(":memory:");
+    new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).setKeepAudio(true);
+    expect(new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).keepAudio).toBe(true);
+  });
+
+  it("applies to the next Recording without restarting", async () => {
+    const { core, engine } = setup();
+    core.start();
+    const first = await record(core, engine);
+    expect(existsSync(first.dir)).toBe(false);
+
+    core.setKeepAudio(true);
+    const second = await record(core, engine);
+    expect(existsSync(second.micPath)).toBe(true);
+
+    core.setKeepAudio(false);
+    const third = await record(core, engine);
+    expect(existsSync(third.dir)).toBe(false);
+  });
+
+  it("deleting a Meeting removes its Transcript, Summary, Participants and kept audio", async () => {
+    const { core, engine, store } = setup();
+    core.start();
+    core.setKeepAudio(true);
+    const files = await record(core, engine);
+    const id = core.listMeetings()[0]!.id;
+    expect(store.getMeeting(id)).toMatchObject({ state: "done", audio: { micPath: files.micPath } });
+
+    await core.deleteMeeting(id);
+
+    expect(core.listMeetings()).toEqual([]);
+    expect(core.getMeeting(id)).toBeUndefined();
+    expect(existsSync(files.dir)).toBe(false);
+  });
+
+  it("deleting a failed Meeting removes the audio kept for its retry", async () => {
+    const { core, engine } = setup({ failTranscribe: "model missing" });
+    core.start();
+    const files = await record(core, engine);
+    const id = core.listMeetings()[0]!.id;
+    expect(existsSync(files.micPath)).toBe(true);
+
+    await core.deleteMeeting(id);
+    expect(existsSync(files.dir)).toBe(false);
+    expect(core.listMeetings()).toEqual([]);
+  });
+
+  it("tells the Meetings window that a Meeting was deleted", async () => {
+    const { core, engine } = setup();
+    core.start();
+    await record(core, engine);
+    const id = core.listMeetings()[0]!.id;
+    let changes = 0;
+    core.onMeetingsChanged(() => changes++);
+    await core.deleteMeeting(id);
+    expect(changes).toBe(1);
+  });
+
+  it("refuses to delete a Meeting that is still recording or being processed", async () => {
+    const { core, engine } = setup();
+    core.start();
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    const id = core.listMeetings()[0]!.id;
+    await expect(core.deleteMeeting(id)).rejects.toThrow(/recording/);
+    expect(core.getMeeting(id)).toBeDefined();
+  });
+
+  it("refuses to delete a Meeting that does not exist", async () => {
+    const { core } = setup();
+    await expect(core.deleteMeeting(99)).rejects.toThrow(/no such Meeting/);
   });
 });
 

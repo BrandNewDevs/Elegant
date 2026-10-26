@@ -35,3 +35,33 @@ it("upgrades a version 1 database, keeping its Meetings", () => {
   expect(store.getMeeting(1)!.audio).toEqual({ micPath: "/a/mic.wav", systemPath: "/a/system.wav" });
   store.close();
 });
+
+it("deletes a Meeting with its Participants, Transcript and Summary, and no other", () => {
+  const store = openStore(":memory:");
+  const keep = store.createMeeting({ app: "Slack", startedAt: "2026-10-01T08:00:00.000Z" });
+  const gone = store.createMeeting({ app: "zoom.us", startedAt: "2026-10-01T09:00:00.000Z" });
+  for (const id of [keep, gone]) {
+    store.saveTranscript(id, { segments: [{ start: 0, end: 1, speaker: "You", text: "hello" }] });
+    store.saveSummary(id, { tldr: "Hello.", participants: [{ speaker: "You", said: ["hello"] }] });
+  }
+
+  store.deleteMeeting(gone);
+
+  expect(store.getMeeting(gone)).toBeUndefined();
+  expect(store.listMeetings().map((m) => m.id)).toEqual([keep]);
+  expect(store.getMeeting(keep)).toMatchObject({ participants: [{ label: "You" }], summary: { tldr: "Hello." } });
+  store.close();
+});
+
+it("remembers a setting, and overwrites it", () => {
+  const path = join(dir, "meetings.db");
+  const store = openStore(path);
+  expect(store.getSetting("keepAudio")).toBeUndefined();
+  store.setSetting("keepAudio", "true");
+  store.setSetting("keepAudio", "false");
+  store.close();
+
+  const reopened = openStore(path);
+  expect(reopened.getSetting("keepAudio")).toBe("false");
+  reopened.close();
+});

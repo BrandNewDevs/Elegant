@@ -14,7 +14,8 @@ export class PipelineRunner {
   constructor(
     private readonly stages: PipelineStages,
     private readonly sink: PipelineSink,
-    private readonly options: { keepAudio?: boolean } = {},
+    /** Asked after each transcription, so changing the setting applies to the next Recording without a restart. */
+    private readonly options: { keepAudio?: () => boolean } = {},
   ) {}
 
   /** Transcribes and summarises a Recording. Also the retry for a Meeting whose transcription failed: its audio is still there. */
@@ -25,7 +26,7 @@ export class PipelineRunner {
     try {
       const transcript = await this.stages.transcribe(tracks);
       this.sink.saveTranscript(meetingId, transcript);
-      if (!this.options.keepAudio) {
+      if (!this.options.keepAudio?.()) {
         await discardAudio(tracks);
         this.sink.clearAudio(meetingId);
       }
@@ -59,7 +60,7 @@ export class PipelineRunner {
 }
 
 /** Deletes a Recording's tracks, and their directory if the engine made it and nothing else is in it. */
-async function discardAudio(tracks: Tracks): Promise<void> {
+export async function discardAudio(tracks: Tracks): Promise<void> {
   for (const path of [tracks.micPath, tracks.systemPath]) await rm(path, { force: true });
   const dir = dirname(tracks.micPath);
   if (!basename(dir).startsWith(RECORDING_DIR_PREFIX)) return;

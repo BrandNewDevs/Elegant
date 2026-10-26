@@ -3,8 +3,11 @@ import { dirname } from "node:path";
 import type { Engine } from "../engine/protocol.js";
 import type { PipelineStages } from "../pipeline/pipeline.js";
 import { DEFAULT_DETECTION, MicWatcher, type DetectionSettings } from "./detection.js";
-import { PipelineRunner } from "../pipeline/runner.js";
+import { discardAudio, PipelineRunner } from "../pipeline/runner.js";
 import type { Meeting, MeetingListItem, Store } from "../store/store.js";
+
+/** The store setting behind `AppCore.keepAudio`. */
+const KEEP_AUDIO_SETTING = "keepAudio";
 
 /** How long to wait for the engine to hand over the tracks after Stop before giving up on the Recording. */
 export const DEFAULT_STOP_TIMEOUT_MS = 30_000;
@@ -16,8 +19,6 @@ export interface AppCoreDeps {
   store: Store;
   pipeline: PipelineStages;
   detection?: Partial<DetectionSettings>;
-  /** Keep a Recording's audio after it is transcribed. Off by default: the audio is deleted. */
-  keepAudio?: boolean;
   stopTimeoutMs?: number;
 }
 
@@ -51,6 +52,7 @@ export class AppCore {
   private _recording: ActiveRecording | undefined;
   private recordingListeners: ((recording: ActiveRecording | undefined) => void)[] = [];
   private recordingFailedListeners: ((message: string) => void)[] = [];
+  private stopNudgeListeners: ((app: string) => void)[] = [];
   private recordingSettledWaiters: (() => void)[] = [];
   private stopTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -58,13 +60,14 @@ export class AppCore {
 
   constructor(private readonly deps: AppCoreDeps) {
     this.store = this.notifyingStore(deps.store);
-    this.runner = new PipelineRunner(deps.pipeline, this.store, { keepAudio: deps.keepAudio });
+    this.runner = new PipelineRunner(deps.pipeline, this.store, { keepAudio: () => this.keepAudio });
     const detection = { ...DEFAULT_DETECTION, ...deps.detection };
     this.promptTimeoutMs = detection.promptTimeoutMs;
     this.micWatcher = new MicWatcher(detection, {
       detected: (app) => this.onDetected(app),
       released: (app) => {
         if (this._detectedMeeting?.app === app) this.declinePrompt();
+        else if (this._recording?.app === app) for (const l of this.stopNudgeListeners) l(app);
       },
     });
     deps.engine.onEvent((event) => {
@@ -158,6 +161,14 @@ export class AppCore {
     this.recordingFailedListeners.push(listener);
   }
 
+  /**
+   * Called when the call app lets go of the microphone during a Recording, as a reminder to press Stop. It only
+   * reminds: the Recording runs on until the user presses Stop.
+   */
+  onStopNudge(listener: (app: string) => void): void {
+    this.stopNudgeListeners.push(listener);
+  }
+
   /** The user pressed Stop. The engine answers with the finished tracks. */
   stopRecording(): void {
     if (!this._recording) return;
@@ -181,6 +192,28 @@ export class AppCore {
 
   getMeeting(id: number): Meeting | undefined {
     return this.store.getMeeting(id);
+  }
+
+  /** Whether a Recording's audio is kept after it is transcribed. Off by default: the audio is deleted. */
+  get keepAudio(): boolean {
+    return this.deps.store.getSetting(KEEP_AUDIO_SETTING) === "true";
+  }
+
+  /** Applies from the next transcription on. */
+  setKeepAudio(keep: boolean): void {
+    this.deps.store.setSetting(KEEP_AUDIO_SETTING, String(keep));
+  }
+
+  /** Removes a Meeting and all its data, including any kept audio. */
+  async deleteMeeting(id: number): Promise<void> {
+    const meeting = this.deps.store.getMeeting(id);
+    if (!meeting) throw new Error(`no such Meeting: ${id}`);
+    // The pipeline is still writing to a Meeting in these states.
+    if (meeting.state === "recording" || meeting.state === "processing") {
+      throw new Error(`a Meeting that is ${meeting.state} cannot be deleted yet`);
+    }
+    if (meeting.audio) await discardAudio(meeting.audio);
+    this.store.deleteMeeting(id);
   }
 
   /** Summarises a failed Meeting again from its stored Transcript, e.g. once Ollama is running. */
@@ -235,6 +268,8 @@ export class AppCore {
     // One Meeting at a time: ignore a second app while a Prompt is showing or a Recording is running.
     if (this._detectedMeeting || this.recordingMeetingId !== undefined) return;
     this._detectedMeeting = { state: "detected", app, detectedAt: new Date().toISOString() };
+    // The start of the Meeting must survive a late answer, so audio is held in memory from now on.
+    this.deps.engine.send({ type: "start_buffer", app });
     this.promptTimer = setTimeout(() => this.declinePrompt(), this.promptTimeoutMs);
     this.notifyDetected();
   }
@@ -293,6 +328,10 @@ export class AppCore {
       },
       setMeetingState: (id, state, error) => {
         store.setMeetingState(id, state, error);
+        notify();
+      },
+      deleteMeeting: (id) => {
+        store.deleteMeeting(id);
         notify();
       },
     };
