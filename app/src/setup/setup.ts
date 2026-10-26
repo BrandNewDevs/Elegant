@@ -1,6 +1,7 @@
 import type { AIJobQueue } from "../pipeline/job-queue.js";
 import type { Engine, Permission } from "../engine/protocol.js";
 import type { OllamaStatus } from "../pipeline/ollama.js";
+import { USER_NAME_SETTING } from "../core/participants.js";
 import type { Store } from "../store/store.js";
 
 /** The store settings that remember what is already done, so a later launch never asks for it again. */
@@ -55,6 +56,7 @@ export class Setup {
   private modelJob?: { resolve: () => void; reject: (error: Error) => void };
   private listeners: (() => void)[] = [];
   private checkedListeners: (() => void)[] = [];
+  private nameListeners: (() => void)[] = [];
   private pendingChecks = new Set<Permission>();
   private _permissionsChecked = false;
 
@@ -132,6 +134,23 @@ export class Setup {
 
   onChange(listener: () => void): void {
     this.listeners.push(listener);
+  }
+
+  /** The person's own name, which Meetings show in place of "You". Empty until they give one. */
+  get userName(): string {
+    return this.store.getSetting(USER_NAME_SETTING) ?? "";
+  }
+
+  /** Remembers the person's name, or forgets it if it is blank. */
+  setUserName(name: string): void {
+    this.store.setSetting(USER_NAME_SETTING, name.trim());
+    for (const l of this.nameListeners) l();
+    this.update({});
+  }
+
+  /** Runs when the name changes, so what shows it can redraw. */
+  onUserNameChange(listener: () => void): void {
+    this.nameListeners.push(listener);
   }
 
   /** Runs once, when every remembered permission has been checked, so the caller knows whether onboarding is needed. */

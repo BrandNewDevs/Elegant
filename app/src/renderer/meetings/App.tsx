@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, FileDown, FileText, Inbox, Loader2, MessagesSquare, Radio, RefreshCw, Search, Sparkles, Trash2, Users, type LucideIcon } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileDown, FileText, Inbox, Loader2, MessagesSquare, Radio, RefreshCw, Search, Settings, Sparkles, Trash2, Users, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { Meeting, MeetingListItem, MeetingState } from "../../store/store";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { formatClock, formatWhen } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { SettingsDialog } from "../settings/SettingsDialog";
 
 const STATE_LABEL: Record<MeetingState, string> = {
   recording: "Recording",
@@ -181,12 +182,14 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
 }
 
 export function MeetingsApp() {
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [meetings, setMeetings] = useState<MeetingListItem[]>([]);
   const [selected, setSelected] = useState<Meeting | undefined>();
 
   useEffect(() => {
     const unsubscribe = window.electron.meetings.onState((state) => {
+      setSettingsOpen(state.settingsOpen);
       setQuery(state.query);
       setMeetings(state.meetings);
       setSelected(state.selected);
@@ -225,6 +228,12 @@ export function MeetingsApp() {
             meetings.map((m) => <MeetingListRow key={m.id} meeting={m} selected={selected?.id === m.id} />)
           )}
         </ScrollArea>
+        <div className="border-t p-2">
+          <Button type="button" variant="ghost" size="sm" className="w-full justify-start" onClick={() => window.electron.meetings.settings(true)}>
+            <Settings aria-hidden />
+            Settings
+          </Button>
+        </div>
       </aside>
       <ScrollArea className="min-h-0 flex-1">
         <main className="p-6">
@@ -238,6 +247,7 @@ export function MeetingsApp() {
           )}
         </main>
       </ScrollArea>
+      <SettingsDialog open={settingsOpen} onOpenChange={(open) => window.electron.meetings.settings(open)} />
     </div>
   );
 }

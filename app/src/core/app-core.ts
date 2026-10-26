@@ -6,7 +6,7 @@ import type { Engine } from "../engine/protocol.js";
 import type { PipelineStages } from "../pipeline/pipeline.js";
 import { exportFileName, meetingToMarkdown } from "./export-markdown.js";
 import { DEFAULT_DETECTION, MicWatcher, type DetectionSettings } from "./detection.js";
-import { applyNames } from "./participants.js";
+import { applyNames, USER_NAME_SETTING } from "./participants.js";
 import { discardAudio, PipelineRunner } from "../pipeline/runner.js";
 import type { Meeting, MeetingListItem, Store } from "../store/store.js";
 
@@ -239,13 +239,18 @@ export class AppCore {
   exportMeeting(id: number): { fileName: string; markdown: string } {
     const meeting = this.store.getMeeting(id);
     if (!meeting) throw new Error(`no such Meeting: ${id}`);
-    return { fileName: exportFileName(meeting), markdown: meetingToMarkdown(meeting) };
+    return { fileName: exportFileName(meeting), markdown: meetingToMarkdown(meeting, this.userName) };
+  }
+
+  /** The person's own name, shown in place of "You"; undefined until they give one. */
+  private get userName(): string | undefined {
+    return this.store.getSetting(USER_NAME_SETTING) || undefined;
   }
 
   /** The Meeting as it is shown: each Participant's chosen name stands in for their label, in the Transcript and the Summary. */
   getMeetingForDisplay(id: number): Meeting | undefined {
     const meeting = this.store.getMeeting(id);
-    return meeting && applyNames(meeting);
+    return meeting && applyNames(meeting, this.userName);
   }
 
   /**

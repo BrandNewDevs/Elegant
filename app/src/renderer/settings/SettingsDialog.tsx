@@ -1,9 +1,12 @@
-import { AlertCircle, CheckCircle2, Cpu, Download, ExternalLink, Loader2, RefreshCw, Settings, ShieldCheck, Sparkles, XCircle, type LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { AlertCircle, CheckCircle2, Cpu, UserRound, Download, ExternalLink, Loader2, RefreshCw, Settings, ShieldCheck, Sparkles, XCircle, type LucideIcon } from "lucide-react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { PERMISSIONS, type PermissionCopy, type PermissionStep } from "@/lib/permissions";
@@ -80,6 +83,35 @@ function PermissionRow({ copy, step, name }: { copy: PermissionCopy; step: Permi
   );
 }
 
+function NameCard({ userName }: { userName: string }) {
+  const [name, setName] = useState(userName);
+  const changed = name.trim() !== userName;
+  const save = (e: FormEvent) => {
+    e.preventDefault();
+    window.electron.setup.setUserName(name);
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardHeading icon={UserRound}>Your name</CardHeading>
+        <CardDescription>Shown in place of &ldquo;You&rdquo; in transcripts, summaries and exports, in every Meeting.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={save} className="flex items-end gap-2">
+          <div className="flex-1 space-y-2">
+            <Label htmlFor="user-name">Name</Label>
+            <Input id="user-name" autoComplete="name" maxLength={100} value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+          </div>
+          <Button type="submit" disabled={!changed}>
+            Save
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ModelsCard({ models, name }: { models: Step & { fraction: number }; name: string }) {
   const percent = Math.round(models.fraction * 100);
   return (
@@ -143,17 +175,14 @@ function SummariesCard({ ollama }: { ollama: Step }) {
   );
 }
 
-export function SettingsApp() {
+function SettingsContent() {
   const view = useSetup();
   if (!view) return null;
   const { name, state } = view;
 
   return (
-    <main className="mx-auto max-w-xl space-y-5 p-8">
-      <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight">
-        <Settings className="size-6 text-muted-foreground" aria-hidden />
-        Settings
-      </h1>
+    <div className="space-y-5">
+      <NameCard key={view.userName} userName={view.userName} />
       <Card>
         <CardHeader className="pb-1">
           <CardHeading icon={ShieldCheck}>Permissions</CardHeading>
@@ -167,6 +196,35 @@ export function SettingsApp() {
       </Card>
       <ModelsCard models={state.models} name={name} />
       <SummariesCard ollama={state.ollama} />
-    </main>
+    </div>
+  );
+}
+
+/** Settings, as a dialog over the main window: your name, the permissions, the model download and the Ollama check. */
+export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="flex max-h-[88vh] max-w-xl flex-col gap-0 overflow-hidden p-0"
+        // The content below arrives a moment after the dialog opens, so by default focus would land on the close button, the
+        // only thing there yet. Put it on the dialog itself instead: Esc and Tab work, and nothing looks focused.
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          (event.currentTarget as HTMLElement).focus();
+        }}
+      >
+        {/* The frame does not scroll, so the header and the close button stay put; only the body below does. */}
+        <DialogHeader className="border-b p-6 pr-12">
+          <DialogTitle className="flex items-center gap-2.5 text-xl">
+            <Settings className="size-5 text-muted-foreground" aria-hidden />
+            Settings
+          </DialogTitle>
+          <DialogDescription>Your name, the permissions, and what summaries need.</DialogDescription>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">
+          <SettingsContent />
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

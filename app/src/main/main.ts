@@ -1,4 +1,4 @@
-import { app, Menu, nativeImage, Notification, shell, Tray } from "electron";
+import { app, BrowserWindow, Menu, nativeImage, Notification, shell, Tray } from "electron";
 import { fileURLToPath } from "node:url";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -14,7 +14,8 @@ import { openStore } from "../store/store.js";
 import { DISPLAY_NAME, SPEECH_MODEL } from "../config.js";
 import { showPrompt } from "./prompt-window.js";
 import { MeetingsWindow } from "./meetings-window.js";
-import { SetupWindow } from "./setup-window.js";
+import { OnboardingWindow } from "./onboarding-window.js";
+import { SetupBridge } from "./setup-bridge.js";
 import { STATUS_LABEL } from "./status-label.js";
 
 const RECORDING_SYMBOL = "⏺";
@@ -26,7 +27,6 @@ let tray: Tray | undefined;
 let core: AppCore | undefined;
 let prompt: { close(): void } | undefined;
 let meetingsWindow: MeetingsWindow | undefined;
-let settingsWindow: SetupWindow | undefined;
 
 let ignoredAppsPath = "";
 
@@ -49,8 +49,8 @@ function render(): void {
         : []),
       { label: text, enabled: false },
       { type: "separator" },
-      { label: "Meetings…", click: () => meetingsWindow?.show() },
-      { label: "Settings…", accelerator: "Command+,", click: () => settingsWindow?.show() },
+      { label: `Open ${DISPLAY_NAME}`, click: () => meetingsWindow?.show() },
+      { label: "Settings…", accelerator: "Command+,", click: () => meetingsWindow?.show({ settings: true }) },
       {
         label: "Keep audio after transcription",
         type: "checkbox",
@@ -103,31 +103,18 @@ app.whenReady().then(() => {
     },
   });
 
-  meetingsWindow = new MeetingsWindow(core);
   const setup = new Setup(engine, store, {
     jobs: core.jobs,
     speechModel: SPEECH_MODEL,
     modelsDirectory: join(dataDir, "models"),
     checkOllama: () => checkOllama(),
   });
-  settingsWindow = new SetupWindow(setup, {
-    page: "settings",
-    title: "Settings",
-    width: 600,
-    height: 720,
-    // The person may have changed a permission in System Settings or started Ollama since the window was last open.
-    onShow: () => {
-      setup.verifyPermissions();
-      void setup.checkOllama();
-    },
+  const setupBridge = new SetupBridge(setup, {
+    done: (sender) => BrowserWindow.fromWebContents(sender)?.close(),
+    openSettings: () => meetingsWindow?.show({ settings: true }),
   });
-  const onboardingWindow = new SetupWindow(setup, {
-    page: "onboarding",
-    title: "Welcome",
-    width: 520,
-    height: 640,
-    openSettings: () => settingsWindow?.show(),
-  });
+  meetingsWindow = new MeetingsWindow(core, setup, setupBridge);
+  const onboardingWindow = new OnboardingWindow(setupBridge);
 
   tray = new Tray(nativeImage.createEmpty());
   core.onDetectedMeetingChange((meeting) => {
