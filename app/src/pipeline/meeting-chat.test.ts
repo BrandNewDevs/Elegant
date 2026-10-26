@@ -21,12 +21,17 @@ function setup(source = transcript) {
 interface Data { question: string; originalQuestion?: string; priorUserQuestion?: string; history: { question: string; answer: string }[]; sources?: SourceFragment[]; exhaustive?: boolean }
 const contents = (request: TextRequest) => JSON.parse(request.messages.at(-1)!.content) as { instruction: string; data: Data };
 const isAnswer = (request: TextRequest) => "text" in (request.schema as { properties: object }).properties;
-function fake(reply: (request: TextRequest, call: number) => unknown): TextModel & { requests: TextRequest[] } {
+function fake(reply: (request: TextRequest, call: number) => unknown, options: {
+  audit?: (request: TextRequest, call: number) => unknown;
+  resolve?: (request: TextRequest, call: number) => unknown;
+} = {}): TextModel & { requests: TextRequest[] } {
   const requests: TextRequest[] = [];
   return { requests, async complete(request) {
     requests.push(request);
     const resolving = "question" in (request.schema as { properties: object }).properties;
-    const result = resolving ? { question: "When will You finish the permission guide?" } : reply(request, requests.length);
+    const auditing = "supported" in (request.schema as { properties: object }).properties;
+    const result = resolving ? options.resolve?.(request, requests.length) ?? { question: "When will You finish the permission guide?" }
+      : auditing ? options.audit?.(request, requests.length) ?? { supported: true } : reply(request, requests.length);
     return { text: typeof result === "string" ? result : JSON.stringify(result), metadata: { model: "local:test", elapsedMs: 1, promptTokens: 10, outputTokens: 4 } };
   } };
 }
@@ -44,8 +49,8 @@ describe("grounded Meeting chat", () => {
     const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), onStage: stage => stages.push(stage) });
     expect(result.answer).toEqual({ text: positive.text, refs: [0], sufficient: true });
     expect(result.revision).toBe(expectedRevision);
-    expect(result.generation).toMatchObject({ promptVersion: CHAT_PROMPT_VERSION, model: "local:test", calls: 1,
-      promptTokens: 10, outputTokens: 4, retrievalCalls: 0, retrievalMode: "full", exhaustive: true });
+    expect(result.generation).toMatchObject({ promptVersion: CHAT_PROMPT_VERSION, model: "local:test", calls: 2,
+      promptTokens: 20, outputTokens: 8, retrievalCalls: 0, retrievalMode: "full", exhaustive: true });
     expect(stages).toEqual(["retrieving", "generating"]);
     expect(contents(model.requests[0]!).data.sources!.map(source => source.text)).toEqual(transcript.segments.map(segment => segment.text));
     const schema = model.requests[0]!.schema as { properties: { sourceIds: { items: { enum: string[] } } } };
@@ -96,8 +101,26 @@ describe("grounded Meeting chat", () => {
     const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "When will they finish it?", history });
     expect(result.answer.refs).toEqual([0]);
     expect(model.requests.filter(request => "question" in (request.schema as { properties: object }).properties)).toHaveLength(1);
-    expect(result.generation.calls).toBe(2);
+    expect(result.generation.calls).toBe(3);
     expect(result.generation.retrievalCalls).toBe(0);
+  });
+
+  it("bounds malformed standalone rewrites and keeps whole question context within its request budget", async () => {
+    const { store, id, expectedRevision } = setup();
+    let rewrites = 0;
+    const model = fake(() => positive, { resolve: () => { rewrites++; return rewrites === 1 ? "not JSON" : { question: "When will You finish the permission guide?" }; } });
+    const history = [{ question, answer: "Verbose previous answer ".repeat(1000) }];
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "When will they finish it?", history });
+    expect(rewrites).toBe(2);
+    const first = contents(model.requests[0]!);
+    expect(first.data.question).toBe("When will they finish it?");
+    expect(first.data.priorUserQuestion).toBe(question);
+    expect(first.data.history).toEqual([]);
+    expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+    expect(result.generation.calls).toBe(4);
+    const invalid = fake(() => positive, { resolve: () => ({ question: "" }) });
+    await expect(createMeetingChat({ store, model: invalid })({ ...input(id, expectedRevision), question: "When will they finish it?", history: [{ question, answer: "You." }] })).rejects.toThrow("standalone question failed validation after three attempts");
+    expect(invalid.requests).toHaveLength(3);
   });
 
   it("never supplies a generated Summary as factual evidence and allows a failed Summary's Transcript", async () => {
@@ -113,13 +136,77 @@ describe("grounded Meeting chat", () => {
     const model = fake((_request, call) => call === 1 ? { ...positive, sourceIds: ["unknown:0"] } : call === 2 ? "not JSON" : positive);
     const result = await createMeetingChat({ store, model })(input(id, expectedRevision));
     expect(result.answer.refs).toEqual([0]);
-    expect(result.generation.calls).toBe(3);
-    expect(result.generation.promptTokens).toBe(30);
+    expect(result.generation.calls).toBe(4);
+    expect(result.generation.promptTokens).toBe(40);
     expect(contents(model.requests[1]!).instruction).toContain("Use only the original sourceIds");
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
     const invalid = fake(() => ({ text: "A claim without evidence", sourceIds: [], sufficient: true }));
     await expect(createMeetingChat({ store, model: invalid })(input(id, expectedRevision))).rejects.toThrow("three attempts");
     expect(invalid.requests).toHaveLength(3);
+  });
+
+  it("audits only cited original passages and regenerates an unsupported or irrelevant answer", async () => {
+    const { store, id, expectedRevision } = setup();
+    let answers = 0;
+    let audits = 0;
+    const model = fake(() => { answers++; return answers === 1 ? { text: "The release date is undecided.", sourceIds: ["0:0"], sufficient: true } : positive; }, {
+      audit: request => {
+        audits++;
+        const payload = contents(request).data as Data & { candidateAnswer: string };
+        expect(payload).not.toHaveProperty("history");
+        expect(payload).not.toHaveProperty("summary");
+        expect(payload.sources!.map(source => source.id)).toEqual(["0:0"]);
+        expect(payload.sources![0]!.text).toBe(transcript.segments[0]!.text);
+        return { supported: audits > 1 };
+      },
+    });
+    const result = await createMeetingChat({ store, model })(input(id, expectedRevision));
+    expect(result.answer.text).toBe(positive.text);
+    expect(answers).toBe(2);
+    expect(audits).toBe(2);
+    expect(contents(model.requests[2]!).instruction).toContain("do not support this answer or its relevance");
+    expect(result.generation.calls).toBe(4);
+  });
+
+  it("keeps unsupported answers failed after three generation-and-audit attempts", async () => {
+    const { store, id, expectedRevision } = setup();
+    const model = fake(() => positive, { audit: () => ({ supported: false }) });
+    await expect(createMeetingChat({ store, model })(input(id, expectedRevision))).rejects.toThrow("three attempts");
+    expect(model.requests.filter(isAnswer)).toHaveLength(3);
+    expect(model.requests.filter(request => "supported" in (request.schema as { properties: object }).properties)).toHaveLength(3);
+  });
+
+  it("preserves prior user intent in a follow-up audit without sending previous assistant facts", async () => {
+    const { store, id, expectedRevision } = setup();
+    const history = [{ question, answer: "PRIVATE EARLIER ASSISTANT DETOUR" }];
+    const model = fake(() => positive, { audit: request => {
+      const payload = contents(request).data;
+      expect(payload.originalQuestion).toBe("When will they finish it?");
+      expect(payload.question).toBe("When will You finish the permission guide?");
+      expect(payload.priorUserQuestion).toBe(question);
+      expect(JSON.stringify(request)).not.toContain("PRIVATE EARLIER ASSISTANT DETOUR");
+      return { supported: true };
+    } });
+    await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "When will they finish it?", history });
+    expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it("does not publish unaudited answers when the audit input cannot fit", async () => {
+    const { store, id, expectedRevision } = setup();
+    const model = fake(() => ({ ...positive, text: "Supported but oversized prose ".repeat(1000) }));
+    const result = await createMeetingChat({ store, model })(input(id, expectedRevision));
+    expect(result.answer).toEqual({ text: CHAT_INCOMPLETE, refs: [], sufficient: false });
+    expect(result.generation.exhaustive).toBe(false);
+    expect(model.requests).toHaveLength(1);
+  });
+
+  it("propagates audit connection failures and cancellation instead of publishing a candidate", async () => {
+    const { store, id, expectedRevision } = setup();
+    const failed = fake(() => positive, { audit: () => { throw new Error("Audit model is unavailable"); } });
+    await expect(createMeetingChat({ store, model: failed })(input(id, expectedRevision))).rejects.toThrow("Audit model is unavailable");
+    const controller = new AbortController();
+    const cancelled = fake(() => positive, { audit: () => { controller.abort(); return { supported: true }; } });
+    await expect(createMeetingChat({ store, model: cancelled })({ ...input(id, expectedRevision), signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
   });
 
   it("performs one forced complete scan when initial targeted context cannot answer", async () => {
@@ -144,7 +231,7 @@ describe("grounded Meeting chat", () => {
     expect(stages.filter(stage => stage === "retrieving")).toHaveLength(2);
     expect(result.answer).toEqual({ text: "You will write the launch guide by Wednesday.", refs: [4], sufficient: true });
     expect(result.generation).toMatchObject({ retrievalMode: "scan", exhaustive: true });
-    expect(result.generation.retrievalCalls).toBe(model.requests.length - answers);
+    expect(result.generation.retrievalCalls).toBe(model.requests.filter(request => !isAnswer(request) && !("supported" in (request.schema as { properties: object }).properties)).length);
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
