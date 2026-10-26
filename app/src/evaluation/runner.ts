@@ -1,0 +1,61 @@
+import type { Summary, Transcript } from "../pipeline/pipeline.js";
+
+export interface EvaluationFixture {
+  id: string;
+  split: "tuning" | "reserved";
+  synthetic: boolean;
+  transcript: Transcript;
+  points: { id: string; text: string; speaker: string; refs: number[]; critical: boolean }[];
+  questions: { id: string; question: string; answer: string | null; refs: number[]; followUpTo?: string; critical: boolean }[];
+}
+export interface EvaluationAnswer { text: string; refs: number[]; sufficient: boolean }
+export interface EvaluationPipeline {
+  summarise(transcript: Transcript): Promise<Summary>;
+  answer?(transcript: Transcript, question: string, history: { question: string; answer: EvaluationAnswer }[]): Promise<EvaluationAnswer>;
+}
+
+/** Evaluation crosses the same Summary/chat interfaces as the app; it never supplies expected answers to the model. */
+export async function evaluateFixture(fixture: EvaluationFixture, pipeline: EvaluationPipeline, callCount: () => number) {
+  const started = performance.now();
+  const initialCalls = callCount();
+  let summary: Summary | undefined;
+  let error: string | undefined;
+  try { summary = await pipeline.summarise(fixture.transcript); }
+  catch (problem) { error = problem instanceof Error ? problem.message : String(problem); }
+  const chat: { questionId: string; answer?: EvaluationAnswer; error?: string; skipped?: string }[] = [];
+  const completed = new Map<string, { question: string; answer: EvaluationAnswer }[]>();
+  for (const question of fixture.questions) {
+    if (!pipeline.answer) { chat.push({ questionId: question.id, skipped: "Meeting chat is not implemented in this revision" }); continue; }
+    const history = question.followUpTo ? completed.get(question.followUpTo) ?? [] : [];
+    try {
+      const answer = await pipeline.answer(fixture.transcript, question.question, history);
+      chat.push({ questionId: question.id, answer });
+      completed.set(question.id, [...history, { question: question.question, answer }]);
+    } catch (problem) { chat.push({ questionId: question.id, error: problem instanceof Error ? problem.message : String(problem) }); }
+  }
+  return { id: fixture.id, split: fixture.split, synthetic: fixture.synthetic, summary, error, chat,
+    elapsedMs: performance.now() - started, calls: callCount() - initialCalls,
+    peakRssKiB: process.resourceUsage().maxRSS };
+}
+
+/** Reject fixture mistakes before spending a model call. Ordinals match the production Transcript order. */
+export function validateFixture(value: unknown): EvaluationFixture {
+  const fixture = value as EvaluationFixture;
+  if (!fixture || typeof fixture.id !== "string" || !["tuning", "reserved"].includes(fixture.split) || typeof fixture.synthetic !== "boolean"
+      || !Array.isArray(fixture.transcript?.segments) || !Array.isArray(fixture.points) || !Array.isArray(fixture.questions)) throw new Error("Invalid evaluation fixture");
+  fixture.transcript.segments.forEach(s => {
+    if (!s || typeof s.text !== "string" || !s.speaker || !Number.isFinite(s.start) || !Number.isFinite(s.end) || s.end < s.start) throw new Error(`Invalid segment in ${fixture.id}`);
+  });
+  const validRefs = (refs: number[]) => Array.isArray(refs) && refs.every(ref => Number.isInteger(ref) && ref >= 0 && ref < fixture.transcript.segments.length);
+  const pointIds = new Set<string>();
+  for (const p of fixture.points) {
+    if (!p.id || pointIds.has(p.id) || !p.text || typeof p.critical !== "boolean" || !validRefs(p.refs) || !p.refs.length || !p.refs.some(i => fixture.transcript.segments[i]?.speaker === p.speaker)) throw new Error(`Invalid expected point in ${fixture.id}`);
+    pointIds.add(p.id);
+  }
+  const questionIds = new Set<string>();
+  for (const q of fixture.questions) {
+    if (!q.id || questionIds.has(q.id) || !q.question || typeof q.critical !== "boolean" || !(q.answer === null || typeof q.answer === "string") || !validRefs(q.refs) || (q.followUpTo && !questionIds.has(q.followUpTo))) throw new Error(`Invalid expected question in ${fixture.id}`);
+    questionIds.add(q.id);
+  }
+  return fixture;
+}
