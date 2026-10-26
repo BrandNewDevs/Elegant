@@ -64,6 +64,8 @@ pnpm run eval:ai private-current /absolute/private/manifest.json /absolute/priva
 
 For diagnosis on a slow device, `AI_SUMMARY_DEADLINE_MS=1800000` permits a 30-minute Summary evaluation instead of the default 15-minute deadline. The runner records this override; it does not change the shipped app or relax the M4 latency gate. Use an extended run to inspect quality after a default-deadline failure, retaining both results. Valid evaluation limits are 1–3,600,000 milliseconds.
 
+`AI_SYNTHETIC_TRACE=1` explicitly saves request messages, schemas and raw model responses alongside current synthetic results for debugging. It is off by default and refused for private modes before reading a manifest or contacting a model. Only use fixtures that truly contain synthetic material. Normal operational results retain request sizes and token counts without prompts. Keep debug traces local until reviewing what they contain.
+
 From the repository root:
 
 ```

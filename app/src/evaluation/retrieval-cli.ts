@@ -1,6 +1,6 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { createMeetingEvidence } from "../pipeline/meeting-evidence.js";
+import { createMeetingEvidence, EVIDENCE_PROMPT_VERSION } from "../pipeline/meeting-evidence.js";
 import { OllamaClient, DEFAULT_SUMMARY_MODEL } from "../pipeline/ollama.js";
 import type { TextModel } from "../pipeline/language-model.js";
 import { openStore } from "../store/store.js";
@@ -19,7 +19,7 @@ for (const name of (await readdir(directory)).filter(name => name.endsWith(".jso
 }
 if (!fixtures.length) throw new Error("No fixtures selected");
 const modelName = process.env.AI_MODEL ?? DEFAULT_SUMMARY_MODEL;
-const metadata = { ...await evaluationMetadata(modelName, "retrieval"), promptVersion: "meeting-evidence-v1",
+const metadata = { ...await evaluationMetadata(modelName, "retrieval"), promptVersion: EVIDENCE_PROMPT_VERSION,
   scope: "Source reference recall only; presence of a reference does not establish answer correctness" };
 const client = new OllamaClient({ model: modelName });
 let calls = 0;
