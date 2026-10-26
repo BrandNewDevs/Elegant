@@ -1,3 +1,4 @@
+import type { ChatAnswer, ChatGeneration, ChatRecord, ChatStatus } from "../shared/meeting-chat.js";
 import { buildPassages, type EvidencePassage } from "../pipeline/passages.js";
 import { transcriptRevision } from "../pipeline/evidence.js";
 import { DatabaseSync } from "node:sqlite";
@@ -53,6 +54,14 @@ export interface Store {
   listPassages(meetingId: number, revision: string): EvidencePassage[];
   /** Ranked OR-word lookup; never returns evidence from a different Meeting or revision. */
   searchPassages(meetingId: number, revision: string, query: string, limit?: number): EvidencePassage[];
+  createChatRequest(input: { id: string; meetingId: number; revision: string; question: string; createdAt: string }): ChatRecord;
+  /** Full visible history, ordered by insertion rather than UUID or timestamp. */
+  getChatHistory(meetingId: number): ChatRecord[];
+  /** Changes only an existing active request. Terminal, cleared and stale requests cannot be resurrected. */
+  updateChatRequest(id: string, revision: string, patch: { status: ChatStatus; answer?: ChatAnswer; error?: string; generation?: ChatGeneration }): boolean;
+  clearChat(meetingId: number): void;
+  /** Explicit startup recovery; opening the Store alone does not interrupt work. */
+  interruptChats(): void;
   close(): void;
 }
 
@@ -381,6 +390,69 @@ export function openStore(path: string): Store {
         ORDER BY bm25(passage_index), p.idx, p.id LIMIT ?`).all(expression, meetingId, revision, limit));
     },
 
+    createChatRequest(input) {
+      if (!input.id || input.id.length > 128 || !Number.isInteger(input.meetingId) || input.meetingId < 1
+        || !input.question.trim() || input.question.length > 2000 || !Number.isFinite(Date.parse(input.createdAt))) {
+        throw new Error("Invalid chat request");
+      }
+      const existing = db.prepare("SELECT * FROM chat_requests WHERE id = ?").get(input.id) as ChatRow | undefined;
+      if (existing) {
+        if (existing.meeting_id === input.meetingId && existing.revision === input.revision && existing.question === input.question) return chatRecord(existing);
+        throw new Error("This chat request id is already in use");
+      }
+      if (!db.prepare("SELECT 1 FROM meetings WHERE id = ?").get(input.meetingId)) throw new Error("This Meeting no longer exists");
+      const segments = db.prepare("SELECT start, end, speaker, text FROM segments WHERE meeting_id = ? ORDER BY idx")
+        .all(input.meetingId) as unknown as Transcript["segments"];
+      if (input.revision !== transcriptRevision({ segments })) throw new Error("This chat request belongs to an older Transcript");
+      db.prepare("INSERT INTO chat_requests (id, meeting_id, revision, question, status, created_at) VALUES (?, ?, ?, ?, 'queued', ?)")
+        .run(input.id, input.meetingId, input.revision, input.question, input.createdAt);
+      return chatRecord(db.prepare("SELECT * FROM chat_requests WHERE id = ?").get(input.id) as ChatRow);
+    },
+
+    getChatHistory(meetingId) {
+      return (db.prepare("SELECT * FROM chat_requests WHERE meeting_id = ? ORDER BY rowid").all(meetingId) as unknown as ChatRow[]).map(chatRecord);
+    },
+
+    updateChatRequest(id, revision, patch) {
+      const row = db.prepare("SELECT * FROM chat_requests WHERE id = ? AND revision = ? AND status IN ('queued','retrieving','generating')")
+        .get(id, revision) as ChatRow | undefined;
+      if (!row) return false;
+      if (!["queued", "retrieving", "generating", "completed", "failed", "cancelled", "interrupted"].includes(patch.status)) throw new Error("Invalid chat status");
+      const segments = db.prepare("SELECT start, end, speaker, text FROM segments WHERE meeting_id = ? ORDER BY idx")
+        .all(row.meeting_id) as unknown as Transcript["segments"];
+      if (revision !== transcriptRevision({ segments })) return false;
+      const { answer, generation } = patch;
+      if (patch.status === "completed") {
+        if (!answer || !generation) throw new Error("Completed chat needs an answer and generation metadata");
+        if (typeof answer.text !== "string" || !answer.text.trim() || typeof answer.sufficient !== "boolean" || !Array.isArray(answer.refs)
+          || answer.refs.some(ref => !Number.isInteger(ref) || ref < 0 || ref >= segments.length)
+          || new Set(answer.refs).size !== answer.refs.length || (answer.sufficient ? !answer.refs.length : !!answer.refs.length)) {
+          throw new Error("Invalid chat answer evidence");
+        }
+      } else if (answer) throw new Error("Only completed chat can contain an answer");
+      if (generation && (typeof generation.model !== "string" || !generation.model || typeof generation.promptVersion !== "string"
+        || !generation.promptVersion || !Number.isFinite(generation.elapsedMs) || generation.elapsedMs < 0
+        || !Number.isInteger(generation.calls) || generation.calls < 0 || !Number.isInteger(generation.retrievalCalls) || generation.retrievalCalls < 0
+        || !["full", "fts", "scan"].includes(generation.retrievalMode) || typeof generation.exhaustive !== "boolean"
+        || [generation.promptTokens, generation.outputTokens].some(value => value !== undefined && (!Number.isFinite(value) || value < 0)))) {
+        throw new Error("Invalid chat generation metadata");
+      }
+      if (patch.error !== undefined && typeof patch.error !== "string") throw new Error("Invalid chat error");
+      const result = db.prepare(`UPDATE chat_requests SET status = ?, answer_json = ?, error = ?, generation_json = ?
+        WHERE id = ? AND revision = ? AND status IN ('queued','retrieving','generating')`)
+        .run(patch.status, answer ? JSON.stringify(answer) : null, patch.error ?? null, generation ? JSON.stringify(generation) : null, id, revision);
+      return result.changes > 0;
+    },
+
+    clearChat(meetingId) {
+      db.prepare("DELETE FROM chat_requests WHERE meeting_id = ?").run(meetingId);
+    },
+
+    interruptChats() {
+      db.prepare(`UPDATE chat_requests SET status = 'interrupted', answer_json = NULL, generation_json = NULL,
+        error = 'The app stopped before this answer completed. Retry the question.' WHERE status IN ('queued','retrieving','generating')`).run();
+    },
+
     close() {
       db.close();
     },
@@ -406,4 +478,22 @@ interface PassageRow {
   idx: number;
   refs_json: string;
   text: string;
+}
+
+
+interface ChatRow {
+  id: string;
+  meeting_id: number;
+  revision: string;
+  question: string;
+  status: ChatStatus;
+  answer_json: string | null;
+  error: string | null;
+  generation_json: string | null;
+  created_at: string;
+}
+function chatRecord(row: ChatRow): ChatRecord {
+  return { id: row.id, meetingId: row.meeting_id, revision: row.revision, question: row.question,
+    status: row.status, answer: row.answer_json ? JSON.parse(row.answer_json) : null, error: row.error,
+    generation: row.generation_json ? JSON.parse(row.generation_json) : null, createdAt: row.created_at };
 }
