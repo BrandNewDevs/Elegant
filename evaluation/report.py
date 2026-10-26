@@ -70,6 +70,30 @@ def valid_review(review: Any) -> bool:
             and all(type(review.get(key)) is bool for key in REVIEW_BOOLEANS))
 
 
+def valid_summary(summary: Any) -> bool:
+    if not isinstance(summary, dict) or not isinstance(summary.get("tldr"), str) or not summary["tldr"].strip():
+        return False
+    participants = summary.get("participants")
+    if not isinstance(participants, list):
+        return False
+    labels = []
+    for participant in participants:
+        if (not isinstance(participant, dict)
+                or not isinstance(participant.get("speaker"), str) or not participant["speaker"].strip()
+                or not isinstance(participant.get("said"), list)
+                or not all(isinstance(point, str) and point.strip() for point in participant["said"])):
+            return False
+        labels.append(participant["speaker"])
+    return len(labels) == len(set(labels))
+
+
+def valid_answer(answer: Any, segment_count: int) -> bool:
+    return (isinstance(answer, dict) and isinstance(answer.get("text"), str)
+            and bool(answer["text"].strip()) and type(answer.get("sufficient")) is bool
+            and isinstance(answer.get("refs"), list)
+            and all(type(ref) is int and 0 <= ref < segment_count for ref in answer["refs"]))
+
+
 def combine_status(statuses: list[str]) -> str:
     if "fail" in statuses:
         return "fail"
@@ -106,16 +130,35 @@ def aggregate(results: dict[str, Any], fixtures: list[dict[str, Any]],
             continue
         row.update({"elapsedMs": run.get("elapsedMs"), "calls": run.get("calls"),
                     "nodePeakRssKiB": run.get("peakRssKiB")})
-        if run.get("error") or not isinstance(run.get("summary"), dict):
-            row.update(summaryStatus="fail", reason="Summary generation failed or is absent")
-            continue
-        labels = {segment["speaker"] for segment in fixture["transcript"]["segments"]}
-        participants = run["summary"].get("participants", [])
-        invented = sum(participant.get("speaker") not in labels for participant in participants)
-        row["inventedLabels"] = invented
-        if invented:
-            row.update(summaryStatus="fail", reason="Summary contains unknown Participant labels")
-            continue
+        questions = fixture.get("questions", [])
+        question_ids = {question["id"] for question in questions}
+        answers: dict[str, Any] = {}
+        chat_entries = run.get("chat", [])
+        malformed_chat = not isinstance(chat_entries, list)
+        if not malformed_chat:
+            for entry in chat_entries:
+                if (not isinstance(entry, dict) or not isinstance(entry.get("questionId"), str)
+                        or entry["questionId"] not in question_ids or entry["questionId"] in answers):
+                    malformed_chat = True
+                    continue
+                answers[entry["questionId"]] = entry
+        chat_errors = any(answer.get("error") for answer in answers.values())
+        malformed_answer = any("answer" in entry and not valid_answer(
+            entry["answer"], len(fixture["transcript"]["segments"])) for entry in answers.values())
+        if chat_errors or malformed_chat or malformed_answer:
+            row["chatStatus"] = "fail"
+        missing_chat = any(question["id"] not in answers
+                           or answers[question["id"]].get("skipped")
+                           or "answer" not in answers[question["id"]]
+                           for question in questions)
+        if run.get("error") or not valid_summary(run.get("summary")):
+            row.update(summaryStatus="fail", reason="Summary generation failed or output is malformed")
+        else:
+            labels = {segment["speaker"] for segment in fixture["transcript"]["segments"]}
+            invented = sum(participant["speaker"] not in labels for participant in run["summary"]["participants"])
+            row["inventedLabels"] = invented
+            if invented:
+                row.update(summaryStatus="fail", reason="Summary contains unknown Participant labels")
         if not valid_review(review):
             continue
         point_ids = {point["id"] for point in fixture["points"]}
@@ -133,20 +176,12 @@ def aggregate(results: dict[str, Any], fixtures: list[dict[str, Any]],
         row.update({
             "coverage": coverage, "criticalPointsCovered": len(critical & covered),
             "criticalPointsExpected": len(critical),
-            "summaryStatus": "pass" if summary_pass else "fail",
-            "reason": "Human reviewed against predefined points and original passages",
             **{key: review[key] for key in REVIEW_COUNTS},
         })
-        questions = fixture.get("questions", [])
-        answers = {answer["questionId"]: answer for answer in run.get("chat", [])}
-        chat_errors = any(answer.get("error") for answer in answers.values())
-        missing = any(question["id"] not in answers
-                      or answers[question["id"]].get("skipped")
-                      or not isinstance(answers[question["id"]].get("answer"), dict)
-                      for question in questions)
-        if chat_errors:
-            row["chatStatus"] = "fail"
-        elif questions and not missing:
+        if row["summaryStatus"] != "fail":
+            row.update(summaryStatus="pass" if summary_pass else "fail",
+                       reason="Human reviewed against predefined points and original passages")
+        if row["chatStatus"] != "fail" and questions and not missing_chat:
             row["chatStatus"] = "pass" if (
                 review["chatCriticalCorrect"] and review["criticalUnsupportedClaims"] == 0
                 and review["invalidReferences"] == 0 and review["citationSupportErrors"] == 0

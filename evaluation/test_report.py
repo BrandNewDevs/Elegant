@@ -81,6 +81,58 @@ class EvaluationReportTests(unittest.TestCase):
         run["chat"] = [{"questionId": "q1", "error": "Model failed"}]
         self.assertEqual(self.result(run=run)["chatQuality"], "fail")
 
+    def test_malformed_summary_cannot_be_overridden_by_positive_review(self):
+        for summary in ({}, {"tldr": " ", "participants": []},
+                        {"tldr": "A decision", "participants": "You"},
+                        {"tldr": "A decision", "participants": [{"speaker": "You", "said": [1]}]},
+                        {"tldr": "A decision", "participants": [{"speaker": "You", "said": [" "]}]},
+                        {"tldr": "A decision", "participants": [None]}):
+            with self.subTest(summary=summary):
+                report = self.result(run=dict(RUN, summary=summary))
+                self.assertEqual(report["summaryQuality"], "fail")
+                self.assertEqual(report["chatQuality"], "pass")
+
+    def test_duplicate_participant_is_malformed(self):
+        run = copy.deepcopy(RUN)
+        run["summary"]["participants"] *= 2
+        self.assertEqual(self.result(run=run)["summaryQuality"], "fail")
+
+    def test_malformed_chat_cannot_be_overridden_by_positive_review(self):
+        for answer in ({}, {"text": " ", "refs": [], "sufficient": False},
+                       {"text": "An answer", "refs": "0", "sufficient": True},
+                       {"text": "An answer", "refs": [True], "sufficient": True},
+                       {"text": "An answer", "refs": [-1], "sufficient": True},
+                       {"text": "An answer", "refs": [8], "sufficient": True},
+                       {"text": "An answer", "refs": [0], "sufficient": "yes"}):
+            with self.subTest(answer=answer):
+                report = self.result(run=dict(RUN, chat=[{"questionId": "q1", "answer": answer}]))
+                self.assertEqual(report["chatQuality"], "fail")
+
+    def test_insufficient_evidence_answer_may_have_no_citations(self):
+        report = self.result(run=dict(RUN, chat=[{"questionId": "q1", "answer": {
+            "text": "The requested fact is not established.", "refs": [], "sufficient": False}}]))
+        self.assertEqual(report["chatQuality"], "pass")
+
+    def test_known_chat_error_fails_without_human_review_or_summary(self):
+        for summary_error in (False, True):
+            with self.subTest(summary_error=summary_error):
+                run = dict(RUN, chat=[{"questionId": "q1", "error": "model stopped"}])
+                if summary_error:
+                    run.update(summary=None, error="Summary model stopped")
+                report = aggregate({"runs": [run]}, [FIXTURE])
+                self.assertEqual(report["chatQuality"], "fail")
+
+    def test_malformed_chat_is_known_failure_without_human_review(self):
+        for chat in ({}, [None], [{"questionId": "q1", "answer": {}}]):
+            with self.subTest(chat=chat):
+                report = aggregate({"runs": [dict(RUN, chat=chat)]}, [FIXTURE])
+                self.assertEqual(report["chatQuality"], "fail")
+
+    def test_duplicate_and_unknown_question_results_fail(self):
+        for chat in ([RUN["chat"][0]] * 2, [{"questionId": "unknown", "answer": RUN["chat"][0]["answer"]}]):
+            with self.subTest(chat=chat):
+                self.assertEqual(self.result(run=dict(RUN, chat=chat))["chatQuality"], "fail")
+
     def test_duplicate_runs_cannot_mask_each_other(self):
         with self.assertRaisesRegex(ValueError, "Duplicate"):
             aggregate({"runs": [RUN, RUN]}, [FIXTURE])
