@@ -13,6 +13,7 @@ import { OllamaClient, DEFAULT_SUMMARY_MODEL } from "../pipeline/ollama.js";
 import type { LanguageModel, TextModel } from "../pipeline/language-model.js";
 import { evaluateFixture, validateFixture } from "./runner.js";
 import { evaluationMetadata } from "./metadata.js";
+import { requestBytes } from "../pipeline/model-request.js";
 
 const [mode, source, output] = process.argv.slice(2);
 if (!source || !output || !["baseline", "current", "chat", "summary", "private-baseline", "private-current", "private-chat", "private-summary"].includes(mode ?? "")) throw new Error("Usage: eval:ai <baseline|current|chat|summary|private-baseline|private-current|private-chat|private-summary> <fixtures-dir|private-manifest.json> <results.json>");
@@ -45,9 +46,19 @@ const metadata = { ...await evaluationMetadata(modelName, implementation), ...(i
 const client = new OllamaClient({ model: modelName });
 const baseline = new BaselineOllamaClient({ model: modelName });
 let calls = 0;
+const requests: { call: number; bytes: number; promptTokens?: number; outputTokens?: number; elapsedMs?: number; failed?: boolean }[] = [];
 const model: LanguageModel & TextModel = {
   generate: request => { calls++; return baseline.generate(request); },
-  complete: request => { calls++; console.log(`Local model request ${calls}`); return client.complete(request); },
+  complete: async request => {
+    const observation: (typeof requests)[number] = { call: ++calls, bytes: requestBytes(request) };
+    requests.push(observation);
+    console.log(`Local model request ${calls}`);
+    try {
+      const result = await client.complete(request);
+      Object.assign(observation, { promptTokens: result.metadata.promptTokens, outputTokens: result.metadata.outputTokens, elapsedMs: result.metadata.elapsedMs });
+      return result;
+    } catch (error) { observation.failed = true; throw error; }
+  },
 };
 const summarise = implementation === "baseline" ? createBaselineSummariser({ model }) : createGroundedSummariser({ model });
 const store = openStore(":memory:");
@@ -71,7 +82,7 @@ try {
 for (const fixture of selected) {
   runs.push(await evaluateFixture(fixture, pipeline, () => calls));
   // Keep results even if a later fixture fails or the process is interrupted. Content stays at the selected local path.
-  await writeFile(destination, JSON.stringify({ metadata, runs }, null, 2) + "\n");
+  await writeFile(destination, JSON.stringify({ metadata, runs, requests }, null, 2) + "\n");
   console.log(`${fixture.id}: ${runs.at(-1)?.error ? "failed" : "generated; human review pending"}`);
 }
 } finally { store.close(); }
