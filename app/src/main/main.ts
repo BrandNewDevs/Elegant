@@ -1,9 +1,10 @@
-import { app, Menu, nativeImage, Notification, Tray } from "electron";
+import { app, Menu, nativeImage, Notification, shell, Tray } from "electron";
 import { fileURLToPath } from "node:url";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { AppCore } from "../core/app-core.js";
 import { formatElapsed } from "../core/elapsed.js";
+import { knownAppsFile } from "../core/known-apps.js";
 import { ProcessEngine } from "../engine/process-engine.js";
 import { createEngineTranscriber } from "../pipeline/engine-transcriber.js";
 import { OllamaClient } from "../pipeline/ollama.js";
@@ -23,6 +24,8 @@ let tray: Tray | undefined;
 let core: AppCore | undefined;
 let prompt: { close(): void } | undefined;
 let meetingsWindow: MeetingsWindow | undefined;
+
+let knownAppsPath = "";
 
 let elapsedTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -53,6 +56,19 @@ function render(): void {
           render();
         },
       },
+      { label: "Known apps…", click: () => void shell.openPath(knownAppsPath) },
+      {
+        label: "Never prompt for",
+        enabled: core.neverApps.length > 0,
+        // Choosing an app undoes Never for it.
+        submenu: core.neverApps.map((name) => ({
+          label: name,
+          click: () => {
+            core?.allowApp(name);
+            render();
+          },
+        })),
+      },
       { label: `Quit ${DISPLAY_NAME}`, role: "quit" },
     ]),
   );
@@ -72,9 +88,11 @@ app.whenReady().then(() => {
 
   const store = openStore(join(dataDir, "meetings.db"));
   const engine = new ProcessEngine({ command: process.env.MEETING_RECORDER_ENGINE ?? devEngine });
+  knownAppsPath = join(dataDir, "known-apps.json");
   core = new AppCore({
     engine,
     store,
+    knownApps: knownAppsFile(knownAppsPath),
     pipeline: {
       transcribe: createEngineTranscriber(engine, { model: SPEECH_MODEL, modelsDirectory: join(dataDir, "models") }),
       summarise: createSummariser({ model: new OllamaClient() }),
@@ -92,6 +110,10 @@ app.whenReady().then(() => {
     prompt = showPrompt(meeting.app, {
       record: () => core!.acceptPrompt(),
       notNow: () => core!.declinePrompt(),
+      never: () => {
+        core!.neverForThisApp();
+        render();
+      },
     });
   });
   core.onStatusChange((status) => {

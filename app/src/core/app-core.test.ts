@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +10,7 @@ import { fakePipeline, fixtureSummary, fixtureTranscript } from "../testing/fake
 import { openStore } from "../store/store.js";
 import { AppCore, DEFAULT_STOP_TIMEOUT_MS, type ActiveRecording, type DetectedMeeting } from "./app-core.js";
 import { DEFAULT_DETECTION } from "./detection.js";
+import { knownAppsFile } from "./known-apps.js";
 
 function setup(pipelineOpts?: Parameters<typeof fakePipeline>[0]) {
   const engine = new FakeEngine();
@@ -1246,5 +1247,159 @@ describe("exporting a Meeting to Markdown", () => {
   it("refuses a Meeting that does not exist", () => {
     const { core } = setup();
     expect(() => core.exportMeeting(99)).toThrow(/no such Meeting/);
+  });
+});
+
+describe("Never for this app", () => {
+  const DEBOUNCE = DEFAULT_DETECTION.debounceMs;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function running(store = openStore(":memory:")) {
+    const engine = new FakeEngine();
+    const core = new AppCore({ engine, store, pipeline: fakePipeline() });
+    core.start();
+    engine.emit({ type: "ready", version: "0.1.0" });
+    const detect = (app: string, pid = 100) => {
+      engine.emit({ type: "mic_in_use_started", app, pid });
+      vi.advanceTimersByTime(DEBOUNCE);
+    };
+    const release = (app: string, pid = 100) => engine.emit({ type: "mic_in_use_stopped", app, pid });
+    return { engine, store, core, detect, release };
+  }
+
+  it("closes the Prompt, discards the buffered audio and keeps nothing about the Meeting", () => {
+    const { core, engine, detect } = running();
+    detect("zoom.us");
+    core.neverForThisApp();
+
+    expect(core.detectedMeeting).toBeUndefined();
+    expect(engine.commands).toContainEqual({ type: "discard_buffer" });
+    expect(engine.commands).not.toContainEqual(expect.objectContaining({ type: "start_recording" }));
+    expect(core.listMeetings()).toEqual([]);
+    expect(core.neverApps).toEqual(["zoom.us"]);
+  });
+
+  it("shows no Prompt, and buffers no audio, when that app is detected again", () => {
+    const { core, engine, detect, release } = running();
+    detect("zoom.us");
+    core.neverForThisApp();
+    release("zoom.us");
+    engine.commands.length = 0;
+
+    detect("ZOOM.US");
+    expect(core.detectedMeeting).toBeUndefined();
+    expect(engine.commands).toEqual([]);
+  });
+
+  it("still prompts for other apps", () => {
+    const { core, detect } = running();
+    detect("zoom.us");
+    core.neverForThisApp();
+    detect("Slack", 200);
+    expect(core.detectedMeeting?.app).toBe("Slack");
+  });
+
+  it("is remembered after a restart", () => {
+    const first = running();
+    first.detect("zoom.us");
+    first.core.neverForThisApp();
+
+    const second = running(first.store);
+    second.detect("zoom.us");
+    expect(second.core.detectedMeeting).toBeUndefined();
+  });
+
+  it("can be undone, after which the app is prompted for again", () => {
+    const { core, detect, release } = running();
+    detect("zoom.us");
+    core.neverForThisApp();
+    release("zoom.us");
+
+    core.allowApp("zoom.us");
+    expect(core.neverApps).toEqual([]);
+    detect("zoom.us");
+    expect(core.detectedMeeting?.app).toBe("zoom.us");
+  });
+
+  it("does nothing when there is no Prompt", () => {
+    const { core } = running();
+    core.neverForThisApp();
+    expect(core.neverApps).toEqual([]);
+  });
+});
+
+describe("the known-apps file", () => {
+  const DEBOUNCE = DEFAULT_DETECTION.debounceMs;
+  let dir: string;
+  let path: string;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    dir = mkdtempSync(join(tmpdir(), "meeting-recorder-test-"));
+    path = join(dir, "known-apps.json");
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  function running() {
+    const engine = new FakeEngine();
+    const core = new AppCore({ engine, store: openStore(":memory:"), pipeline: fakePipeline(), knownApps: knownAppsFile(path) });
+    core.start();
+    engine.emit({ type: "ready", version: "0.1.0" });
+    const detect = (app: string, pid = 100) => {
+      engine.emit({ type: "mic_in_use_started", app, pid });
+      vi.advanceTimersByTime(DEBOUNCE);
+    };
+    return { core, detect };
+  }
+
+  it("is created with the default apps, which are detected", () => {
+    const { core, detect } = running();
+    expect(JSON.parse(readFileSync(path, "utf8")).knownApps).toContain("zoom.us");
+    detect("zoom.us");
+    expect(core.detectedMeeting?.app).toBe("zoom.us");
+  });
+
+  it("makes an app added to it detectable without a restart", () => {
+    const { core, detect } = running();
+    detect("Whereby");
+    expect(core.detectedMeeting).toBeUndefined();
+
+    writeFileSync(path, JSON.stringify({ knownApps: ["zoom.us", "Whereby"] }));
+    detect("Whereby", 200);
+    expect(core.detectedMeeting?.app).toBe("Whereby");
+  });
+
+  it("stops detecting an app removed from it", () => {
+    const { core, detect } = running();
+    writeFileSync(path, JSON.stringify({ knownApps: ["Slack"] }));
+    detect("zoom.us");
+    expect(core.detectedMeeting).toBeUndefined();
+  });
+
+  it("keeps the last good list when the file is edited into something unreadable", () => {
+    const { core, detect } = running();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    writeFileSync(path, "{ not json");
+    detect("zoom.us");
+    expect(core.detectedMeeting?.app).toBe("zoom.us");
+    expect(error).toHaveBeenCalled();
+  });
+
+  it("keeps an existing file as it is", () => {
+    writeFileSync(path, JSON.stringify({ knownApps: ["Whereby"] }));
+    const { core, detect } = running();
+    detect("zoom.us");
+    expect(core.detectedMeeting).toBeUndefined();
+    detect("Whereby", 200);
+    expect(core.detectedMeeting?.app).toBe("Whereby");
   });
 });

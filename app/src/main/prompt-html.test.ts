@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { NOT_NOW_URL, RECORD_URL, escapeHtml, promptHtml } from "./prompt-html.js";
+import { NEVER_URL, NOT_NOW_URL, RECORD_URL, escapeHtml, promptHtml } from "./prompt-html.js";
 
 describe("the Prompt page", () => {
-  it("names the app that is using the microphone and offers Record and Not now", () => {
+  it("names the app that is using the microphone and offers Record, Not now and Never for this app", () => {
     const html = promptHtml("zoom.us");
     expect(html).toContain("zoom.us is using your microphone");
     expect(html).toContain(`href="${RECORD_URL}">Record<`);
     expect(html).toContain(`href="${NOT_NOW_URL}">Not now<`);
+    expect(html).toContain(`href="${NEVER_URL}">Never for this app<`);
   });
 
   it("escapes the app name, which comes from a process path and is not trusted", () => {

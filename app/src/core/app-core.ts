@@ -10,6 +10,9 @@ import type { Meeting, MeetingListItem, Store } from "../store/store.js";
 /** The store setting behind `AppCore.keepAudio`. */
 const KEEP_AUDIO_SETTING = "keepAudio";
 
+/** The store setting behind `AppCore.neverApps`: a JSON array of app names. */
+const NEVER_APPS_SETTING = "neverApps";
+
 /** How long to wait for the engine to hand over the tracks after Stop before giving up on the Recording. */
 export const DEFAULT_STOP_TIMEOUT_MS = 30_000;
 
@@ -20,6 +23,8 @@ export interface AppCoreDeps {
   store: Store;
   pipeline: PipelineStages;
   detection?: Partial<DetectionSettings>;
+  /** The apps that count as call apps, asked at each microphone event so edits apply at once. Defaults to `detection.knownApps`. */
+  knownApps?: () => readonly string[];
   stopTimeoutMs?: number;
 }
 
@@ -64,7 +69,8 @@ export class AppCore {
     this.runner = new PipelineRunner(deps.pipeline, this.store, { keepAudio: () => this.keepAudio });
     const detection = { ...DEFAULT_DETECTION, ...deps.detection };
     this.promptTimeoutMs = detection.promptTimeoutMs;
-    this.micWatcher = new MicWatcher(detection, {
+    const knownApps = deps.knownApps ?? (() => detection.knownApps);
+    this.micWatcher = new MicWatcher({ debounceMs: detection.debounceMs, knownApps }, {
       detected: (app) => this.onDetected(app),
       released: (app) => {
         if (this._detectedMeeting?.app === app) this.declinePrompt();
@@ -146,6 +152,26 @@ export class AppCore {
   declinePrompt(): void {
     if (!this.clearDetectedMeeting()) return;
     this.deps.engine.send({ type: "discard_buffer" });
+  }
+
+  /** The user chose Never for this app. Nothing about the Meeting is kept, and the app is not asked about again. */
+  neverForThisApp(): void {
+    const meeting = this._detectedMeeting;
+    if (!meeting) return;
+    this.deps.store.setSetting(NEVER_APPS_SETTING, JSON.stringify([...this.neverApps, meeting.app]));
+    this.declinePrompt();
+  }
+
+  /** The apps the user chose Never for, in the order they were chosen. */
+  get neverApps(): string[] {
+    const stored = this.deps.store.getSetting(NEVER_APPS_SETTING);
+    return stored ? (JSON.parse(stored) as string[]) : [];
+  }
+
+  /** Undoes Never for this app: the next Detection of it shows the Prompt again. */
+  allowApp(app: string): void {
+    const name = app.toLowerCase();
+    this.deps.store.setSetting(NEVER_APPS_SETTING, JSON.stringify(this.neverApps.filter((a) => a.toLowerCase() !== name)));
   }
 
   /** The Recording in progress, if any. It ends when the user presses Stop, and at no other time. */
@@ -275,6 +301,7 @@ export class AppCore {
   private onDetected(app: string): void {
     // One Meeting at a time: ignore a second app while a Prompt is showing or a Recording is running.
     if (this._detectedMeeting || this.recordingMeetingId !== undefined) return;
+    if (this.neverApps.some((a) => a.toLowerCase() === app.toLowerCase())) return;
     this._detectedMeeting = { state: "detected", app, detectedAt: new Date().toISOString() };
     // The start of the Meeting must survive a late answer, so audio is held in memory from now on.
     this.deps.engine.send({ type: "start_buffer", app });
