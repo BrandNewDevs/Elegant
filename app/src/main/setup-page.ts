@@ -54,7 +54,7 @@ export function renderSetupPage(state: SetupState, name: string, complete: boole
   const progress =
     state.models.status === "working"
       ? `<progress max="100" value="${Math.round(state.models.fraction * 100)}"></progress>
-         <p>${state.models.fraction >= 1 ? "Preparing the model…" : `${Math.round(state.models.fraction * 100)}% downloaded`}</p>`
+         <p>${state.models.fraction >= 1 ? "Preparing the models…" : `${Math.round(state.models.fraction * 100)}% downloaded`}</p>`
       : "";
   const microphone = card({
     title: "Microphone",
@@ -71,8 +71,8 @@ export function renderSetupPage(state: SetupState, name: string, complete: boole
     settings: "settings-system-audio",
   });
   const models = card({
-    title: "Speech models",
-    explanation: `${name} turns speech into text on your Mac, with no cloud service. That needs a speech model, a one-time download of several hundred MB.`,
+    title: "Speech and speaker models",
+    explanation: `${name} turns speech into text and tells speakers apart on your Mac, with no cloud service. The speech and speaker models need a one-time download.`,
     step: state.models,
     button: { action: "models", start: "Download models", again: "Try again" },
     extra: progress,

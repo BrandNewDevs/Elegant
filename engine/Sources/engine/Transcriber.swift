@@ -2,6 +2,7 @@
 // voices on the system track apart. English only, one batch after the Meeting.
 // See docs/research/whisperkit.md for why each option is set as it is.
 import Foundation
+import ArgmaxCore
 import SpeakerKit
 import WhisperKit
 
@@ -81,18 +82,27 @@ actor Transcriber {
         return constrain(segments, to: regions)
     }
 
-    private func loadedSpeakerKit(modelsDirectory: URL) async throws -> SpeakerKit {
+    private func loadedSpeakerKit(modelsDirectory: URL, progress: (@Sendable (Double) -> Void)? = nil) async throws -> SpeakerKit {
         if let speakerKit { return speakerKit }
         log("preparing speaker model; the first time this downloads it")
-        let loaded = try await SpeakerKit(PyannoteConfig(downloadBase: modelsDirectory.path, load: true, verbose: false))
+        let config = PyannoteConfig(downloadBase: modelsDirectory.path, download: false, load: false, verbose: false)
+        let diarizer = SpeakerKitDiarizer.pyannote(config: config)
+        try await (diarizer as ModelManager).downloadModels(progressCallback: { downloaded in
+            progress?(downloaded.fractionCompleted)
+        })
+        try await diarizer.loadModels()
+        config.diarizer = diarizer
+        let loaded = try await SpeakerKit(config)
         speakerKit = loaded
         return loaded
     }
 
-    /// Downloads `model` if it is not here yet and loads it, so the first Recording does not wait for either.
-    /// `progress` gets the download's fraction, from 0 to 1.
+    /// Prepares both models before the first Recording. Each download occupies half the progress range.
     func prepare(model: String, modelsDirectory: URL, progress: @escaping @Sendable (Double) -> Void) async throws {
-        _ = try await loadedKit(model: model, modelsDirectory: modelsDirectory, progress: progress)
+        _ = try await loadedKit(model: model, modelsDirectory: modelsDirectory) { progress($0 / 2) }
+        progress(0.5)
+        _ = try await loadedSpeakerKit(modelsDirectory: modelsDirectory) { progress(0.5 + $0 / 2) }
+        progress(1)
     }
 
     private func loadedKit(model: String, modelsDirectory: URL, progress: (@Sendable (Double) -> Void)? = nil) async throws -> WhisperKit {
