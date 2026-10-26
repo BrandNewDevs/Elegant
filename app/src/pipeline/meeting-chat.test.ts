@@ -18,7 +18,7 @@ function setup(source = transcript) {
   store.saveTranscript(id, source); store.setMeetingState(id, "done");
   return { store, id, expectedRevision: transcriptRevision(source) };
 }
-interface Data { question: string; history: { question: string; answer: string }[]; sources?: SourceFragment[]; exhaustive?: boolean }
+interface Data { question: string; priorUserQuestion?: string; history: { question: string; answer: string }[]; sources?: SourceFragment[]; exhaustive?: boolean }
 const contents = (request: TextRequest) => JSON.parse(request.messages.at(-1)!.content) as { instruction: string; data: Data };
 const isAnswer = (request: TextRequest) => contents(request).instruction.startsWith("Answer the question");
 function fake(reply: (request: TextRequest, call: number) => unknown): TextModel & { requests: TextRequest[] } {
@@ -64,8 +64,23 @@ describe("grounded Meeting chat", () => {
     const model = fake(() => positive);
     await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "And their deadline?", history });
     expect(contents(model.requests[0]!).data.history).toEqual(history.slice(-4));
+    expect(contents(model.requests[0]!).data.priorUserQuestion).toBe(history.at(-1)!.question);
     expect(contents(model.requests[0]!).instruction).toContain("earlier answers are not independent facts");
     expect(contents(model.requests[0]!).data.question).toBe("And their deadline?");
+  });
+
+  it("keeps the prior user subject explicit when an earlier answer mentioned unasked Participants", async () => {
+    const { store, id, expectedRevision } = setup();
+    const history = [{ question: "Who will write the permission guide?", answer: "You will write it by Thursday. Speaker 1 will review it on Friday." }];
+    const model = fake(request => {
+      const content = contents(request);
+      expect(content.data.priorUserQuestion).toBe(history[0]!.question);
+      expect(content.instruction).toContain("primarily from priorUserQuestion");
+      expect(content.instruction).toContain("omit unasked tasks, Participants and deadlines");
+      return { text: "You will finish the permission guide by Thursday.", sourceIds: ["0:0"], sufficient: true };
+    });
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "When will they finish it?", history });
+    expect(result.answer).toEqual({ text: "You will finish the permission guide by Thursday.", refs: [0], sufficient: true });
   });
 
   it("never supplies a generated Summary as factual evidence and allows a failed Summary's Transcript", async () => {
