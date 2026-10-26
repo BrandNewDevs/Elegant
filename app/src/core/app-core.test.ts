@@ -1476,6 +1476,8 @@ describe("the ignored-apps file", () => {
     expect(core.detectedMeeting).toBeUndefined();
     detect("Dictation", 200);
     expect(core.detectedMeeting).toBeUndefined();
+    detect("Wispr Flow", 300);
+    expect(core.detectedMeeting).toBeUndefined();
   });
 
   it("keeps the last good list when the file is edited into something unreadable", () => {
