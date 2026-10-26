@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { cpus, platform, release, totalmem } from "node:os";
 import { execFileSync } from "node:child_process";
 import { createBaselineSummariser } from "./baseline.js";
-import { OllamaClient, DEFAULT_SUMMARY_MODEL, DEFAULT_OLLAMA_URL } from "../pipeline/ollama.js";
+import { BaselineOllamaClient, DEFAULT_SUMMARY_MODEL, DEFAULT_OLLAMA_URL } from "./baseline-model.js";
 import type { LanguageModel } from "../pipeline/language-model.js";
 import type { Transcript } from "../pipeline/pipeline.js";
 
@@ -20,7 +20,7 @@ async function localJson(path: string, body?: object): Promise<unknown> {
 const tags = await localJson("/api/tags") as { models: { name: string; digest: string; details: unknown }[] };
 const installed = tags.models.find(m => m.name === model);
 if (!installed) throw new Error(`Model ${model} is not installed; set AI_MODEL to an installed tag`);
-const client = new OllamaClient({ model });
+const client = new BaselineOllamaClient({ model });
 let calls = 0;
 const counted: LanguageModel = { generate: request => { calls++; return client.generate(request); } };
 const started = performance.now();

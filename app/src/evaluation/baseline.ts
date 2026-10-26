@@ -1,7 +1,7 @@
 // Frozen Summary baseline from main 1ee9d82. Do not tune this implementation.
 import type { LanguageModel } from "../pipeline/language-model.js";
 import type { Summary, Transcript, TranscriptSegment } from "../pipeline/pipeline.js";
-import { InvalidSummaryError, parseSummary, parseTldr, SUMMARY_SCHEMA, TLDR_SCHEMA } from "../pipeline/validate-summary.js";
+import { InvalidSummaryError, parseSummary, parseTldr, SUMMARY_SCHEMA, TLDR_SCHEMA } from "./baseline-validation.js";
 
 export interface SummariserOptions {
   model: LanguageModel;
