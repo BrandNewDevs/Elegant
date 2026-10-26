@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { AIJobQueue } from "../pipeline/job-queue.js";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Engine } from "../engine/protocol.js";
@@ -27,6 +29,7 @@ export interface AppCoreDeps {
   /** Extra apps to ignore for Detection, asked at each microphone event so edits apply at once. */
   extraIgnoredApps?: () => readonly string[];
   stopTimeoutMs?: number;
+  jobs?: AIJobQueue;
 }
 
 /** A Meeting the app has noticed but not yet been told to record. It lives in memory only; nothing is stored for it. */
@@ -64,9 +67,11 @@ export class AppCore {
   private stopTimer: ReturnType<typeof setTimeout> | undefined;
 
   private readonly store: Store;
+  readonly jobs: AIJobQueue;
 
   constructor(private readonly deps: AppCoreDeps) {
     this.store = this.notifyingStore(deps.store);
+    this.jobs = deps.jobs ?? new AIJobQueue();
     this.runner = new PipelineRunner(deps.pipeline, this.store, { keepAudio: () => this.keepAudio });
     const detection = { ...DEFAULT_DETECTION, ...deps.detection };
     this.promptTimeoutMs = detection.promptTimeoutMs;
@@ -109,7 +114,7 @@ export class AppCore {
             this.store.saveAudio(id, { micPath: event.micPath, systemPath: event.systemPath });
             this.store.setMeetingState(id, "failed", `the app quit before this Recording was processed; the audio is in ${where}`);
           } else {
-            this.track(this.runner.run(id, { micPath: event.micPath, systemPath: event.systemPath }));
+            this.pipelineJob(id, "transcription-and-summary", signal => this.runner.run(id, { micPath: event.micPath, systemPath: event.systemPath }, { signal }));
           }
           break;
         }
@@ -279,7 +284,7 @@ export class AppCore {
     if (!meeting) throw new Error(`no such Meeting: ${id}`);
     if (meeting.state !== "failed") throw new Error(`only a failed Meeting can be retried, and this one is ${meeting.state}`);
     if (meeting.transcript.segments.length === 0) throw new Error("this Meeting has no Transcript to summarise");
-    await this.track(this.runner.resummarise(id, meeting.transcript));
+    await this.pipelineJob(id, "summary", signal => this.runner.resummarise(id, meeting.transcript, { signal }));
   }
 
   /**
@@ -293,7 +298,7 @@ export class AppCore {
       throw new Error(`a Meeting that is ${meeting.state} cannot be summarised again yet`);
     }
     if (meeting.transcript.segments.length === 0) throw new Error("this Meeting has no Transcript to summarise");
-    await this.track(this.runner.resummarise(id, meeting.transcript));
+    await this.pipelineJob(id, "summary", signal => this.runner.resummarise(id, meeting.transcript, { signal }));
   }
 
   /** Transcribes a failed Meeting again from its kept audio, without re-recording. */
@@ -305,7 +310,7 @@ export class AppCore {
     for (const path of [meeting.audio.micPath, meeting.audio.systemPath]) {
       if (!existsSync(path)) throw new Error(`the audio is no longer there: ${path}`);
     }
-    await this.track(this.runner.run(id, meeting.audio));
+    await this.pipelineJob(id, "transcription-and-summary", signal => this.runner.run(id, meeting.audio!, { signal }));
   }
 
   /** Resolves when no Recording is being processed. */
@@ -321,17 +326,28 @@ export class AppCore {
 
   async stop(): Promise<void> {
     this.stopping = true;
+    const jobsStopped = this.jobs.shutdown();
     // A Recording in progress is finished first, so its audio is kept rather than lost with the engine.
     this.stopRecording();
     await this.recordingSettled();
     this.deps.engine.send({ type: "shutdown" });
     await this.deps.engine.stop();
+    await jobsStopped;
+    await this.idle();
     this.setStatus("stopped");
+  }
+
+  private pipelineJob(id: number, kind: string, task: (signal: AbortSignal) => Promise<void>): Promise<void> {
+    this.store.setMeetingState(id, "processing");
+    const work = this.jobs.enqueue({ id: randomUUID(), owner: `meeting:${id}`, kind }, task).catch(error => {
+      if (this.store.getMeeting(id)) this.store.setMeetingState(id, "failed", error instanceof Error ? error.message : "AI work cancelled");
+    });
+    return this.track(work);
   }
 
   private track(job: Promise<void>): Promise<void> {
     this.inFlight.add(job);
-    void job.finally(() => this.inFlight.delete(job));
+    void job.then(() => this.inFlight.delete(job), () => this.inFlight.delete(job));
     return job;
   }
 
