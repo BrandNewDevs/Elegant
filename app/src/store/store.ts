@@ -406,7 +406,7 @@ export function openStore(path: string): Store {
       if (input.revision !== transcriptRevision({ segments })) throw new Error("This chat request belongs to an older Transcript");
       db.prepare("INSERT INTO chat_requests (id, meeting_id, revision, question, status, created_at) VALUES (?, ?, ?, ?, 'queued', ?)")
         .run(input.id, input.meetingId, input.revision, input.question, input.createdAt);
-      return chatRecord(db.prepare("SELECT * FROM chat_requests WHERE id = ?").get(input.id) as ChatRow);
+      return chatRecord(db.prepare("SELECT * FROM chat_requests WHERE id = ?").get(input.id) as unknown as ChatRow);
     },
 
     getChatHistory(meetingId) {
