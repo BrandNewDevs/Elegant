@@ -12,6 +12,7 @@ export default defineConfig({
           name: "node",
           environment: "node",
           include: ["src/**/*.test.ts"],
+          exclude: ["src/renderer/**"],
         },
       },
       {
@@ -20,7 +21,7 @@ export default defineConfig({
         test: {
           name: "renderer",
           environment: "happy-dom",
-          include: ["src/renderer/**/*.test.tsx"],
+          include: ["src/renderer/**/*.test.{ts,tsx}"],
           setupFiles: ["src/renderer/test-setup.ts"],
         },
       },
