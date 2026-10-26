@@ -1,3 +1,4 @@
+import { groupFacts } from "./fact-grouping.js";
 import type { TextModel, TextRequest } from "./language-model.js";
 import type { PipelineContext, Summary, Transcript } from "./pipeline.js";
 import { transcriptRevision } from "./evidence.js";
@@ -191,14 +192,10 @@ async function consolidate(initial: SupportedFact[], ask: <T>(mode: Mode, payloa
     check();
     const payload = candidates(facts);
     if (fits("summary", payload)) return ask("summary", payload, json => parseGrounded(json, payload.sources));
-    const groups: SupportedFact[][] = [];
-    let group: SupportedFact[] = [];
     for (const fact of facts) {
       if (!fits("reduce", candidates([fact]))) throw new Error("Summary incomplete: one fact's original evidence exceeds the consolidation budget");
-      if (group.length && !fits("reduce", candidates([...group, fact]))) { groups.push(group); group = []; }
-      group.push(fact);
     }
-    if (group.length) groups.push(group);
+    const groups = groupFacts(facts, group => fits("reduce", candidates(group)));
     if (groups.every(group => group.length === 1)) throw new Error("Summary incomplete: original evidence cannot be combined within the request budget");
     const next: SupportedFact[] = [];
     for (const group of groups) {
