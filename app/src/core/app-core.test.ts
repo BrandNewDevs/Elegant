@@ -10,7 +10,7 @@ import { fakePipeline, fixtureSummary, fixtureTranscript } from "../testing/fake
 import { openStore } from "../store/store.js";
 import { AppCore, DEFAULT_STOP_TIMEOUT_MS, type ActiveRecording, type DetectedMeeting } from "./app-core.js";
 import { DEFAULT_DETECTION } from "./detection.js";
-import { knownAppsFile } from "./known-apps.js";
+import { ignoredAppsFile } from "./ignored-apps.js";
 
 function setup(pipelineOpts?: Parameters<typeof fakePipeline>[0]) {
   const engine = new FakeEngine();
@@ -510,9 +510,9 @@ describe("detecting a meeting", () => {
     expect(core.detectedMeeting?.app).toBe("Google Chrome");
   });
 
-  it("shows no Prompt for an app that is not listed", () => {
+  it("shows no Prompt for a built-in ignored app", () => {
     const { core, prompts, micStarted } = running();
-    micStarted("Wispr Flow");
+    micStarted("Siri");
     vi.advanceTimersByTime(60_000);
     expect(core.detectedMeeting).toBeUndefined();
     expect(prompts).toEqual([]);
@@ -669,9 +669,9 @@ describe("holding audio from Detection", () => {
     expect(engine.commands).toEqual([{ type: "start_buffer", app: "zoom.us" }]);
   });
 
-  it("asks for nothing when an app that is not listed uses the microphone", () => {
+  it("asks for nothing when a built-in ignored app uses the microphone", () => {
     const { engine, micStarted } = running();
-    micStarted("Wispr Flow");
+    micStarted("Dictation");
     vi.advanceTimersByTime(60_000);
     expect(engine.commands).toEqual([]);
   });
@@ -1420,7 +1420,7 @@ describe("Never for this app", () => {
   });
 });
 
-describe("the known-apps file", () => {
+describe("the ignored-apps file", () => {
   const DEBOUNCE = DEFAULT_DETECTION.debounceMs;
   let dir: string;
   let path: string;
@@ -1428,7 +1428,7 @@ describe("the known-apps file", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     dir = mkdtempSync(join(tmpdir(), "meeting-recorder-test-"));
-    path = join(dir, "known-apps.json");
+    path = join(dir, "ignored-apps.json");
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -1437,7 +1437,12 @@ describe("the known-apps file", () => {
 
   function running() {
     const engine = new FakeEngine();
-    const core = new AppCore({ engine, store: openStore(":memory:"), pipeline: fakePipeline(), knownApps: knownAppsFile(path) });
+    const core = new AppCore({
+      engine,
+      store: openStore(":memory:"),
+      pipeline: fakePipeline(),
+      extraIgnoredApps: ignoredAppsFile(path),
+    });
     core.start();
     engine.emit({ type: "ready", version: "0.1.0" });
     const detect = (app: string, pid = 100) => {
@@ -1447,27 +1452,29 @@ describe("the known-apps file", () => {
     return { core, detect };
   }
 
-  it("is created with the default apps, which are detected", () => {
+  it("is created empty and detects any app bundle name", () => {
     const { core, detect } = running();
-    expect(JSON.parse(readFileSync(path, "utf8")).knownApps).toContain("zoom.us");
-    detect("zoom.us");
-    expect(core.detectedMeeting?.app).toBe("zoom.us");
+    expect(JSON.parse(readFileSync(path, "utf8")).ignoredApps).toEqual([]);
+    detect("Helium");
+    expect(core.detectedMeeting?.app).toBe("Helium");
   });
 
-  it("makes an app added to it detectable without a restart", () => {
+  it("ignores an app added to the file without a restart", () => {
     const { core, detect } = running();
     detect("Whereby");
-    expect(core.detectedMeeting).toBeUndefined();
-
-    writeFileSync(path, JSON.stringify({ knownApps: ["zoom.us", "Whereby"] }));
-    detect("Whereby", 200);
     expect(core.detectedMeeting?.app).toBe("Whereby");
+    core.declinePrompt();
+
+    writeFileSync(path, JSON.stringify({ ignoredApps: ["Whereby"] }));
+    detect("Whereby", 200);
+    expect(core.detectedMeeting).toBeUndefined();
   });
 
-  it("stops detecting an app removed from it", () => {
+  it("does not detect built-in ignores", () => {
     const { core, detect } = running();
-    writeFileSync(path, JSON.stringify({ knownApps: ["Slack"] }));
-    detect("zoom.us");
+    detect("Siri");
+    expect(core.detectedMeeting).toBeUndefined();
+    detect("Dictation", 200);
     expect(core.detectedMeeting).toBeUndefined();
   });
 
@@ -1481,12 +1488,12 @@ describe("the known-apps file", () => {
   });
 
   it("keeps an existing file as it is", () => {
-    writeFileSync(path, JSON.stringify({ knownApps: ["Whereby"] }));
+    writeFileSync(path, JSON.stringify({ ignoredApps: ["Whereby"] }));
     const { core, detect } = running();
     detect("zoom.us");
-    expect(core.detectedMeeting).toBeUndefined();
+    expect(core.detectedMeeting?.app).toBe("zoom.us");
     detect("Whereby", 200);
-    expect(core.detectedMeeting?.app).toBe("Whereby");
+    expect(core.detectedMeeting?.app).toBe("zoom.us");
   });
 });
 

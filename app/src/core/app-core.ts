@@ -24,8 +24,8 @@ export interface AppCoreDeps {
   store: Store;
   pipeline: PipelineStages;
   detection?: Partial<DetectionSettings>;
-  /** The apps that count as call apps, asked at each microphone event so edits apply at once. Defaults to `detection.knownApps`. */
-  knownApps?: () => readonly string[];
+  /** Extra apps to ignore for Detection, asked at each microphone event so edits apply at once. */
+  extraIgnoredApps?: () => readonly string[];
   stopTimeoutMs?: number;
 }
 
@@ -70,14 +70,17 @@ export class AppCore {
     this.runner = new PipelineRunner(deps.pipeline, this.store, { keepAudio: () => this.keepAudio });
     const detection = { ...DEFAULT_DETECTION, ...deps.detection };
     this.promptTimeoutMs = detection.promptTimeoutMs;
-    const knownApps = deps.knownApps ?? (() => detection.knownApps);
-    this.micWatcher = new MicWatcher({ debounceMs: detection.debounceMs, knownApps }, {
-      detected: (app) => this.onDetected(app),
-      released: (app) => {
-        if (this._detectedMeeting?.app === app) this.declinePrompt();
-        else if (this._recording?.app === app) for (const l of this.stopNudgeListeners) l(app);
+    const extraIgnoredApps = deps.extraIgnoredApps ?? (() => []);
+    this.micWatcher = new MicWatcher(
+      { debounceMs: detection.debounceMs, ignoredMicApps: detection.ignoredMicApps, extraIgnoredApps },
+      {
+        detected: (app) => this.onDetected(app),
+        released: (app) => {
+          if (this._detectedMeeting?.app === app) this.declinePrompt();
+          else if (this._recording?.app === app) for (const l of this.stopNudgeListeners) l(app);
+        },
       },
-    });
+    );
     deps.engine.onEvent((event) => {
       switch (event.type) {
         case "ready":

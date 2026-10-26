@@ -4,7 +4,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { AppCore } from "../core/app-core.js";
 import { formatElapsed } from "../core/elapsed.js";
-import { knownAppsFile } from "../core/known-apps.js";
+import { ignoredAppsFile } from "../core/ignored-apps.js";
 import { ProcessEngine } from "../engine/process-engine.js";
 import { createEngineTranscriber } from "../pipeline/engine-transcriber.js";
 import { checkOllama, OllamaClient } from "../pipeline/ollama.js";
@@ -28,7 +28,7 @@ let prompt: { close(): void } | undefined;
 let meetingsWindow: MeetingsWindow | undefined;
 let setupWindow: SetupWindow | undefined;
 
-let knownAppsPath = "";
+let ignoredAppsPath = "";
 
 let elapsedTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -60,7 +60,7 @@ function render(): void {
           render();
         },
       },
-      { label: "Known apps…", click: () => void shell.openPath(knownAppsPath) },
+      { label: "Ignored apps…", click: () => void shell.openPath(ignoredAppsPath) },
       {
         label: "Never prompt for",
         enabled: core.neverApps.length > 0,
@@ -92,11 +92,11 @@ app.whenReady().then(() => {
 
   const store = openStore(join(dataDir, "meetings.db"));
   const engine = new ProcessEngine({ command: process.env.MEETING_RECORDER_ENGINE ?? devEngine });
-  knownAppsPath = join(dataDir, "known-apps.json");
+  ignoredAppsPath = join(dataDir, "ignored-apps.json");
   core = new AppCore({
     engine,
     store,
-    knownApps: knownAppsFile(knownAppsPath),
+    extraIgnoredApps: ignoredAppsFile(ignoredAppsPath),
     pipeline: {
       transcribe: createEngineTranscriber(engine, { model: SPEECH_MODEL, modelsDirectory: join(dataDir, "models") }),
       summarise: createSummariser({ model: new OllamaClient() }),
