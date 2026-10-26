@@ -83,7 +83,6 @@ describe("evidence-backed Summary generation", () => {
   it("rejects unknown references, blank points and evidence from a different speaker", async () => {
     const invalid = [
       { ...good, tldrRefs: [99] },
-      { ...good, tldrRefs: [0, 0] },
       { ...good, points: [{ speaker: "You", text: " ", refs: [0] }] },
       { ...good, points: [{ speaker: "You", text: "A claim", refs: [1] }] },
     ];
@@ -92,6 +91,14 @@ describe("evidence-backed Summary generation", () => {
       await expect(createGroundedSummariser({ model, attempts: 1 })(transcript)).rejects.toThrow("failed validation");
       expect(model.requests).toHaveLength(1);
     }
+  });
+
+  it("normalizes repeated citation identifiers without changing their source meaning", async () => {
+    const model = fake(() => ({ ...good, tldrRefs: [1, 0, 0, 1], points: [{ ...good.points[0], refs: [0, 0] }] }));
+    const result = await createGroundedSummariser({ model })(transcript);
+    expect(result.evidence!.tldr).toEqual([0, 1]);
+    expect(result.evidence!.participants[0]!.said).toEqual([[0]]);
+    expect(model.requests).toHaveLength(1);
   });
 
   it("does not retry connection errors and never returns an empty Transcript Summary", async () => {
@@ -128,6 +135,22 @@ describe("evidence-backed Summary generation", () => {
     expect(new Set(primary.map(piece => piece.id)).size).toBe(primary.length);
     expect(result.evidence!.tldr).toEqual([0]);
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it("normalizes duplicate extraction refs and sourceIds before consolidation", async () => {
+    const model = fake(request => {
+      const output = hierarchicalReply(request) as { facts?: Fact[] };
+      if (output.facts) return { facts: output.facts.map(fact => ({ ...fact, refs: [...fact.refs, ...fact.refs], sourceIds: [...fact.sourceIds, ...fact.sourceIds] })) };
+      return output;
+    });
+    const result = await createGroundedSummariser({ model })(longTranscript());
+    expect(result.evidence!.tldr).toEqual([35]);
+    for (const request of model.requests) {
+      for (const fact of payload(request).candidates ?? []) {
+        expect(fact.refs).toEqual([...new Set(fact.refs)]);
+        expect(fact.sourceIds).toEqual([...new Set(fact.sourceIds)]);
+      }
+    }
   });
 
   it("handles a single oversized word without losing Unicode characters", async () => {

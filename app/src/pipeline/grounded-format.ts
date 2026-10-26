@@ -6,7 +6,7 @@ export interface SupportedPoint { speaker: string; text: string; refs: number[] 
 export interface SupportedFact extends SupportedPoint { kind: FactKind; sources: SourcePiece[] }
 export interface GroundedOutput { tldr: string; tldrRefs: number[]; points: SupportedPoint[] }
 
-const refsSchema = { type: "array", items: { type: "integer" }, minItems: 1 };
+const refsSchema = { type: "array", items: { type: "integer" }, minItems: 1, uniqueItems: true };
 const pointProperties = { speaker: { type: "string" }, text: { type: "string" }, refs: refsSchema };
 export const GROUNDED_SCHEMA = {
   type: "object", properties: {
@@ -16,7 +16,7 @@ export const GROUNDED_SCHEMA = {
 };
 export const FACTS_SCHEMA = {
   type: "object", properties: { facts: { type: "array", items: {
-    type: "object", properties: { ...pointProperties, sourceIds: { type: "array", items: { type: "string" }, minItems: 1 }, kind: { type: "string", enum: ["proposal", "decision", "commitment", "disagreement", "unresolved", "update"] } },
+    type: "object", properties: { ...pointProperties, sourceIds: { type: "array", items: { type: "string" }, minItems: 1, uniqueItems: true }, kind: { type: "string", enum: ["proposal", "decision", "commitment", "disagreement", "unresolved", "update"] } },
     required: ["speaker", "text", "refs", "kind", "sourceIds"],
   } } }, required: ["facts"],
 };
@@ -33,9 +33,9 @@ function text(value: unknown): string {
 }
 function references(value: unknown, sources: SourcePiece[]): number[] {
   const available = new Set(sources.map(source => source.ref));
-  if (!Array.isArray(value) || !value.length || !value.every(ref => Number.isInteger(ref) && available.has(ref))
-      || new Set(value).size !== value.length) return problem("Use distinct source references supplied in this request");
-  return [...value].sort((a, b) => a - b) as number[];
+  if (!Array.isArray(value) || !value.length || !value.every(ref => Number.isInteger(ref) && available.has(ref))) return problem("Use source references supplied in this request");
+  // Repeating a valid identifier adds no evidence; normalize without spending a model retry.
+  return [...new Set(value)].sort((a, b) => a - b) as number[];
 }
 function point(value: unknown, sources: SourcePiece[]): SupportedPoint {
   if (!record(value)) return problem("Every point must be an object");
@@ -54,8 +54,7 @@ export function parseFacts(json: string, sources: SourcePiece[], primary?: Sourc
   if (!Array.isArray(value.facts)) return problem("facts must be a list");
   return value.facts.map(value => {
     if (!record(value) || typeof value.kind !== "string" || !["proposal", "decision", "commitment", "disagreement", "unresolved", "update"].includes(value.kind)) return problem("Use a supported fact kind");
-    if (!Array.isArray(value.sourceIds) || !value.sourceIds.length || !value.sourceIds.every(id => typeof id === "string" && sources.some(source => source.id === id))
-        || new Set(value.sourceIds).size !== value.sourceIds.length) return problem("Cite distinct sourceIds supplied with the original passages");
+    if (!Array.isArray(value.sourceIds) || !value.sourceIds.length || !value.sourceIds.every(id => typeof id === "string" && sources.some(source => source.id === id))) return problem("Cite sourceIds supplied with the original passages");
     const selected = sources.filter(source => (value.sourceIds as string[]).includes(source.id));
     const p = point(value, selected);
     if (selected.some(source => !p.refs.includes(source.ref))) return problem("Every cited sourceId must belong to a cited segment ref");
