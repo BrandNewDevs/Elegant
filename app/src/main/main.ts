@@ -49,8 +49,8 @@ function render(): void {
         : []),
       { label: text, enabled: false },
       { type: "separator" },
-      { label: "Meetings…", click: () => meetingsWindow?.show("meetings") },
-      { label: "Settings…", accelerator: "Command+,", click: () => meetingsWindow?.show("settings") },
+      { label: "Meetings…", click: () => meetingsWindow?.show({ settings: false }) },
+      { label: "Settings…", accelerator: "Command+,", click: () => meetingsWindow?.show({ settings: true }) },
       {
         label: "Keep audio after transcription",
         type: "checkbox",
@@ -111,7 +111,7 @@ app.whenReady().then(() => {
   });
   const setupBridge = new SetupBridge(setup, {
     done: (sender) => BrowserWindow.fromWebContents(sender)?.close(),
-    openSettings: () => meetingsWindow?.show("settings"),
+    openSettings: () => meetingsWindow?.show({ settings: true }),
   });
   meetingsWindow = new MeetingsWindow(core, setup, setupBridge);
   const onboardingWindow = new OnboardingWindow(setupBridge);

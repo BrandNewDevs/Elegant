@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowLeft, CheckCircle2, Cpu, UserRound, Download, ExternalLink, Loader2, RefreshCw, Settings, ShieldCheck, Sparkles, XCircle, type LucideIcon } from "lucide-react";
+import { AlertCircle, CheckCircle2, Cpu, UserRound, Download, ExternalLink, Loader2, RefreshCw, Settings, ShieldCheck, Sparkles, XCircle, type LucideIcon } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { PERMISSIONS, type PermissionCopy, type PermissionStep } from "@/lib/permissions";
@@ -174,24 +175,13 @@ function SummariesCard({ ollama }: { ollama: Step }) {
   );
 }
 
-/** The Settings page of the main window: permissions, the model download and the Ollama check. */
-export function SettingsPage({ onBack }: { onBack: () => void }) {
+function SettingsContent() {
   const view = useSetup();
   if (!view) return null;
   const { name, state } = view;
 
   return (
-    <main className="mx-auto max-w-xl space-y-5 p-8">
-      <div className="space-y-3">
-        <Button type="button" variant="ghost" size="sm" className="-ml-3" onClick={onBack}>
-          <ArrowLeft aria-hidden />
-          Meetings
-        </Button>
-        <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight">
-          <Settings className="size-6 text-muted-foreground" aria-hidden />
-          Settings
-        </h1>
-      </div>
+    <div className="space-y-5">
       <NameCard key={view.userName} userName={view.userName} />
       <Card>
         <CardHeader className="pb-1">
@@ -206,6 +196,24 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
       </Card>
       <ModelsCard models={state.models} name={name} />
       <SummariesCard ollama={state.ollama} />
-    </main>
+    </div>
+  );
+}
+
+/** Settings, as a dialog over the main window: your name, the permissions, the model download and the Ollama check. */
+export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[88vh] max-w-xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2.5 text-xl">
+            <Settings className="size-5 text-muted-foreground" aria-hidden />
+            Settings
+          </DialogTitle>
+          <DialogDescription>Your name, the permissions, and what summaries need.</DialogDescription>
+        </DialogHeader>
+        <SettingsContent />
+      </DialogContent>
+    </Dialog>
   );
 }

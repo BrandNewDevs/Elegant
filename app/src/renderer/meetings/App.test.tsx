@@ -26,7 +26,7 @@ beforeEach(() => {
     meetings: {
       ready: vi.fn(),
       onState: vi.fn(() => () => {}),
-      view: vi.fn(),
+      settings: vi.fn(),
       select: vi.fn(),
       search: vi.fn(),
       rename: vi.fn(),
@@ -41,7 +41,7 @@ beforeEach(() => {
 
 it("shows the query in the box, escaped, and says when nothing matches", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
-    callback({ view: "meetings", meetings: [], selected: undefined, query: `"><script>` });
+    callback({ settingsOpen: false, meetings: [], selected: undefined, query: `"><script>` });
     return () => {};
   });
   render(<MeetingsApp />);
@@ -53,7 +53,7 @@ it("shows the query in the box, escaped, and says when nothing matches", () => {
 it("lists Meetings and selects one", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
     callback({
-      view: "meetings",
+      settingsOpen: false,
       meetings: [{ id: 7, app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z", state: "done" }],
       selected: undefined,
       query: "x",
@@ -66,7 +66,7 @@ it("lists Meetings and selects one", () => {
 
 it("offers a rename field for each Participant, showing their label and current name", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
-    callback({ view: "meetings", meetings: [], selected: meeting, query: "" });
+    callback({ settingsOpen: false, meetings: [], selected: meeting, query: "" });
     return () => {};
   });
   render(<MeetingsApp />);
@@ -76,17 +76,18 @@ it("offers a rename field for each Participant, showing their label and current 
 
 it("opens Settings from the sidebar", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
-    callback({ view: "meetings", meetings: [], selected: undefined, query: "" });
+    callback({ settingsOpen: false, meetings: [], selected: undefined, query: "" });
     return () => {};
   });
   render(<MeetingsApp />);
+  expect(screen.queryByRole("dialog")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-  expect(window.electron.meetings.view).toHaveBeenCalledWith("settings");
+  expect(window.electron.meetings.settings).toHaveBeenCalledWith(true);
 });
 
-it("shows the Settings page in place of the Meetings when the window is on it, and goes back", () => {
+it("shows Settings as a dialog over the Meetings when it is open, and asks to close it", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
-    callback({ view: "settings", meetings: [], selected: undefined, query: "" });
+    callback({ settingsOpen: true, meetings: [], selected: undefined, query: "" });
     return () => {};
   });
   window.electron.setup = {
@@ -99,9 +100,9 @@ it("shows the Settings page in place of the Meetings when the window is on it, a
     setUserName: vi.fn(),
   };
   render(<MeetingsApp />);
-  expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
-  expect(screen.queryByPlaceholderText("Search meetings")).toBeNull();
+  expect(screen.getByRole("dialog", { name: "Settings" })).toBeTruthy();
+  expect(screen.getByPlaceholderText("Search meetings")).toBeTruthy();
 
-  fireEvent.click(screen.getByRole("button", { name: "Meetings" }));
-  expect(window.electron.meetings.view).toHaveBeenCalledWith("meetings");
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  expect(window.electron.meetings.settings).toHaveBeenCalledWith(false);
 });

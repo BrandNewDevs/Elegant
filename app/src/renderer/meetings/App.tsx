@@ -1,6 +1,5 @@
 import { AlertCircle, CheckCircle2, FileDown, FileText, Inbox, Loader2, MessagesSquare, Radio, RefreshCw, Search, Settings, Sparkles, Trash2, Users, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import type { MeetingsView } from "../../shared/meetings-view-state";
 import type { Meeting, MeetingListItem, MeetingState } from "../../store/store";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { formatClock, formatWhen } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { SettingsPage } from "../settings/App";
+import { SettingsDialog } from "../settings/SettingsDialog";
 
 const STATE_LABEL: Record<MeetingState, string> = {
   recording: "Recording",
@@ -183,14 +182,14 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
 }
 
 export function MeetingsApp() {
-  const [view, setView] = useState<MeetingsView>("meetings");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [meetings, setMeetings] = useState<MeetingListItem[]>([]);
   const [selected, setSelected] = useState<Meeting | undefined>();
 
   useEffect(() => {
     const unsubscribe = window.electron.meetings.onState((state) => {
-      setView(state.view);
+      setSettingsOpen(state.settingsOpen);
       setQuery(state.query);
       setMeetings(state.meetings);
       setSelected(state.selected);
@@ -203,14 +202,6 @@ export function MeetingsApp() {
     e.preventDefault();
     window.electron.meetings.search(query);
   };
-
-  if (view === "settings") {
-    return (
-      <div className="h-screen overflow-y-auto">
-        <SettingsPage onBack={() => window.electron.meetings.view("meetings")} />
-      </div>
-    );
-  }
 
   return (
     <div className="flex h-screen min-h-0 overflow-hidden">
@@ -238,7 +229,7 @@ export function MeetingsApp() {
           )}
         </ScrollArea>
         <div className="border-t p-2">
-          <Button type="button" variant="ghost" size="sm" className="w-full justify-start" onClick={() => window.electron.meetings.view("settings")}>
+          <Button type="button" variant="ghost" size="sm" className="w-full justify-start" onClick={() => window.electron.meetings.settings(true)}>
             <Settings aria-hidden />
             Settings
           </Button>
@@ -256,6 +247,7 @@ export function MeetingsApp() {
           )}
         </main>
       </ScrollArea>
+      <SettingsDialog open={settingsOpen} onOpenChange={(open) => window.electron.meetings.settings(open)} />
     </div>
   );
 }

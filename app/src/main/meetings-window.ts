@@ -3,19 +3,19 @@ import { writeFile } from "node:fs/promises";
 import type { AppCore } from "../core/app-core.js";
 import { DISPLAY_NAME } from "../config.js";
 import type { Setup } from "../setup/setup.js";
-import type { MeetingsView, MeetingsViewState } from "../shared/meetings-view-state.js";
+import type { MeetingsViewState } from "../shared/meetings-view-state.js";
 import type { SetupBridge } from "./setup-bridge.js";
 import { preloadPath, rendererPagePath, windowBackground } from "./window-ui.js";
 
 type MeetingAction = { type: "regenerate" | "delete"; id: number };
 
 /**
- * The main window. It shows the Meetings (a list on the left, the selected Meeting on the right) or the Settings page, and
- * redraws when Meetings change.
+ * The main window: the Meetings (a list on the left, the selected Meeting on the right), with the Settings dialog over them
+ * when it is open. Redraws when Meetings change.
  */
 export class MeetingsWindow {
   private window: BrowserWindow | undefined;
-  private view: MeetingsView = "meetings";
+  private settingsOpen = false;
   private selectedId: number | undefined;
   private query = "";
   private pageLoaded = false;
@@ -39,9 +39,9 @@ export class MeetingsWindow {
       if (!this.fromThis(event.sender)) return;
       this.pushState();
     });
-    ipcMain.on("meetings:view", (event, view: MeetingsView) => {
+    ipcMain.on("meetings:settings", (event, open: boolean) => {
       if (!this.fromThis(event.sender)) return;
-      this.switchTo(view);
+      this.setSettingsOpen(open === true);
     });
     ipcMain.on("meetings:select", (event, id: number) => {
       if (!this.fromThis(event.sender)) return;
@@ -79,9 +79,9 @@ export class MeetingsWindow {
     });
   }
 
-  /** Shows the window, creating it the first time or after it was closed. `view` switches it to that page first. */
-  show(view?: MeetingsView): void {
-    if (view) this.switchTo(view, false);
+  /** Shows the window, creating it the first time or after it was closed. `settings` opens or closes the Settings dialog first. */
+  show(options: { settings?: boolean } = {}): void {
+    if (options.settings !== undefined) this.setSettingsOpen(options.settings, false);
     if (!this.window) {
       const window = new BrowserWindow({
         width: 900,
@@ -109,10 +109,10 @@ export class MeetingsWindow {
     this.window.focus();
   }
 
-  private switchTo(view: MeetingsView, push = true): void {
-    this.view = view;
+  private setSettingsOpen(open: boolean, push = true): void {
+    this.settingsOpen = open;
     // The person may have changed a permission in System Settings or started Ollama since Settings was last open.
-    if (view === "settings") {
+    if (open) {
       this.setup.verifyPermissions();
       void this.setup.checkOllama();
     }
@@ -162,7 +162,7 @@ export class MeetingsWindow {
     if (!this.window || this.window.isDestroyed() || !this.pageLoaded) return;
     const selected = this.selectedId === undefined ? undefined : this.core.getMeetingForDisplay(this.selectedId);
     const meetings = this.query.trim() ? this.core.searchMeetings(this.query) : this.core.listMeetings();
-    const payload: MeetingsViewState = { view: this.view, meetings, selected, query: this.query };
+    const payload: MeetingsViewState = { settingsOpen: this.settingsOpen, meetings, selected, query: this.query };
     this.window.webContents.send("meetings:state", payload);
   }
 }

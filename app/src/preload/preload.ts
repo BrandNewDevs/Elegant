@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
-import type { MeetingsView, MeetingsViewState } from "../shared/meetings-view-state.js";
+import type { MeetingsViewState } from "../shared/meetings-view-state.js";
 import type { PromptChoice } from "../shared/prompt-choice.js";
 import type { SetupAction } from "../shared/setup-actions.js";
 import type { SetupViewState } from "../shared/setup-view-state.js";
@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld("electron", {
   meetings: {
     ready: () => ipcRenderer.send("meetings:ready"),
     onState: (callback: (state: MeetingsViewState) => void) => subscribe("meetings:state", callback),
-    view: (view: MeetingsView) => ipcRenderer.send("meetings:view", view),
+    settings: (open: boolean) => ipcRenderer.send("meetings:settings", open),
     select: (id: number) => ipcRenderer.send("meetings:select", id),
     search: (query: string) => ipcRenderer.send("meetings:search", query),
     rename: (payload: { meetingId: number; label: string; name: string }) =>
