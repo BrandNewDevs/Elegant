@@ -12,7 +12,7 @@ Read before changing anything:
 Layout and commands:
 
 - `app/` is the Electron app (TypeScript, ES modules). `engine/` is the Swift engine (a SwiftPM package). They talk over JSON lines on stdio; the protocol lives in `app/src/engine/protocol.ts`.
-- The windows (Meetings, setup, Prompt) are React + Tailwind + shadcn/ui pages in `app/src/renderer/`, built by Vite. `app/src/preload/` is the sandboxed CommonJS bridge; `app/src/shared/` holds the types the main process and renderer share. Add shadcn components under `app/src/renderer/components/ui/`.
+- The windows (the main window with Meetings and Settings, onboarding, the Prompt) are React + Tailwind + shadcn/ui pages in `app/src/renderer/`, built by Vite. `app/src/preload/` is the sandboxed CommonJS bridge; `app/src/shared/` holds the types the main process and renderer share. Add shadcn components under `app/src/renderer/components/ui/`.
 - Run these from `app/`: `pnpm install`, `pnpm run typecheck`, `pnpm test` (builds the engine and runs its Swift tests first), `pnpm start` (builds and runs the menu-bar app).
 - Test at the seams in the spec (issue #2): drive `AppCore` with `FakeEngine` and `fakePipeline` from `src/testing/`, and test `ProcessEngine` against a stub or the built engine. Don't test internals.
 - If you launch Electron by hand, run it with `env -u ELECTRON_RUN_AS_NODE`; with that variable set it exits silently.

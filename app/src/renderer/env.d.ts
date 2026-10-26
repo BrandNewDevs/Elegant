@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { MeetingsViewState } from "../shared/meetings-view-state";
+import type { MeetingsView, MeetingsViewState } from "../shared/meetings-view-state";
 import type { SetupAction } from "../shared/setup-actions";
 import type { SetupViewState } from "../shared/setup-view-state";
 import type { PromptChoice } from "../shared/prompt-choice";
@@ -11,6 +11,7 @@ declare global {
       meetings: {
         ready(): void;
         onState(callback: (state: MeetingsViewState) => void): () => void;
+        view(view: MeetingsView): void;
         select(id: number): void;
         search(query: string): void;
         rename(payload: { meetingId: number; label: string; name: string }): void;

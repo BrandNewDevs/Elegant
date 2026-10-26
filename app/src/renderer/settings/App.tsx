@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Cpu, Download, ExternalLink, Loader2, RefreshCw, Settings, ShieldCheck, Sparkles, XCircle, type LucideIcon } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Cpu, Download, ExternalLink, Loader2, RefreshCw, Settings, ShieldCheck, Sparkles, XCircle, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -143,17 +143,24 @@ function SummariesCard({ ollama }: { ollama: Step }) {
   );
 }
 
-export function SettingsApp() {
+/** The Settings page of the main window: permissions, the model download and the Ollama check. */
+export function SettingsPage({ onBack }: { onBack: () => void }) {
   const view = useSetup();
   if (!view) return null;
   const { name, state } = view;
 
   return (
     <main className="mx-auto max-w-xl space-y-5 p-8">
-      <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight">
-        <Settings className="size-6 text-muted-foreground" aria-hidden />
-        Settings
-      </h1>
+      <div className="space-y-3">
+        <Button type="button" variant="ghost" size="sm" className="-ml-3" onClick={onBack}>
+          <ArrowLeft aria-hidden />
+          Meetings
+        </Button>
+        <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight">
+          <Settings className="size-6 text-muted-foreground" aria-hidden />
+          Settings
+        </h1>
+      </div>
       <Card>
         <CardHeader className="pb-1">
           <CardHeading icon={ShieldCheck}>Permissions</CardHeading>

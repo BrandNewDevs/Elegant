@@ -15,7 +15,6 @@ export default defineConfig({
       input: {
         meetings: resolve(import.meta.dirname, "src/renderer/meetings.html"),
         onboarding: resolve(import.meta.dirname, "src/renderer/onboarding.html"),
-        settings: resolve(import.meta.dirname, "src/renderer/settings.html"),
         prompt: resolve(import.meta.dirname, "src/renderer/prompt.html"),
       },
     },
