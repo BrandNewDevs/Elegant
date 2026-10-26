@@ -1,8 +1,13 @@
 /**
  * Apps whose microphone use should not count as a Meeting. The engine only reports processes inside a `.app`
- * bundle; everything else is already dropped there. Dictation and Siri are tuned on the demo pass (#10).
+ * bundle; everything else is already dropped there. Voice assistants and dictation-style apps are tuned on the demo pass (#10).
  */
-export const DEFAULT_IGNORED_MIC_APPS = ["Siri", "Dictation"];
+export const DEFAULT_IGNORED_MIC_APPS = [
+  "Siri",
+  "Siri AI",
+  "Dictation",
+  "Wispr Flow",
+];
 
 export interface DetectionSettings {
   /** How long an app must hold the microphone before a Detection. A default to tune against real calls. */
