@@ -52,10 +52,13 @@ From `app/`:
 ```
 AI_MODEL=gemma3:4b-it-q4_K_M AI_SPLIT=tuning pnpm run eval:ai current ../evaluation/fixtures /tmp/current.json
 AI_MODEL=gemma3:4b-it-q4_K_M pnpm run eval:ai baseline ../evaluation/fixtures /tmp/baseline-suite.json
+AI_MODEL=gemma3:4b-it-q4_K_M pnpm run eval:ai summary ../evaluation/fixtures /tmp/summaries.json
 pnpm run eval:ai private-current /absolute/private/manifest.json /absolute/private/results.json
 ```
 
 `AI_SPLIT=tuning` or `reserved` selects a split; omit it to run all. Use tuning examples while changing prompts. Baseline runs on synthetic reserved examples are visible to implementers and cannot be described as blind evaluation. The private 10- and 60-minute examples remain the final untouched checks. Set `AI_RUN_CONDITION=cold` or `warm` only after controlling model loading; otherwise leave its default `uncontrolled`.
+
+`summary` and `private-summary` measure the production Summary pipeline without generating chat answers. Chat stays skipped, and chat quality remains pending. Current-pipeline results also include an operational `requests` list: serialized bytes, actual prompt/output token counts, timing and transport failure status. It contains no prompt text. Check individual prompt counts against the 6,144-token input allowance (8,192 minus the 2,048-token response reservation); a successful count on one example does not establish a universal tokenizer bound.
 
 From the repository root:
 
@@ -96,3 +99,16 @@ pnpm --dir app run eval:ai private-chat /absolute/private/manifest.json /absolut
 The `chat` modes intentionally skip Summary generation and use the production Meeting-chat module on stored Transcripts. Reports leave Summary quality pending, even when chat has been reviewed. Results separate Summary latency/calls from individual chat latency/calls. Follow-ups use actual prior answers, never expected answers.
 
 `chat/linux-short-answers.json` records four real Gemma answers to synthetic questions: writer, contextual deadline, undecided release date, and excluded calendar integration. The writer and deadline cite the expected passage; the negative outcomes remain explicit. Some extra citation choices and inline citation formatting still need quality review. `linux-before-followup-fix.json` is a failed earlier observation, not a passed evaluation: it demonstrates why a standalone question and focused evidence audit were needed. Neither file establishes real Meeting quality or M4 performance; final independent quality gates remain pending.
+
+## Measure memory alongside a run
+
+Build the TypeScript evaluation command before measuring so compilation is excluded:
+
+```
+pnpm --dir app exec tsc -p tsconfig.build.json
+AI_MODEL=gemma3:4b-it-q4_K_M python3 evaluation/measure.py --output /tmp/resources.json --include-ollama --nvidia -- node app/dist/evaluation/cli.js summary evaluation/fixtures /tmp/summaries.json
+```
+
+Omit `--nvidia` on the Mac. The wrapper discards command stdout/stderr and does not store command arguments. The evaluation command writes its own result file, so private outputs must still stay outside Git. The wrapper samples summed process-tree RSS, optional separate Ollama RSS, system swap and optional NVIDIA memory; these are not a unique physical-memory total. Missing measurements are null with warnings. Use Activity Monitor on the Mac to inspect memory pressure and retained Swift models too. See [device testing and recovery](../docs/ai-testing.md) for the full procedure.
+
+Pass `--label cold` or `--label warm` only after establishing that condition yourself. The label does not prepare it. To compare models, use identical fixture files, generation settings and production commit, unload the previous model, verify Ollama has no resident model before the cold run, then immediately repeat after verifying the selected model remains resident. Record the digest and quantization on each machine: matching tag names alone do not establish matching weights. Keep the baseline unless the candidate meets quality and target-M4 gates.
