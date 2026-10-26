@@ -20,7 +20,7 @@ function setup(source = transcript) {
 }
 interface Data { question: string; priorUserQuestion?: string; history: { question: string; answer: string }[]; sources?: SourceFragment[]; exhaustive?: boolean }
 const contents = (request: TextRequest) => JSON.parse(request.messages.at(-1)!.content) as { instruction: string; data: Data };
-const isAnswer = (request: TextRequest) => contents(request).instruction.startsWith("Answer the question");
+const isAnswer = (request: TextRequest) => "text" in (request.schema as { properties: object }).properties;
 function fake(reply: (request: TextRequest, call: number) => unknown): TextModel & { requests: TextRequest[] } {
   const requests: TextRequest[] = [];
   return { requests, async complete(request) {
