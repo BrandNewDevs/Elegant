@@ -60,6 +60,7 @@ export class AppCore {
   private readonly runner: PipelineRunner;
   private recordingMeetingId: number | undefined;
   private readonly inFlight = new Set<Promise<void>>();
+  private readonly deletingMeetings = new Set<number>();
   private readonly micWatcher: MicWatcher;
   private readonly promptTimeoutMs: number;
   private promptTimer: ReturnType<typeof setTimeout> | undefined;
@@ -294,19 +295,30 @@ export class AppCore {
 
   /** Removes a Meeting and all its data, including any kept audio. */
   async deleteMeeting(id: number): Promise<void> {
+    this.assertNotDeleting(id);
     const meeting = this.deps.store.getMeeting(id);
     if (!meeting) throw new Error(`no such Meeting: ${id}`);
     // The pipeline is still writing to a Meeting in these states.
     if (meeting.state === "recording" || meeting.state === "processing") {
       throw new Error(`a Meeting that is ${meeting.state} cannot be deleted yet`);
     }
-    this.chatController.clear(id);
-    if (meeting.audio) await discardAudio(meeting.audio);
-    this.store.deleteMeeting(id);
+    // Reserve the Meeting before cancellation notifies views or audio removal yields to another action.
+    this.deletingMeetings.add(id);
+    try {
+      this.chatController.clear(id);
+      if (meeting.audio) await discardAudio(meeting.audio);
+      this.chatController.clear(id);
+      this.store.deleteMeeting(id);
+    } finally {
+      this.deletingMeetings.delete(id);
+      // A failed audio removal leaves the Meeting recoverable and chat available again.
+      this.chatController.refresh(id);
+    }
   }
 
   /** Summarises a failed Meeting again from its stored Transcript, e.g. once Ollama is running. */
   async retrySummary(id: number): Promise<void> {
+    this.assertNotDeleting(id);
     const meeting = this.deps.store.getMeeting(id);
     if (!meeting) throw new Error(`no such Meeting: ${id}`);
     if (meeting.state !== "failed") throw new Error(`only a failed Meeting can be retried, and this one is ${meeting.state}`);
@@ -319,6 +331,7 @@ export class AppCore {
    * live apart from the Summary, which holds labels, so a rename carries over.
    */
   async regenerateSummary(id: number): Promise<void> {
+    this.assertNotDeleting(id);
     const meeting = this.deps.store.getMeeting(id);
     if (!meeting) throw new Error(`no such Meeting: ${id}`);
     if (meeting.state !== "done" && meeting.state !== "failed") {
@@ -330,6 +343,7 @@ export class AppCore {
 
   /** Transcribes a failed Meeting again from its kept audio, without re-recording. */
   async retryTranscription(id: number): Promise<void> {
+    this.assertNotDeleting(id);
     const meeting = this.deps.store.getMeeting(id);
     if (!meeting) throw new Error(`no such Meeting: ${id}`);
     if (meeting.state !== "failed") throw new Error(`only a failed Meeting can be retried, and this one is ${meeting.state}`);
@@ -346,6 +360,7 @@ export class AppCore {
   getChatHistoryForDisplay(id: number): ChatRecord[] { return this.chatController.historyForDisplay(id); }
 
   sendQuestion(meetingId: number, requestId: string, question: string): ChatRecord {
+    this.assertNotDeleting(meetingId);
     return this.chatController.send(meetingId, requestId, question);
   }
 
@@ -369,7 +384,7 @@ export class AppCore {
 
   isChatAvailable(id: number): boolean {
     const meeting = this.store.getMeeting(id);
-    if (this.stopping || !this.deps.chat || !meeting || !meeting.transcript.segments.length || meeting.state === "recording") return false;
+    if (this.stopping || this.deletingMeetings.has(id) || !this.deps.chat || !meeting || !meeting.transcript.segments.length || meeting.state === "recording") return false;
     const pipelineJobs = this.jobs.snapshot.filter(job => job.owner === `meeting:${id}`);
     if (pipelineJobs.some(job => job.kind !== "summary")) return false;
     return meeting.state !== "processing" || (pipelineJobs.length > 0 && pipelineJobs.every(job => job.kind === "summary"));
@@ -410,7 +425,12 @@ export class AppCore {
     this.setStatus("stopped");
   }
 
+  private assertNotDeleting(id: number): void {
+    if (this.deletingMeetings.has(id)) throw new Error("This Meeting is being deleted");
+  }
+
   private pipelineJob(id: number, kind: string, task: (context: PipelineContext) => Promise<void>): Promise<void> {
+    this.assertNotDeleting(id);
     this.store.setMeetingState(id, "processing");
     const queueId = randomUUID();
     const work = this.jobs.enqueue({ id: queueId, owner: `meeting:${id}`, kind }, signal => task({ signal,
