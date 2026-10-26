@@ -33,6 +33,10 @@ export interface Store {
   saveSummary(id: number, summary: Summary): void;
   saveAudio(id: number, tracks: Tracks): void;
   clearAudio(id: number): void;
+  /** Removes the Meeting and everything stored for it: Participants, Transcript segments and Summary. */
+  deleteMeeting(id: number): void;
+  getSetting(key: string): string | undefined;
+  setSetting(key: string, value: string): void;
   getMeeting(id: number): Meeting | undefined;
   /** Newest first. */
   listMeetings(): MeetingListItem[];
@@ -148,6 +152,19 @@ export function openStore(path: string): Store {
 
     clearAudio(id) {
       db.prepare("UPDATE meetings SET mic_path = NULL, system_path = NULL WHERE id = ?").run(id);
+    },
+
+    deleteMeeting(id) {
+      db.prepare("DELETE FROM meetings WHERE id = ?").run(id);
+    },
+
+    getSetting(key) {
+      const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
+      return row?.value;
+    },
+
+    setSetting(key, value) {
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, value);
     },
 
     getMeeting(id) {

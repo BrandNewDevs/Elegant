@@ -32,21 +32,44 @@ var recorder: Recorder?
 let isoFormatter = ISO8601DateFormatter()
 isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
+/// Detection: start holding the last few minutes in memory. Nothing is written until `start_recording`.
+func startBuffer() {
+    guard recorder == nil else { return } // already holding audio, or recording
+    do {
+        recorder = try Recorder()
+    } catch {
+        // Not fatal: `start_recording` tries again and reports its own failure.
+        send(["type": "error", "message": "cannot hold audio before recording: \(error)"])
+    }
+}
+
+/// The Prompt was declined or timed out. A Recording in progress is never touched.
+func discardBuffer() {
+    guard let held = recorder, !held.isRecording else { return }
+    held.discard()
+    recorder = nil
+}
+
 func startRecording(app: String) {
-    guard recorder == nil else {
+    if recorder?.isRecording == true {
         send(["type": "error", "message": "start_recording: a recording is already in progress"])
         return
     }
     do {
-        recorder = try Recorder()
+        // Keeps what `start_buffer` has held; without one, the Recording simply starts now.
+        let held = try recorder ?? Recorder()
+        recorder = held
+        try held.beginRecording()
         send(["type": "recording_started", "app": app, "startedAt": isoFormatter.string(from: Date())])
     } catch {
+        recorder?.discard()
+        recorder = nil
         send(["type": "recording_failed", "message": "cannot start recording: \(error)"])
     }
 }
 
 func stopRecording() {
-    guard let active = recorder else {
+    guard let active = recorder, active.isRecording else {
         send(["type": "recording_failed", "message": "stop_recording: no recording is in progress"])
         return
     }
@@ -108,8 +131,10 @@ func handle(command line: String) {
         stopRecording()
     case "transcribe":
         transcribe(command)
+    case "start_buffer":
+        startBuffer()
     case "discard_buffer":
-        break // nothing is buffered before a Recording starts yet
+        discardBuffer()
     default:
         send(["type": "error", "message": "command not implemented yet: \(type)"])
     }

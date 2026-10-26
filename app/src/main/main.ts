@@ -44,6 +44,15 @@ function render(): void {
       { label: text, enabled: false },
       { type: "separator" },
       { label: "Meetings…", click: () => meetingsWindow?.show() },
+      {
+        label: "Keep audio after transcription",
+        type: "checkbox",
+        checked: core.keepAudio,
+        click: (item) => {
+          core?.setKeepAudio(item.checked);
+          render();
+        },
+      },
       { label: `Quit ${DISPLAY_NAME}`, role: "quit" },
     ]),
   );
@@ -92,6 +101,13 @@ app.whenReady().then(() => {
   core.onRecordingFailed((message) => {
     console.error(`[recording] ${message}`);
     new Notification({ title: `${DISPLAY_NAME} could not record`, body: message }).show();
+  });
+  core.onStopNudge((callApp) => {
+    // A reminder only: the Recording keeps running until Stop is pressed in the menu bar.
+    new Notification({
+      title: `${callApp} has stopped using the microphone`,
+      body: `${DISPLAY_NAME} is still recording. Choose Stop recording in the menu bar when the call is over.`,
+    }).show();
   });
   core.onRecordingChange((recording) => {
     clearInterval(elapsedTimer);

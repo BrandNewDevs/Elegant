@@ -24,6 +24,13 @@ export type EngineEvent =
 export type EngineCommand =
   /** `app` is the call app being recorded; the engine echoes it back in `recording_started`. */
   | { type: "start_recording"; app: string }
+  /**
+   * A Detection happened: start holding the last few minutes of both tracks in memory, so that accepting the Prompt
+   * late does not lose the start of the Meeting. Nothing is written to disk. `start_recording` keeps the buffer;
+   * `discard_buffer` drops it. Ignored if the engine is already buffering or recording.
+   */
+  | { type: "start_buffer"; app: string }
+  /** The Prompt was declined or timed out: drop the buffered audio and stop capturing. Never touches a Recording. */
   | { type: "discard_buffer" }
   | { type: "stop_recording" }
   /**
