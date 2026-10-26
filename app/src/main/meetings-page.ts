@@ -18,6 +18,12 @@ export function meetingIdFromLink(url: string): number | undefined {
   return match ? Number(match[1]) : undefined;
 }
 
+/** The detail view's Export link; the window reads it back with `exportIdFromLink`. */
+export function exportIdFromLink(url: string): number | undefined {
+  const match = /^export:(\d+)$/.exec(url);
+  return match ? Number(match[1]) : undefined;
+}
+
 const clock = (seconds: number): string => {
   const s = Math.floor(seconds);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -35,7 +41,8 @@ function listItem(m: MeetingListItem, selectedId: number | undefined): string {
 }
 
 function detail(m: Meeting): string {
-  const head = `<h1>${esc(m.app)}</h1><p class="when">${esc(when(m.startedAt))}</p>`;
+  const head = `<h1>${esc(m.app)}</h1><p class="when">${esc(when(m.startedAt))}</p>
+    <p><a href="export:${m.id}">Export to Markdown…</a></p>`;
   let body: string;
   switch (m.state) {
     case "recording":
