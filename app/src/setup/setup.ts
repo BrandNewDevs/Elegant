@@ -8,6 +8,8 @@ const PERMISSION_SETTING: Record<Permission, string> = {
   system_audio: "permission.system_audio",
 };
 const MODELS_READY_SETTING = "modelsReady";
+/** Set by the earlier setup, which finished only once both permissions were granted and the models downloaded. */
+const LEGACY_COMPLETE_SETTING = "setupComplete";
 
 export type StepStatus = "todo" | "working" | "done" | "problem";
 
@@ -58,7 +60,7 @@ export class Setup {
     private readonly store: Store,
     private readonly options: SetupOptions,
   ) {
-    const modelsReady = store.getSetting(MODELS_READY_SETTING) === "true";
+    const modelsReady = store.getSetting(MODELS_READY_SETTING) === "true" || this.finishedEarlierSetup();
     this._state = {
       microphone: { status: this.granted("microphone") ? "done" : "todo" },
       systemAudio: { status: this.granted("system_audio") ? "done" : "todo" },
@@ -169,8 +171,14 @@ export class Setup {
     this.update({ ollama: result.status === "ready" ? { status: "done" } : { status: "problem", message: result.message } });
   }
 
+  /** Whether the earlier setup finished here, so everything it asked for was already granted and need not be asked again. */
+  private finishedEarlierSetup(): boolean {
+    return this.store.getSetting(LEGACY_COMPLETE_SETTING) === "true";
+  }
+
   private granted(permission: Permission): boolean {
-    return this.store.getSetting(PERMISSION_SETTING[permission]) === "granted";
+    const remembered = this.store.getSetting(PERMISSION_SETTING[permission]);
+    return remembered === "granted" || (remembered === undefined && this.finishedEarlierSetup());
   }
 
   private applyPermission(permission: Permission, granted: boolean, wasCheck: boolean): void {

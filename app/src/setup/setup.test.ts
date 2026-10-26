@@ -180,6 +180,24 @@ describe("remembering permissions", () => {
   });
 });
 
+describe("an upgrade from the earlier setup", () => {
+  it("does not ask again for what the earlier setup finished, but still checks it", () => {
+    const store = openStore(":memory:");
+    store.setSetting("setupComplete", "true");
+    const { engine, s } = setup(undefined, store);
+    expect(s.state.microphone.status).toBe("done");
+    expect(s.state.systemAudio.status).toBe("done");
+    expect(s.state.models).toEqual({ status: "done", fraction: 1 });
+
+    engine.emit({ type: "ready", version: "1" });
+    expect(engine.commands).toHaveLength(2);
+    engine.emit({ type: "permission_result", permission: "microphone", granted: true });
+    engine.emit({ type: "permission_result", permission: "system_audio", granted: false });
+    expect(s.state.systemAudio.status).toBe("problem");
+    expect(setup(undefined, store).s.state.systemAudio.status).toBe("todo");
+  });
+});
+
 describe("remembering the models", () => {
   it("shows them as downloaded on the next launch, even though Ollama is not running", async () => {
     const first = setup({ status: "not-running", message: "Ollama is not running" });
