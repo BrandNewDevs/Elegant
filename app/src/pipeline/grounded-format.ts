@@ -36,6 +36,14 @@ export function factsSchema(sources: SourcePiece[], speakers = sources) {
   } } } } };
 }
 
+/** Refinement cites draft point IDs; application code carries their original evidence forward. */
+export function refinementSchema(points: SupportedPoint[]) {
+  return { type: "object", properties: { points: { type: "array", items: { type: "object", properties: {
+    speaker: { type: "string", enum: [...new Set(points.map(point => point.speaker))] }, text: { type: "string" },
+    covers: { type: "array", minItems: 1, uniqueItems: true, items: { type: "integer", enum: points.map((_, index) => index) } },
+  }, required: ["speaker", "text", "covers"] } } }, required: ["points"] };
+}
+
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const problem = (message: string): never => { throw new InvalidSummaryError(message); };
 function object(json: string): Record<string, unknown> {
@@ -64,6 +72,23 @@ export function parseGrounded(json: string, sources: SourcePiece[]): GroundedOut
   if (!Array.isArray(value.points)) return problem("points must be a list");
   return { tldr: text(value.tldr), tldrRefs: references(value.tldrRefs, sources), points: value.points.map(value => point(value, sources)) };
 }
+export function parseRefinedPoints(json: string, draft: SupportedPoint[]): SupportedPoint[] {
+  const value = object(json);
+  if (!Array.isArray(value.points)) return problem("Refined points must be a list");
+  const covered = new Set<number>();
+  const points = value.points.map(value => {
+    if (!record(value)) return problem("Every refined point must be an object");
+    const speaker = text(value.speaker);
+    if (!Array.isArray(value.covers) || !value.covers.length || !value.covers.every(id => Number.isInteger(id) && id >= 0 && id < draft.length)) return problem("Use the supplied draft point IDs in covers");
+    const ids = [...new Set(value.covers)] as number[];
+    if (ids.some(id => draft[id]!.speaker !== speaker)) return problem("A refined point may cover only draft points by the same speaker");
+    ids.forEach(id => covered.add(id));
+    return { speaker, text: text(value.text), refs: [...new Set(ids.flatMap(id => draft[id]!.refs))].sort((a, b) => a - b) };
+  });
+  if (covered.size !== draft.length) return problem("Every original draft point must be covered by a refined point");
+  return points;
+}
+
 export function parseFacts(json: string, sources: SourcePiece[], primary?: SourcePiece[]): SupportedFact[] {
   const value = object(json);
   if (!Array.isArray(value.facts)) return problem("facts must be a list");

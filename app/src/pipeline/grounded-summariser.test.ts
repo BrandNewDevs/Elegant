@@ -64,12 +64,15 @@ describe("evidence-backed Summary generation", () => {
 
   it("refines repeated short-Meeting points with original evidence in one bounded additional pass", async () => {
     const repeated = { ...good, points: [good.points[0], { ...good.points[0], text: "The permission guide will be written by Thursday." }, good.points[1]] };
-    const model = fake(request => payload(request).draft ? good : repeated);
+    const model = fake(request => payload(request).draft ? { points: [
+      { speaker: "You", text: good.points[0]!.text, covers: [0, 1] },
+      { speaker: "Speaker 1", text: good.points[1]!.text, covers: [2] },
+    ] } : repeated);
     const result = await createGroundedSummariser({ model })(transcript);
     expect(model.requests).toHaveLength(2);
     expect(result.participants[0]!.said).toEqual([good.points[0]!.text]);
     expect(payload(model.requests[1]!).sources).toEqual(payload(model.requests[0]!).sources);
-    expect(payload(model.requests[1]!).draft).toEqual(repeated);
+    expect(payload(model.requests[1]!).draft).toEqual(repeated.points.map((point, id) => ({ id, ...point })));
     expect(model.requests[1]!.messages[1]!.content).toContain("original sources as truth");
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
     expect(result.generation!.calls).toBe(2);
@@ -88,7 +91,11 @@ describe("evidence-backed Summary generation", () => {
     const source = { segments: [...transcript.segments, { start: 10, end: 15, speaker: "You", text: "I will run the permission tests by Friday." }] };
     const testPoint = { speaker: "You", text: "Will run the permission tests by Friday.", refs: [2] };
     const draft = { ...good, points: [good.points[0], { ...good.points[0], text: "Write the guide by Thursday." }, testPoint, good.points[1]] };
-    const revised = { ...good, points: [good.points[0], testPoint, good.points[1]] };
+    const revised = { points: [
+      { speaker: "You", text: good.points[0]!.text, covers: [0, 1] },
+      { speaker: "You", text: testPoint.text, covers: [2] },
+      { speaker: "Speaker 1", text: good.points[1]!.text, covers: [3] },
+    ] };
     const model = fake(request => payload(request).draft ? revised : draft);
     const result = await createGroundedSummariser({ model })(source);
     expect(result.participants[0]!.said).toEqual([good.points[0]!.text, testPoint.text]);
@@ -100,10 +107,39 @@ describe("evidence-backed Summary generation", () => {
     const source = { segments: [...transcript.segments, { start: 10, end: 15, speaker: "You", text: "I will run the permission tests by Friday." }] };
     const testPoint = { speaker: "You", text: "Will run the permission tests by Friday.", refs: [2] };
     const draft = { ...good, points: [...good.points, testPoint] };
-    for (const revised of [good, { ...good, points: [testPoint] }]) {
+    for (const revised of [{ points: [
+      { speaker: "You", text: good.points[0]!.text, covers: [0] },
+      { speaker: "Speaker 1", text: good.points[1]!.text, covers: [1] },
+    ] }, { points: [{ speaker: "You", text: testPoint.text, covers: [2] }] }]) {
       const model = fake(request => payload(request).draft ? revised : draft);
       const result = await createGroundedSummariser({ model })(source);
       expect(result.participants[0]!.said).toEqual([good.points[0]!.text, testPoint.text]);
+      expect(result.participants[1]!.speaker).toBe("Speaker 1");
+      expect(model.requests).toHaveLength(4);
+    }
+  });
+
+  it("merges repeated draft points with different original ordinals and derives their union refs", async () => {
+    const source = { segments: Array.from({ length: 5 }, (_, index) => ({ start: index, end: index + 1, speaker: index % 2 ? "Speaker 1" : "You", text: "We reviewed the same permission task." })) };
+    const draft = { ...good, points: [0, 2, 4].map(ref => ({ speaker: "You", text: "Will finish the permission tests by Thursday.", refs: [ref] })) };
+    const model = fake(request => payload(request).draft ? { points: [{ speaker: "You", text: "Will finish the permission tests by Thursday.", covers: [0, 1, 2] }] } : draft);
+    const result = await createGroundedSummariser({ model })(source);
+    expect(result.participants[0]!.said).toHaveLength(1);
+    expect(result.evidence!.participants[0]!.said).toEqual([[0, 2, 4]]);
+    expect(result.tldr).toBe(draft.tldr);
+    expect(result.evidence!.tldr).toEqual(draft.tldrRefs);
+    expect(model.requests).toHaveLength(2);
+    const schema = model.requests[1]!.schema as { properties: { points: { items: { properties: { covers: { items: { enum: number[] } } } } } } };
+    expect(schema.properties.points.items.properties.covers.items.enum).toEqual([0, 1, 2]);
+    expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it("rejects unknown coverage IDs or cross-speaker coverage and retains the original draft", async () => {
+    const draft = { ...good, points: [...good.points, good.points[0]] };
+    for (const covers of [[0, 1, 2], [0, 2, 99]]) {
+      const model = fake(request => payload(request).draft ? { points: [{ speaker: "You", text: "A merged point", covers }] } : draft);
+      const result = await createGroundedSummariser({ model })(transcript);
+      expect(result.participants[0]!.said).toHaveLength(2);
       expect(result.participants[1]!.speaker).toBe("Speaker 1");
       expect(model.requests).toHaveLength(4);
     }
