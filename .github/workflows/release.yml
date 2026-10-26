@@ -1,0 +1,76 @@
+name: Release
+# A pushed v<version> tag builds the signed .dmg and attaches it to a draft GitHub release; publish the draft once it
+# has been checked. Running the workflow by hand builds the same .dmg as a workflow artifact only, with no release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  # The certificate every release is signed with. macOS ties the microphone and system-audio permissions to it, so a
+  # release signed with any other one would make every install ask again; the job fails instead.
+  SIGNING_IDENTITY_SHA1: CCCE36A1BF38EE36661B1A839EDD556DB3F3ACEE
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 60
+    # The signing secrets live in this environment; see docs/design.md for limiting it to tags and main.
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the tag matches package.json
+        if: github.ref_type == 'tag'
+        run: |
+          version=$(node -p 'require("./app/package.json").version')
+          [ "$GITHUB_REF_NAME" = "v$version" ] || { echo "::error::tag $GITHUB_REF_NAME does not match package.json version $version"; exit 1; }
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile && node node_modules/electron/install.js
+        working-directory: app
+      - uses: actions/cache@v4
+        with:
+          path: engine/.build
+          key: swift-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('engine/Package*', 'engine/Sources/**', 'engine/Tests/**') }}
+          restore-keys: swift-${{ runner.os }}-${{ runner.arch }}-
+      - run: pnpm run typecheck && pnpm test
+        working-directory: app
+      - name: Import the signing identity
+        id: identity
+        working-directory: app
+        env:
+          SIGNING_IDENTITY_P12: ${{ secrets.SIGNING_IDENTITY_P12 }}
+          SIGNING_IDENTITY_PASSWORD: ${{ secrets.SIGNING_IDENTITY_PASSWORD }}
+        run: |
+          hash=$(scripts/import-signing-identity.sh "$RUNNER_TEMP/signing.keychain-db")
+          [ "$hash" = "$SIGNING_IDENTITY_SHA1" ] || { echo "::error::the signing secret holds certificate $hash, not $SIGNING_IDENTITY_SHA1"; exit 1; }
+      - name: Build the .dmg (manual run)
+        if: github.event_name == 'workflow_dispatch'
+        run: scripts/dmg.sh "$SIGNING_IDENTITY_SHA1"
+        working-directory: app
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: dmg
+          path: app/out/*.dmg
+          if-no-files-found: error
+      - name: Build the .dmg and attach it to a draft release
+        if: github.ref_type == 'tag'
+        run: scripts/release.sh "$SIGNING_IDENTITY_SHA1"
+        working-directory: app
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Delete the signing keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
