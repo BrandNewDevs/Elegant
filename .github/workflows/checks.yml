@@ -20,7 +20,7 @@ jobs:
           cache-dependency-path: app/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
         working-directory: app
-      - run: pnpm run typecheck && pnpm run build && pnpm exec vitest run --exclude src/engine/real-engine.test.ts
+      - run: pnpm run typecheck && pnpm run build && pnpm exec vitest run --project node --project renderer
         working-directory: app
   engine:
     runs-on: macos-15
