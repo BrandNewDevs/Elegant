@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { expect, it } from "vitest";
+import { applyNames } from "../core/participants.js";
 import { openStore } from "./store.js";
 import { fixtureSummary, fixtureTranscript } from "../testing/fake-pipeline.js";
 import { transcriptRevision } from "../pipeline/evidence.js";
@@ -26,6 +27,8 @@ it("persists evidence atomically, preserves it after rejected replacement, and i
     expect(store.getMeeting(id)?.summary).toEqual(grounded());
     store.renameParticipant(id, "You", "Maker");
     expect(store.getMeeting(id)?.summary?.evidence).toEqual(grounded().evidence);
+    expect(applyNames(store.getMeeting(id)!).summary?.evidence).toEqual(grounded().evidence);
+    expect(applyNames(store.getMeeting(id)!).summary?.generation).toEqual(grounded().generation);
     const invalid = grounded(); invalid.evidence!.tldr = [999];
     expect(() => store.saveSummary(id, invalid)).toThrow("Invalid Summary evidence");
     expect(store.getMeeting(id)?.summary).toEqual(grounded());
