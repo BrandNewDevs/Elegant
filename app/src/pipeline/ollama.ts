@@ -70,8 +70,8 @@ export class OllamaClient implements LanguageModel, TextModel {
     if (!Number.isInteger(timeoutMs) || timeoutMs < 1) throw new Error("Ollama timeout must be a positive number of milliseconds");
   }
 
-  async generate({ prompt, schema }: { prompt: string; schema: object }): Promise<string> {
-    return (await this.complete({ messages: [{ role: "user", content: prompt }], schema })).text;
+  async generate({ prompt, schema, signal }: { prompt: string; schema: object; signal?: AbortSignal }): Promise<string> {
+    return (await this.complete({ messages: [{ role: "user", content: prompt }], schema, signal })).text;
   }
 
   async complete(request: TextRequest): Promise<TextResponse> {

@@ -15,7 +15,7 @@ export function requestBytes(request: Pick<TextRequest, "messages" | "schema">):
   return Buffer.byteLength(JSON.stringify({ messages: request.messages, schema: request.schema }), "utf8");
 }
 
-export function assertRequestBudget(request: Pick<TextRequest, "messages" | "schema">, maxBytes = AI_SETTINGS.maxInputBytes): void {
+export function assertRequestBudget(request: Pick<TextRequest, "messages" | "schema">, maxBytes: number = AI_SETTINGS.maxInputBytes): void {
   if (!Number.isInteger(maxBytes) || maxBytes < 1) throw new Error("AI input budget must be a positive integer");
   if (requestBytes(request) > maxBytes) throw new Error(`AI request exceeds the ${maxBytes}-byte input budget; split the evidence before generation`);
 }

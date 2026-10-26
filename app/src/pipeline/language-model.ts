@@ -1,6 +1,6 @@
 /** Compatibility interface for the original Summary implementation. */
 export interface LanguageModel {
-  generate(request: { prompt: string; schema: object }): Promise<string>;
+  generate(request: { prompt: string; schema: object; signal?: AbortSignal }): Promise<string>;
 }
 
 export interface ModelMessage {
