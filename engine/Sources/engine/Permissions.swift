@@ -4,6 +4,11 @@ import AudioToolbox
 import CoreAudio
 import Foundation
 
+/// Whether the microphone is allowed right now. Never shows a prompt, so it is safe to run at every launch.
+func microphoneAccessGranted() -> Bool {
+    AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+}
+
 /// Shows the microphone prompt if the user has not answered it yet, and reports whether access is granted.
 func requestMicrophoneAccess() async -> Bool {
     switch AVCaptureDevice.authorizationStatus(for: .audio) {

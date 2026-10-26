@@ -1,57 +1,92 @@
-import { BrowserWindow, dialog } from "electron";
+import { BrowserWindow, dialog, ipcMain, type WebContents } from "electron";
 import { writeFile } from "node:fs/promises";
 import type { AppCore } from "../core/app-core.js";
 import { DISPLAY_NAME } from "../config.js";
-import { exportIdFromLink, meetingActionFromLink, meetingIdFromLink, renameFromLink, renderMeetingsPage, searchFromLink, type MeetingAction } from "./meetings-page.js";
+import type { MeetingsViewState } from "../shared/meetings-view-state.js";
+import { preloadPath, rendererPagePath, windowBackground } from "./window-ui.js";
+
+type MeetingAction = { type: "regenerate" | "delete"; id: number };
 
 /** The Meetings window: a list on the left, the selected Meeting on the right. Redraws when Meetings change. */
 export class MeetingsWindow {
   private window: BrowserWindow | undefined;
   private selectedId: number | undefined;
   private query = "";
+  private pageLoaded = false;
 
   constructor(private readonly core: AppCore) {
-    core.onMeetingsChanged(() => this.draw());
+    core.onMeetingsChanged(() => this.pushState());
+    this.registerIpc();
+  }
+
+  private fromThis(sender: WebContents): boolean {
+    return Boolean(this.window && !this.window.isDestroyed() && sender === this.window.webContents);
+  }
+
+  private registerIpc(): void {
+    ipcMain.on("meetings:ready", (event) => {
+      if (!this.fromThis(event.sender)) return;
+      this.pushState();
+    });
+    ipcMain.on("meetings:select", (event, id: number) => {
+      if (!this.fromThis(event.sender)) return;
+      this.selectedId = id;
+      this.pushState();
+    });
+    ipcMain.on("meetings:search", (event, query: string) => {
+      if (!this.fromThis(event.sender)) return;
+      this.query = query;
+      this.pushState();
+    });
+    ipcMain.on("meetings:rename", (event, payload: { meetingId: number; label: string; name: string }) => {
+      if (!this.fromThis(event.sender)) return;
+      try {
+        this.core.renameParticipant(payload.meetingId, payload.label, payload.name);
+      } catch (err) {
+        console.error("[meetings] rename failed", err);
+      }
+    });
+    ipcMain.on("meetings:export", (event, id: number) => {
+      if (!this.fromThis(event.sender)) return;
+      void this.export(id);
+    });
+    ipcMain.handle("meetings:regenerate", async (event, id: number) => {
+      if (!this.fromThis(event.sender)) return;
+      try {
+        await this.core.regenerateSummary(id);
+      } catch (err) {
+        dialog.showErrorBox("Could not regenerate the Meeting", err instanceof Error ? err.message : String(err));
+      }
+    });
+    ipcMain.handle("meetings:delete", async (event, id: number) => {
+      if (!this.fromThis(event.sender)) return;
+      await this.perform({ type: "delete", id });
+    });
   }
 
   /** Shows the window, creating it the first time or after it was closed. */
   show(): void {
     if (!this.window) {
-      const window = new BrowserWindow({ width: 900, height: 640, title: `${DISPLAY_NAME}: Meetings` });
-      window.on("closed", () => (this.window = undefined));
-      // The page is plain HTML; clicking a Meeting navigates to its link, which we turn into a selection.
-      window.webContents.on("will-navigate", (event, url) => {
-        event.preventDefault();
-        const exportId = exportIdFromLink(url);
-        if (exportId !== undefined) {
-          void this.export(exportId);
-          return;
-        }
-        const action = meetingActionFromLink(url);
-        if (action) return void this.perform(action, window);
-        const query = searchFromLink(url);
-        if (query !== undefined) {
-          this.query = query;
-          this.draw();
-          return;
-        }
-        const rename = renameFromLink(url);
-        if (rename) {
-          try {
-            this.core.renameParticipant(rename.meetingId, rename.label, rename.name);
-          } catch (err) {
-            console.error("[meetings] rename failed", err);
-          }
-          return; // the rename redraws the window through onMeetingsChanged
-        }
-        const id = meetingIdFromLink(url);
-        if (id === undefined) return;
-        this.selectedId = id;
-        this.draw();
+      const window = new BrowserWindow({
+        width: 900,
+        height: 640,
+        title: `${DISPLAY_NAME}: Meetings`,
+        backgroundColor: windowBackground(),
+        webPreferences: { preload: preloadPath(), contextIsolation: true, sandbox: true },
+      });
+      window.on("closed", () => {
+        this.window = undefined;
+        this.pageLoaded = false;
       });
       window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
       this.window = window;
-      this.draw();
+      void this.window.loadFile(rendererPagePath("meetings"));
+      this.window.webContents.once("did-finish-load", () => {
+        this.pageLoaded = true;
+        this.pushState();
+      });
+    } else if (this.pageLoaded) {
+      this.pushState();
     }
     this.window.show();
     this.window.focus();
@@ -71,7 +106,9 @@ export class MeetingsWindow {
     }
   }
 
-  private async perform({ type, id }: MeetingAction, window: BrowserWindow): Promise<void> {
+  private async perform({ type, id }: MeetingAction): Promise<void> {
+    const window = this.window;
+    if (!window) return;
     try {
       if (type === "regenerate") {
         await this.core.regenerateSummary(id);
@@ -88,16 +125,17 @@ export class MeetingsWindow {
       if (response !== 0) return;
       await this.core.deleteMeeting(id);
       if (this.selectedId === id) this.selectedId = undefined;
-      this.draw();
+      this.pushState();
     } catch (err) {
       dialog.showErrorBox(`Could not ${type} the Meeting`, err instanceof Error ? err.message : String(err));
     }
   }
 
-  private draw(): void {
-    if (!this.window) return;
+  private pushState(): void {
+    if (!this.window || this.window.isDestroyed() || !this.pageLoaded) return;
     const selected = this.selectedId === undefined ? undefined : this.core.getMeetingForDisplay(this.selectedId);
-    const html = renderMeetingsPage(this.query.trim() ? this.core.searchMeetings(this.query) : this.core.listMeetings(), selected, this.query);
-    void this.window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    const meetings = this.query.trim() ? this.core.searchMeetings(this.query) : this.core.listMeetings();
+    const payload: MeetingsViewState = { meetings, selected, query: this.query };
+    this.window.webContents.send("meetings:state", payload);
   }
 }

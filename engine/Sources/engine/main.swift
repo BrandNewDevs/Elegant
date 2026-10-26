@@ -127,6 +127,19 @@ func requestPermission(_ command: [String: Any]) {
     }
 }
 
+func checkPermission(_ command: [String: Any]) {
+    guard let permission = command["permission"] as? String, ["microphone", "system_audio"].contains(permission) else {
+        send(["type": "error", "message": "malformed check_permission command"])
+        return
+    }
+    // System audio has no status call, so it is checked by starting a tap; that only prompts if the user never answered,
+    // which is why the app asks for it only after a grant was recorded.
+    Task {
+        let granted = permission == "microphone" ? microphoneAccessGranted() : requestSystemAudioAccess()
+        send(["type": "permission_result", "permission": permission, "granted": granted])
+    }
+}
+
 func downloadModels(_ command: [String: Any]) {
     guard let model = command["model"] as? String, let modelsDirectory = command["modelsDirectory"] as? String else {
         send(["type": "error", "message": "malformed download_models command"])
@@ -166,6 +179,8 @@ func handle(command line: String) {
         transcribe(command)
     case "request_permission":
         requestPermission(command)
+    case "check_permission":
+        checkPermission(command)
     case "download_models":
         downloadModels(command)
     case "start_buffer":
