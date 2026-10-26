@@ -4,6 +4,7 @@ import type { Engine } from "../engine/protocol.js";
 import type { PipelineStages } from "../pipeline/pipeline.js";
 import { exportFileName, meetingToMarkdown } from "./export-markdown.js";
 import { DEFAULT_DETECTION, MicWatcher, type DetectionSettings } from "./detection.js";
+import { applyNames } from "./participants.js";
 import { discardAudio, PipelineRunner } from "../pipeline/runner.js";
 import type { Meeting, MeetingListItem, Store } from "../store/store.js";
 
@@ -233,6 +234,20 @@ export class AppCore {
     return { fileName: exportFileName(meeting), markdown: meetingToMarkdown(meeting) };
   }
 
+  /** The Meeting as it is shown: each Participant's chosen name stands in for their label, in the Transcript and the Summary. */
+  getMeetingForDisplay(id: number): Meeting | undefined {
+    const meeting = this.store.getMeeting(id);
+    return meeting && applyNames(meeting);
+  }
+
+  /**
+   * Names a Participant in one Meeting, or clears the name if it is blank. Only what is displayed changes: the stored
+   * Transcript and Summary keep the labels, so a regenerated Summary is unaffected.
+   */
+  renameParticipant(meetingId: number, label: string, name: string): void {
+    this.store.renameParticipant(meetingId, label, name.trim() || null);
+  }
+
   /** Whether a Recording's audio is kept after it is transcribed. Off by default: the audio is deleted. */
   get keepAudio(): boolean {
     return this.deps.store.getSetting(KEEP_AUDIO_SETTING) === "true";
@@ -382,6 +397,10 @@ export class AppCore {
       },
       setMeetingState: (id, state, error) => {
         store.setMeetingState(id, state, error);
+        notify();
+      },
+      renameParticipant: (id, label, name) => {
+        store.renameParticipant(id, label, name);
         notify();
       },
       deleteMeeting: (id) => {

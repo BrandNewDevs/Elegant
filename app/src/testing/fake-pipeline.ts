@@ -3,7 +3,7 @@ import type { PipelineStages, Summary, Transcript } from "../pipeline/pipeline.j
 export const fixtureTranscript: Transcript = {
   segments: [
     { start: 0, end: 3.2, speaker: "You", text: "Let's ship the walking skeleton first." },
-    { start: 3.5, end: 6, speaker: "Others", text: "Agreed, then fan out to detection and the window." },
+    { start: 3.5, end: 6, speaker: "Speaker 1", text: "Agreed, then fan out to detection and the window." },
   ],
 };
 
@@ -11,7 +11,7 @@ export const fixtureSummary: Summary = {
   tldr: "Ship the walking skeleton first, then fan out.",
   participants: [
     { speaker: "You", said: ["Ship the walking skeleton first."] },
-    { speaker: "Others", said: ["Fan out to detection and the window afterwards."] },
+    { speaker: "Speaker 1", said: ["Fan out to detection and the window afterwards."] },
   ],
 };
 

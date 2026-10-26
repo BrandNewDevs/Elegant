@@ -1,6 +1,8 @@
-// Runs WhisperKit over a Recording's two tracks and returns the Transcript's segments.
-// English only, one batch after the Meeting. See docs/research/whisperkit.md for why each option is set as it is.
+// Runs WhisperKit over a Recording's two tracks and returns the Transcript's segments, with SpeakerKit telling the
+// voices on the system track apart. English only, one batch after the Meeting.
+// See docs/research/whisperkit.md for why each option is set as it is.
 import Foundation
+import SpeakerKit
 import WhisperKit
 
 enum TranscriptionError: Error, CustomStringConvertible {
@@ -23,6 +25,7 @@ let trackLengthTolerance = outputSampleRate / 100
 actor Transcriber {
     private var kit: WhisperKit?
     private var loadedModel: String?
+    private var speakerKit: SpeakerKit?
 
     /// `model` is a WhisperKit variant name; models and tokenizers are kept under `modelsDirectory`.
     func transcribe(micPath: String, systemPath: String, model: String, modelsDirectory: URL) async throws -> [TranscriptSegment] {
@@ -38,10 +41,21 @@ actor Transcriber {
         if micRegions.isEmpty && systemRegions.isEmpty { return [] }
 
         let kit = try await loadedKit(model: model, modelsDirectory: modelsDirectory)
-        return mergeTracks(
-            mic: try await recognise(mic, regions: micRegions, with: kit),
-            system: try await recognise(system, regions: systemRegions, with: kit)
-        )
+        let micSegments = try await recognise(mic, regions: micRegions, with: kit)
+        let systemSegments = try await recognise(system, regions: systemRegions, with: kit)
+        // One run over the whole track, so a voice keeps its label for the whole Meeting.
+        let turns = systemSegments.isEmpty ? [] : try await diarize(system, regions: systemRegions, modelsDirectory: modelsDirectory)
+        return mergeTracks(mic: micSegments, system: systemSegments, turns: turns)
+    }
+
+    /// Who speaks when on the system track. Only the speech regions are looked at, as for transcription.
+    private func diarize(_ samples: [Float], regions: [SpeechRegion], modelsDirectory: URL) async throws -> [SpeakerTurn] {
+        let speakerKit = try await loadedSpeakerKit(modelsDirectory: modelsDirectory)
+        let options = PyannoteDiarizationOptions(clipTimestamps: regions.flatMap { [Float($0.start), Float($0.end)] })
+        let result = try await speakerKit.diarize(audioArray: samples, options: options)
+        return result.segments.compactMap { segment in
+            segment.speaker.speakerId.map { SpeakerTurn(start: Double(segment.startTime), end: Double(segment.endTime), speaker: $0) }
+        }
     }
 
     private func loadTrack(_ path: String) throws -> [Float] {
@@ -65,6 +79,14 @@ actor Transcriber {
             RecognisedSegment(start: Double($0.start), end: Double($0.end), text: $0.text, compressionRatio: Double($0.compressionRatio))
         }
         return constrain(segments, to: regions)
+    }
+
+    private func loadedSpeakerKit(modelsDirectory: URL) async throws -> SpeakerKit {
+        if let speakerKit { return speakerKit }
+        log("preparing speaker model; the first time this downloads it")
+        let loaded = try await SpeakerKit(PyannoteConfig(downloadBase: modelsDirectory.path, load: true, verbose: false))
+        speakerKit = loaded
+        return loaded
     }
 
     private func loadedKit(model: String, modelsDirectory: URL) async throws -> WhisperKit {

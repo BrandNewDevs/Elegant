@@ -90,7 +90,7 @@ describe("a recorded meeting", () => {
     expect(meeting.state).toBe("done");
     expect(meeting.transcript.segments).toEqual(fixtureTranscript.segments);
     expect(meeting.summary).toEqual(fixtureSummary);
-    expect(meeting.participants.map((p) => p.label)).toEqual(["You", "Others"]);
+    expect(meeting.participants.map((p) => p.label)).toEqual(["You", "Speaker 1"]);
   });
 
   it("is done, with no Summary and no failure, when the Recording has no speech", async () => {
@@ -1306,7 +1306,7 @@ describe("exporting a Meeting to Markdown", () => {
     expect(markdown).toContain("- Fan out to detection and the window afterwards.");
     expect(markdown).toContain("## Transcript");
     expect(markdown).toContain("**You** (0:00): Let's ship the walking skeleton first.");
-    expect(markdown).toContain("**Others** (0:03): Agreed, then fan out to detection and the window.");
+    expect(markdown).toContain("**Speaker 1** (0:03): Agreed, then fan out to detection and the window.");
   });
 
   it("shows a renamed Participant by name in the Summary and the Transcript, and leaves the others as labelled", async () => {
@@ -1314,7 +1314,7 @@ describe("exporting a Meeting to Markdown", () => {
     // Stand-in for the rename feature: the name is stored per Meeting, and the Summary keeps labels.
     const { DatabaseSync } = await import("node:sqlite");
     const db = new DatabaseSync(path);
-    db.prepare("UPDATE participants SET name = 'Priya' WHERE label = 'Others'").run();
+    db.prepare("UPDATE participants SET name = 'Priya' WHERE label = 'Speaker 1'").run();
     db.close();
 
     const { markdown } = core.exportMeeting(id);
