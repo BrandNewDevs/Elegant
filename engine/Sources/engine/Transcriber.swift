@@ -85,7 +85,8 @@ actor Transcriber {
     private func loadedSpeakerKit(modelsDirectory: URL, progress: (@Sendable (Double) -> Void)? = nil) async throws -> SpeakerKit {
         if let speakerKit { return speakerKit }
         log("preparing speaker model; the first time this downloads it")
-        let config = PyannoteConfig(downloadBase: modelsDirectory.path, download: false, load: false, verbose: false)
+        // `download` must stay true: the loader reads it on the explicit downloadModels() below, and with false that throws "download is disabled".
+        let config = PyannoteConfig(downloadBase: modelsDirectory.path, download: true, load: false, verbose: false)
         let diarizer = SpeakerKitDiarizer.pyannote(config: config)
         try await (diarizer as ModelManager).downloadModels(progressCallback: { downloaded in
             progress?(downloaded.fractionCompleted)
