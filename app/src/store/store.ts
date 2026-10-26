@@ -1,3 +1,4 @@
+import { transcriptRevision } from "../pipeline/evidence.js";
 import { DatabaseSync } from "node:sqlite";
 import type { Summary, Tracks, Transcript } from "../pipeline/pipeline.js";
 
@@ -50,7 +51,28 @@ export interface Store {
   close(): void;
 }
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
+
+const AI_SCHEMA = `
+  CREATE TABLE summary_artifacts (
+    meeting_id INTEGER PRIMARY KEY REFERENCES meetings(id) ON DELETE CASCADE,
+    revision TEXT NOT NULL, evidence_json TEXT NOT NULL, generation_json TEXT NOT NULL
+  );
+  CREATE TABLE chat_requests (
+    id TEXT PRIMARY KEY, meeting_id INTEGER NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+    revision TEXT NOT NULL, question TEXT NOT NULL, status TEXT NOT NULL
+      CHECK(status IN ('queued','retrieving','generating','completed','failed','cancelled','interrupted')),
+    answer_json TEXT, error TEXT, generation_json TEXT, created_at TEXT NOT NULL
+  );
+  CREATE TABLE passages (
+    id INTEGER PRIMARY KEY, meeting_id INTEGER NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+    revision TEXT NOT NULL, idx INTEGER NOT NULL, refs_json TEXT NOT NULL, text TEXT NOT NULL,
+    UNIQUE(meeting_id, revision, idx)
+  );
+  CREATE VIRTUAL TABLE passage_index USING fts5(
+    passage_id UNINDEXED, meeting_id UNINDEXED, revision UNINDEXED, text, tokenize = 'porter unicode61'
+  );
+`;
 
 const SCHEMA = `
   CREATE TABLE meetings (
@@ -112,13 +134,26 @@ export function openStore(path: string): Store {
   db.exec("PRAGMA foreign_keys = ON");
 
   const version = (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
-  if (version === 0) {
-    db.exec(SCHEMA);
-    db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
-  } else if (version === 1) {
-    db.exec("ALTER TABLE meetings ADD COLUMN mic_path TEXT");
-    db.exec("ALTER TABLE meetings ADD COLUMN system_path TEXT");
-    db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  if (version > SCHEMA_VERSION) {
+    db.close();
+    throw new Error("This database was created by a newer app version");
+  }
+  if (version < SCHEMA_VERSION) {
+    db.exec("BEGIN");
+    try {
+      if (version === 0) db.exec(SCHEMA);
+      else if (version === 1) {
+        db.exec("ALTER TABLE meetings ADD COLUMN mic_path TEXT");
+        db.exec("ALTER TABLE meetings ADD COLUMN system_path TEXT");
+      }
+      db.exec(AI_SCHEMA);
+      db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      db.close();
+      throw error;
+    }
   }
 
   // Created apart from the versions above, so it also appears in a database that predates it.
@@ -171,6 +206,12 @@ export function openStore(path: string): Store {
 
     saveTranscript(id, transcript) {
       inTransaction(() => {
+        // A replacement Transcript invalidates every generated or derived fact about the old revision.
+        db.prepare("DELETE FROM summary_artifacts WHERE meeting_id = ?").run(id);
+        db.prepare("DELETE FROM summaries WHERE meeting_id = ?").run(id);
+        db.prepare("DELETE FROM chat_requests WHERE meeting_id = ?").run(id);
+        db.prepare("DELETE FROM passage_index WHERE meeting_id = ?").run(id);
+        db.prepare("DELETE FROM passages WHERE meeting_id = ?").run(id);
         db.prepare("DELETE FROM segments WHERE meeting_id = ?").run(id);
         const insertSegment = db.prepare(
           "INSERT INTO segments (meeting_id, idx, start, end, speaker, text) VALUES (?, ?, ?, ?, ?, ?)",
@@ -182,15 +223,37 @@ export function openStore(path: string): Store {
           insertParticipant.run(id, s.speaker);
           insertSegment.run(id, i, s.start, s.end, s.speaker, s.text);
         });
+        db.prepare("DELETE FROM participants WHERE meeting_id = ? AND label NOT IN (SELECT speaker FROM segments WHERE meeting_id = ?)").run(id, id);
         reindex(id);
       });
     },
 
     saveSummary(id, summary) {
-      db.prepare(
-        "INSERT OR REPLACE INTO summaries (meeting_id, tldr, participants_json) VALUES (?, ?, ?)",
-      ).run(id, summary.tldr, JSON.stringify(summary.participants));
-      reindex(id);
+      inTransaction(() => {
+        const { evidence, generation } = summary;
+        if (!!evidence !== !!generation) throw new Error("Summary evidence and generation metadata must be saved together");
+        if (evidence) {
+          const segments = db.prepare("SELECT start, end, speaker, text FROM segments WHERE meeting_id = ? ORDER BY idx").all(id) as unknown as Transcript["segments"];
+          if (evidence.revision !== transcriptRevision({ segments })) throw new Error("Summary evidence belongs to a different Transcript");
+          const check = (refs: number[], speaker?: string) => {
+            if (!Array.isArray(refs) || !refs.length || new Set(refs).size !== refs.length || refs.some(ref => !Number.isInteger(ref) || ref < 0 || ref >= segments.length)
+              || (speaker && !refs.some(ref => segments[ref]?.speaker === speaker))) throw new Error("Invalid Summary evidence");
+          };
+          check(evidence.tldr);
+          if (evidence.participants.length !== summary.participants.length) throw new Error("Summary evidence does not match its points");
+          evidence.participants.forEach((participant, i) => {
+            const point = summary.participants[i]!;
+            if (participant.speaker !== point.speaker || participant.said.length !== point.said.length) throw new Error("Summary evidence does not match its points");
+            participant.said.forEach(refs => check(refs, participant.speaker));
+          });
+        }
+        db.prepare("INSERT OR REPLACE INTO summaries (meeting_id, tldr, participants_json) VALUES (?, ?, ?)")
+          .run(id, summary.tldr, JSON.stringify(summary.participants));
+        db.prepare("DELETE FROM summary_artifacts WHERE meeting_id = ?").run(id);
+        if (evidence && generation) db.prepare("INSERT INTO summary_artifacts (meeting_id, revision, evidence_json, generation_json) VALUES (?, ?, ?, ?)")
+          .run(id, evidence.revision, JSON.stringify(evidence), JSON.stringify(generation));
+        reindex(id);
+      });
     },
 
     renameParticipant(id, label, name) {
@@ -209,6 +272,7 @@ export function openStore(path: string): Store {
     deleteMeeting(id) {
       inTransaction(() => {
         db.prepare("DELETE FROM search_index WHERE meeting_id = ?").run(id);
+        db.prepare("DELETE FROM passage_index WHERE meeting_id = ?").run(id);
         db.prepare("DELETE FROM meetings WHERE id = ?").run(id);
       });
     },
@@ -234,6 +298,7 @@ export function openStore(path: string): Store {
       const s = db.prepare("SELECT tldr, participants_json FROM summaries WHERE meeting_id = ?").get(id) as
         | { tldr: string; participants_json: string }
         | undefined;
+      const artifact = db.prepare("SELECT evidence_json, generation_json FROM summary_artifacts WHERE meeting_id = ?").get(id) as { evidence_json: string; generation_json: string } | undefined;
       return {
         id: row.id,
         app: row.app,
@@ -243,7 +308,8 @@ export function openStore(path: string): Store {
         error: row.error,
         participants,
         transcript: { segments },
-        summary: s ? { tldr: s.tldr, participants: JSON.parse(s.participants_json) } : null,
+        summary: s ? { tldr: s.tldr, participants: JSON.parse(s.participants_json),
+          ...(artifact ? { evidence: JSON.parse(artifact.evidence_json), generation: JSON.parse(artifact.generation_json) } : {}) } : null,
         audio: row.mic_path && row.system_path ? { micPath: row.mic_path, systemPath: row.system_path } : null,
       };
     },
