@@ -86,7 +86,7 @@ export function MeetingsApp() {
 
   return (
     <div className="flex h-screen min-h-0 overflow-hidden">
-      <aside className="flex w-72 shrink-0 flex-col border-r bg-muted/40" aria-label="Meetings">
+      <aside className="flex w-56 shrink-0 flex-col border-r bg-muted/40 md:w-72" aria-label="Meetings">
         <form className="relative border-b p-3" onSubmit={onSearch} role="search">
           <Search className="pointer-events-none absolute left-6 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <Input
@@ -99,7 +99,7 @@ export function MeetingsApp() {
             onBlur={() => window.electron.meetings.search(query)}
           />
         </form>
-        <ScrollArea className="min-h-0 flex-1">
+        <ScrollArea className="min-h-0 min-w-0 flex-1">
           {meetings.length === 0 ? (
             <div className="flex flex-col items-center gap-2 p-8 text-center text-sm text-muted-foreground">
               <Inbox className="size-6" aria-hidden />
@@ -117,8 +117,8 @@ export function MeetingsApp() {
           </Button>
         </div>
       </aside>
-      <ScrollArea className="min-h-0 flex-1">
-        <main className="p-6">
+      <ScrollArea className="min-h-0 min-w-0 flex-1">
+        <main className="min-w-0 p-4 sm:p-6">
           {selected ? (
             <MeetingDetail key={`${selected.id}:${chat?.revision ?? "legacy"}`} meeting={selected} chat={chat} jobs={jobs} isCurrent={() => selection.current.id === selected.id && selection.current.revision === chat?.revision} />
           ) : (
