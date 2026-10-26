@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PipelineStages } from "../pipeline/pipeline.js";
 import { createSummariser } from "../pipeline/summariser.js";
@@ -1108,6 +1109,99 @@ describe("summarising with a language model", () => {
     await core.idle();
     await expect(core.retrySummary(core.listMeetings()[0]!.id)).rejects.toThrow(/failed/);
     await expect(core.retrySummary(999)).rejects.toThrow(/no such Meeting/);
+  });
+});
+
+describe("regenerating a Summary", () => {
+  const tracks = { type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav", micStartHostTime: 1000.197, systemStartHostTime: 1000 } as const;
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+
+  const reply = (tldr: string) => ({ tldr, participants: [{ speaker: "You", said: ["Ship the walking skeleton first."] }] });
+
+  /** A finished Meeting whose model is answered by `answer`, which the test can change between runs. */
+  async function summarised(answer: { current: () => unknown }, dbPath = ":memory:") {
+    const engine = new FakeEngine();
+    const store = openStore(dbPath);
+    const model = new FakeModel(() => answer.current());
+    const core = new AppCore({ engine, store, pipeline: { transcribe: fakePipeline().transcribe, summarise: createSummariser({ model }) } });
+    core.start();
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    engine.emit(tracks);
+    await core.idle();
+    return { core, store, id: core.listMeetings()[0]!.id };
+  }
+
+  it("replaces the Summary with one from the current model", async () => {
+    const answer = { current: () => reply("First attempt.") };
+    const { core, id } = await summarised(answer);
+    expect(core.getMeeting(id)!.summary!.tldr).toBe("First attempt.");
+
+    answer.current = () => reply("Second attempt.");
+    await core.regenerateSummary(id);
+
+    expect(core.getMeeting(id)).toMatchObject({ state: "done", error: null, summary: reply("Second attempt.") });
+    expect(core.getMeeting(id)!.transcript.segments).toEqual(fixtureTranscript.segments);
+  });
+
+  it("works after a Participant was renamed, and keeps the name", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "meeting-recorder-test-"));
+    dirs.push(dir);
+    const dbPath = join(dir, "meetings.db");
+    const answer = { current: () => reply("First attempt.") };
+    const { core, store, id } = await summarised(answer, dbPath);
+
+    // Renaming is stored on the Participant; the Summary only ever holds labels.
+    const db = new DatabaseSync(dbPath);
+    db.prepare("UPDATE participants SET name = 'Alice' WHERE meeting_id = ? AND label = 'Others'").run(id);
+    db.close();
+
+    answer.current = () => reply("After the rename.");
+    await core.regenerateSummary(id);
+
+    const meeting = core.getMeeting(id)!;
+    expect(meeting).toMatchObject({ state: "done", summary: reply("After the rename.") });
+    expect(meeting.participants).toContainEqual({ label: "Others", name: "Alice" });
+    store.close();
+  });
+
+  it("keeps the old Summary, and can be retried, when the model fails", async () => {
+    const answer = { current: (): unknown => reply("First attempt.") };
+    const { core, id } = await summarised(answer);
+
+    answer.current = () => {
+      throw new Error("Ollama is not running at http://127.0.0.1:11434");
+    };
+    await core.regenerateSummary(id);
+    expect(core.getMeeting(id)).toMatchObject({ state: "failed", summary: reply("First attempt.") });
+
+    answer.current = () => reply("Third attempt.");
+    await core.regenerateSummary(id);
+    expect(core.getMeeting(id)).toMatchObject({ state: "done", error: null, summary: reply("Third attempt.") });
+  });
+
+  it("tells the Meetings window that the Meeting is processing, then done", async () => {
+    const { core, id } = await summarised({ current: () => reply("First attempt.") });
+    const states: string[] = [];
+    core.onMeetingsChanged(() => states.push(core.getMeeting(id)!.state));
+    await core.regenerateSummary(id);
+    expect(states).toEqual(["processing", "done"]);
+  });
+
+  it("refuses a Meeting that does not exist, is still being processed, or has no Transcript", async () => {
+    const { core, engine } = setup({ silent: true });
+    core.start();
+    await expect(core.regenerateSummary(99)).rejects.toThrow(/no such Meeting/);
+
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    const id = core.listMeetings()[0]!.id;
+    await expect(core.regenerateSummary(id)).rejects.toThrow(/recording/);
+
+    engine.emit(tracks);
+    await core.idle();
+    await expect(core.regenerateSummary(id)).rejects.toThrow(/no Transcript/);
   });
 });
 

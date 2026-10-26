@@ -225,6 +225,20 @@ export class AppCore {
     await this.track(this.runner.resummarise(id, meeting.transcript));
   }
 
+  /**
+   * Replaces a Meeting's Summary with a new one from its stored Transcript, using the current model. Participant names
+   * live apart from the Summary, which holds labels, so a rename carries over.
+   */
+  async regenerateSummary(id: number): Promise<void> {
+    const meeting = this.deps.store.getMeeting(id);
+    if (!meeting) throw new Error(`no such Meeting: ${id}`);
+    if (meeting.state !== "done" && meeting.state !== "failed") {
+      throw new Error(`a Meeting that is ${meeting.state} cannot be summarised again yet`);
+    }
+    if (meeting.transcript.segments.length === 0) throw new Error("this Meeting has no Transcript to summarise");
+    await this.track(this.runner.resummarise(id, meeting.transcript));
+  }
+
   /** Transcribes a failed Meeting again from its kept audio, without re-recording. */
   async retryTranscription(id: number): Promise<void> {
     const meeting = this.deps.store.getMeeting(id);

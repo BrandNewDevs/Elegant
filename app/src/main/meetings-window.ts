@@ -1,7 +1,7 @@
-import { BrowserWindow } from "electron";
+import { BrowserWindow, dialog } from "electron";
 import type { AppCore } from "../core/app-core.js";
 import { DISPLAY_NAME } from "../config.js";
-import { meetingIdFromLink, renderMeetingsPage } from "./meetings-page.js";
+import { meetingActionFromLink, meetingIdFromLink, renderMeetingsPage, type MeetingAction } from "./meetings-page.js";
 
 /** The Meetings window: a list on the left, the selected Meeting on the right. Redraws when Meetings change. */
 export class MeetingsWindow {
@@ -20,6 +20,8 @@ export class MeetingsWindow {
       // The page is plain HTML; clicking a Meeting navigates to its link, which we turn into a selection.
       window.webContents.on("will-navigate", (event, url) => {
         event.preventDefault();
+        const action = meetingActionFromLink(url);
+        if (action) return void this.perform(action, window);
         const id = meetingIdFromLink(url);
         if (id === undefined) return;
         this.selectedId = id;
@@ -31,6 +33,29 @@ export class MeetingsWindow {
     }
     this.window.show();
     this.window.focus();
+  }
+
+  private async perform({ type, id }: MeetingAction, window: BrowserWindow): Promise<void> {
+    try {
+      if (type === "regenerate") {
+        await this.core.regenerateSummary(id);
+        return;
+      }
+      const { response } = await dialog.showMessageBox(window, {
+        type: "warning",
+        message: "Delete this Meeting?",
+        detail: "Its Transcript, Summary, Participants and any kept audio are removed for good.",
+        buttons: ["Delete", "Cancel"],
+        defaultId: 1,
+        cancelId: 1,
+      });
+      if (response !== 0) return;
+      await this.core.deleteMeeting(id);
+      if (this.selectedId === id) this.selectedId = undefined;
+      this.draw();
+    } catch (err) {
+      dialog.showErrorBox(`Could not ${type} the Meeting`, err instanceof Error ? err.message : String(err));
+    }
   }
 
   private draw(): void {

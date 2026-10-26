@@ -18,6 +18,14 @@ export function meetingIdFromLink(url: string): number | undefined {
   return match ? Number(match[1]) : undefined;
 }
 
+/** Buttons in the detail view are links too: `regenerate:<id>` and `delete:<id>`. */
+export type MeetingAction = { type: "regenerate" | "delete"; id: number };
+
+export function meetingActionFromLink(url: string): MeetingAction | undefined {
+  const match = /^(regenerate|delete):(\d+)$/.exec(url);
+  return match ? { type: match[1] as MeetingAction["type"], id: Number(match[2]) } : undefined;
+}
+
 const clock = (seconds: number): string => {
   const s = Math.floor(seconds);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -35,7 +43,13 @@ function listItem(m: MeetingListItem, selectedId: number | undefined): string {
 }
 
 function detail(m: Meeting): string {
-  const head = `<h1>${esc(m.app)}</h1><p class="when">${esc(when(m.startedAt))}</p>`;
+  // A Meeting being recorded or processed is still being written to, so it can be neither summarised again nor deleted.
+  const busy = m.state === "recording" || m.state === "processing";
+  const regenerate = !busy && m.transcript.segments.length > 0;
+  const actions = busy
+    ? ""
+    : `<p class="actions">${regenerate ? `<a class="button" href="regenerate:${m.id}">Regenerate Summary</a>` : ""}<a class="button danger" href="delete:${m.id}">Delete Meeting</a></p>`;
+  const head = `<h1>${esc(m.app)}</h1><p class="when">${esc(when(m.startedAt))}</p>${actions}`;
   let body: string;
   switch (m.state) {
     case "recording":
@@ -83,6 +97,9 @@ const STYLE = `
   .notice { padding: 8px 12px; border-radius: 6px; }
   .notice.failed { background: #ffe5e8; color: #c4001a; }
   .notice.recording, .notice.processing { background: #fff1d6; color: #7a4500; }
+  .actions { display: flex; gap: 8px; }
+  a.button { padding: 4px 10px; border: 1px solid #c7c7cc; border-radius: 6px; color: inherit; text-decoration: none; }
+  a.button.danger { color: #c4001a; }
   .segment { margin: 4px 0; }
   .time { color: #6e6e73; font-variant-numeric: tabular-nums; }
   .empty { color: #6e6e73; padding: 16px; }
