@@ -4,7 +4,7 @@ import type { AIJobQueue } from "../pipeline/job-queue.js";
 import { transcriptRevision } from "../pipeline/evidence.js";
 import type { MeetingChatGenerator } from "../pipeline/meeting-chat.js";
 import type { ChatRecord, ChatStatus } from "../shared/meeting-chat.js";
-import { canonicaliseParticipantMentions, displayParticipantMentions } from "./participants.js";
+import { canonicaliseParticipantMentions, displayParticipantMentions, effectiveParticipants } from "./participants.js";
 
 const activeStatus = (status: ChatStatus) => status === "queued" || status === "retrieving" || status === "generating";
 const validId = (id: unknown): id is string => typeof id === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(id);
@@ -14,6 +14,7 @@ export interface MeetingChatControllerOptions {
   store: Store;
   jobs: AIJobQueue;
   generate?: MeetingChatGenerator;
+  ownName?: () => string | undefined;
   isAvailable: (meetingId: number) => boolean;
 }
 
@@ -40,9 +41,10 @@ export class MeetingChatController {
   historyForDisplay(meetingId: number): ChatRecord[] {
     const meeting = this.options.store.getMeeting(meetingId);
     if (!meeting) return [];
+    const participants = effectiveParticipants(meeting.participants, this.options.ownName?.());
     return this.history(meetingId).map(record => ({ ...record,
-      question: displayParticipantMentions(record.question, meeting.participants),
-      answer: record.answer && { ...record.answer, text: displayParticipantMentions(record.answer.text, meeting.participants) },
+      question: displayParticipantMentions(record.question, participants),
+      answer: record.answer && { ...record.answer, text: displayParticipantMentions(record.answer.text, participants) },
     }));
   }
 
@@ -53,7 +55,7 @@ export class MeetingChatController {
     const { store, jobs, generate } = this.options;
     const meeting = store.getMeeting(meetingId);
     if (!meeting) throw new Error("This Meeting no longer exists");
-    const canonical = canonicaliseParticipantMentions(question.trim(), meeting.participants);
+    const canonical = canonicaliseParticipantMentions(question.trim(), effectiveParticipants(meeting.participants, this.options.ownName?.()));
     if (!canonical.trim() || canonical.length > 2000) throw new Error("The question is too long after resolving Participant names");
     const revision = transcriptRevision(meeting.transcript);
     const existing = store.getChatHistory(meetingId).find(record => record.id === requestId);

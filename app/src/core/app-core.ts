@@ -6,7 +6,7 @@ import type { Engine } from "../engine/protocol.js";
 import type { PipelineContext, PipelineStages } from "../pipeline/pipeline.js";
 import { exportFileName, meetingToMarkdown } from "./export-markdown.js";
 import { DEFAULT_DETECTION, MicWatcher, type DetectionSettings } from "./detection.js";
-import { applyNames } from "./participants.js";
+import { applyNames, USER_NAME_SETTING } from "./participants.js";
 import { MeetingChatController } from "./meeting-chat-controller.js";
 import type { MeetingChatGenerator } from "../pipeline/meeting-chat.js";
 import type { ChatRecord } from "../shared/meeting-chat.js";
@@ -80,7 +80,7 @@ export class AppCore {
     this.store = this.notifyingStore(deps.store);
     this.jobs = deps.jobs ?? new AIJobQueue();
     this.runner = new PipelineRunner(deps.pipeline, this.store, { keepAudio: () => this.keepAudio });
-    this.chatController = new MeetingChatController({ store: this.store, jobs: this.jobs, generate: deps.chat,
+    this.chatController = new MeetingChatController({ store: this.store, jobs: this.jobs, generate: deps.chat, ownName: () => this.userName,
       isAvailable: id => this.isChatAvailable(id) });
     let previousOwners = new Set<string>();
     this.jobs.onChange(state => {
@@ -259,13 +259,18 @@ export class AppCore {
   exportMeeting(id: number): { fileName: string; markdown: string } {
     const meeting = this.store.getMeeting(id);
     if (!meeting) throw new Error(`no such Meeting: ${id}`);
-    return { fileName: exportFileName(meeting), markdown: meetingToMarkdown(meeting) };
+    return { fileName: exportFileName(meeting), markdown: meetingToMarkdown(meeting, this.userName) };
+  }
+
+  /** The person's own name, shown in place of "You"; undefined until they give one. */
+  private get userName(): string | undefined {
+    return this.store.getSetting(USER_NAME_SETTING) || undefined;
   }
 
   /** The Meeting as it is shown: each Participant's chosen name stands in for their label, in the Transcript and the Summary. */
   getMeetingForDisplay(id: number): Meeting | undefined {
     const meeting = this.store.getMeeting(id);
-    return meeting && applyNames(meeting);
+    return meeting && applyNames(meeting, this.userName);
   }
 
   /**

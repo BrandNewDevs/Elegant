@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const mainDir = dirname(fileURLToPath(import.meta.url));
 
-export type RendererPage = "meetings" | "onboarding" | "settings" | "prompt";
+export type RendererPage = "meetings" | "onboarding" | "prompt";
 
 export function rendererPagePath(page: RendererPage): string {
   return join(mainDir, "../renderer", `${page}.html`);

@@ -242,6 +242,55 @@ describe("Meeting chat through AppCore", () => {
     expect(ctx.core.getMeetingForDisplay(id)?.transcript.segments[1]?.text).toBe(fixtureTranscript.segments[1]!.text);
   });
 
+  it("uses the current global own name for chat while keeping stored questions and answers canonical", async () => {
+    const generatedQuestions: string[] = [];
+    const ctx = context(async input => {
+      generatedQuestions.push(input.question);
+      const result = answer(input.expectedRevision, "You proposed the walking skeleton.");
+      result.answer.refs = [0];
+      return result;
+    });
+    const id = ctx.saved();
+    ctx.store.setSetting("userName", "Alex");
+    ctx.core.sendQuestion(id, "own_name", "What did Alex propose?"); await ctx.core.idle();
+    expect(generatedQuestions).toEqual(["What did You propose?"]);
+    expect(ctx.core.getChatHistory(id)[0]).toMatchObject({ question: "What did You propose?", answer: { text: "You proposed the walking skeleton." } });
+    expect(ctx.core.getChatHistoryForDisplay(id)[0]).toMatchObject({ question: "What did Alex propose?", answer: { text: "Alex proposed the walking skeleton." } });
+    ctx.store.setSetting("userName", "Jordan");
+    expect(ctx.core.getChatHistoryForDisplay(id)[0]).toMatchObject({ question: "What did Jordan propose?", answer: { text: "Jordan proposed the walking skeleton." } });
+    expect(ctx.core.getMeetingForDisplay(id)?.transcript.segments[0]?.speaker).toBe("Jordan");
+    expect(ctx.core.getMeeting(id)?.transcript.segments[0]?.speaker).toBe("You");
+    expect(ctx.core.getChatHistory(id)[0]?.question).toBe("What did You propose?");
+    expect(ctx.core.getTranscriptRevision(id)).toBe(revision);
+  });
+
+  it("gives a per-Meeting own-name override precedence over global Settings in chat", async () => {
+    const ctx = context(async input => {
+      const result = answer(input.expectedRevision, "You proposed the walking skeleton.");
+      result.answer.refs = [0];
+      return result;
+    });
+    const id = ctx.saved();
+    ctx.store.setSetting("userName", "Alex");
+    ctx.core.renameParticipant(id, "You", "Lead");
+    ctx.core.sendQuestion(id, "own_override", "What did Lead propose?"); await ctx.core.idle();
+    expect(ctx.core.getChatHistory(id)[0]?.question).toBe("What did You propose?");
+    ctx.store.setSetting("userName", "Jordan");
+    expect(ctx.core.getChatHistoryForDisplay(id)[0]).toMatchObject({ question: "What did Lead propose?", answer: { text: "Lead proposed the walking skeleton." } });
+    expect(ctx.core.getMeetingForDisplay(id)?.transcript.segments[0]?.speaker).toBe("Lead");
+    ctx.core.renameParticipant(id, "You", "");
+    expect(ctx.core.getChatHistoryForDisplay(id)[0]).toMatchObject({ question: "What did Jordan propose?", answer: { text: "Jordan proposed the walking skeleton." } });
+  });
+
+  it("rejects a global own name that is ambiguous with another Participant", () => {
+    const ctx = context();
+    const id = ctx.saved();
+    ctx.store.setSetting("userName", "Alex");
+    ctx.core.renameParticipant(id, "Speaker 1", "alex");
+    expect(() => ctx.core.sendQuestion(id, "own_ambiguous", "What did Alex say?")).toThrow("ambiguous");
+    expect(ctx.core.getChatHistory(id)).toEqual([]);
+  });
+
   it("resolves escaped whole names without substrings and rejects ambiguous aliases", async () => {
     const ctx = context();
     const id = ctx.saved();

@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("electron", {
   meetings: {
     ready: () => ipcRenderer.send("meetings:ready"),
     onState: (callback: (state: MeetingsViewState) => void) => subscribe("meetings:state", callback),
+    settings: (open: boolean) => ipcRenderer.send("meetings:settings", open),
     select: (id: number) => ipcRenderer.send("meetings:select", id),
     search: (query: string) => ipcRenderer.send("meetings:search", query),
     rename: (payload: { meetingId: number; label: string; name: string }) =>
@@ -26,6 +27,7 @@ contextBridge.exposeInMainWorld("electron", {
     ready: () => ipcRenderer.send("setup:ready"),
     onState: (callback: (state: SetupViewState) => void) => subscribe("setup:state", callback),
     act: (action: SetupAction) => ipcRenderer.send("setup:act", action),
+    setUserName: (name: string) => ipcRenderer.send("setup:set-user-name", name),
   },
   prompt: {
     ready: () => ipcRenderer.send("prompt:ready"),

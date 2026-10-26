@@ -12,9 +12,9 @@ export function exportFileName(meeting: Pick<Meeting, "app" | "startedAt">): str
   return `${meeting.app} ${stamp}.md`.replace(/[\\/:*?"<>|]/g, "_");
 }
 
-/** One Meeting as Markdown: the Summary, then the Transcript. Renamed Participants appear by name. */
-export function meetingToMarkdown(meeting: Meeting): string {
-  meeting = applyNames(meeting);
+/** One Meeting as Markdown: the Summary, then the Transcript. Renamed Participants appear by name, and so does the person (`ownName`). */
+export function meetingToMarkdown(meeting: Meeting, ownName?: string): string {
+  meeting = applyNames(meeting, ownName);
 
   const lines = [`# ${meeting.app}`, "", `Recorded ${meeting.startedAt}`];
 

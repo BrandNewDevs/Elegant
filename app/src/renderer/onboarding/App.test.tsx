@@ -11,6 +11,7 @@ it("welcomes a first-time user, then asks for the microphone only when they pres
   expect(screen.queryByRole("button", { name: "Allow microphone" })).toBeNull();
 
   fireEvent.click(screen.getByRole("button", { name: "Get started" }));
+  fireEvent.click(screen.getByRole("button", { name: "Skip for now" }));
   expect(screen.getByText(/macOS asks whether to allow it/)).toBeTruthy();
   expect(send).not.toHaveBeenCalled();
 
@@ -35,6 +36,7 @@ it("shows the permission as allowed when macOS grants it, and Continue moves to 
   };
   render(<OnboardingApp />);
   fireEvent.click(screen.getByRole("button", { name: "Get started" }));
+  fireEvent.click(screen.getByRole("button", { name: "Skip for now" }));
   expect(screen.getByRole("button", { name: "Allow microphone" })).toBeTruthy();
 
   act(() => push(withState({ microphone: { status: "done" } })));
@@ -69,4 +71,28 @@ it("finishes with Done, or sends the user to Settings for the models", () => {
   expect(send).toHaveBeenCalledWith("open-settings");
   fireEvent.click(screen.getByRole("button", { name: "Done" }));
   expect(send).toHaveBeenCalledWith("done");
+});
+
+it("asks for a name after the welcome, saves it, and moves on to the permissions", () => {
+  const send = pushSetupState(nothingDone);
+  render(<OnboardingApp />);
+  fireEvent.click(screen.getByRole("button", { name: "Get started" }));
+  expect(screen.getByRole("heading", { name: "What should we call you?" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Allow microphone" })).toBeNull();
+
+  fireEvent.change(screen.getByLabelText("Your name"), { target: { value: "  Kenny " } });
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  expect(send.setUserName).toHaveBeenCalledWith("  Kenny ");
+  expect(screen.getByRole("button", { name: "Allow microphone" })).toBeTruthy();
+});
+
+it("lets the name be skipped, and starts with one already given", () => {
+  const send = pushSetupState({ ...nothingDone, userName: "Priya" });
+  render(<OnboardingApp />);
+  fireEvent.click(screen.getByRole("button", { name: "Get started" }));
+  expect((screen.getByLabelText("Your name") as HTMLInputElement).value).toBe("Priya");
+
+  fireEvent.change(screen.getByLabelText("Your name"), { target: { value: "" } });
+  fireEvent.click(screen.getByRole("button", { name: "Skip for now" }));
+  expect(send.setUserName).toHaveBeenCalledWith("");
 });

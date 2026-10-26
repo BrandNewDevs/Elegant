@@ -11,6 +11,7 @@ declare global {
       meetings: {
         ready(): void;
         onState(callback: (state: MeetingsViewState) => void): () => void;
+        settings(open: boolean): void;
         select(id: number): void;
         search(query: string): void;
         rename(payload: { meetingId: number; label: string; name: string }): void;
@@ -22,6 +23,7 @@ declare global {
         ready(): void;
         onState(callback: (state: SetupViewState) => void): () => void;
         act(action: SetupAction): void;
+        setUserName(name: string): void;
       };
       prompt: {
         ready(): void;
