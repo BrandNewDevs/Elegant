@@ -22,6 +22,7 @@ jobs:
         working-directory: app
       - run: pnpm run typecheck && pnpm run build && pnpm exec vitest run --project node --project renderer
         working-directory: app
+      - run: python3 -m unittest discover -s evaluation -p 'test_*.py'
   engine:
     runs-on: macos-15
     steps:
@@ -36,5 +37,10 @@ jobs:
           cache-dependency-path: app/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
         working-directory: app
+      - uses: actions/cache@v4
+        with:
+          path: engine/.build
+          key: swift-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('engine/Package*', 'engine/Sources/**', 'engine/Tests/**') }}
+          restore-keys: swift-${{ runner.os }}-${{ runner.arch }}-
       - run: pnpm test
         working-directory: app
