@@ -14,6 +14,8 @@ export interface EvidenceRequest {
   /** Checks the caller's complete answer request budget, not just the evidence text. */
   fits?: (sources: SourceFragment[]) => boolean;
   forceScan?: boolean;
+  /** Trusted main-process authorization: stored Transcript is complete while only Summary work is pending. */
+  allowSummaryProcessing?: boolean;
   onStage?: (stage: EvidenceStage) => void;
 }
 export interface MeetingEvidence {
@@ -67,7 +69,9 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
     if (typeof input.question !== "string" || !input.question.trim() || input.question.length > 2000) throw new Error("Questions must contain between 1 and 2000 characters");
     const meeting = store.getMeeting(input.meetingId);
     if (!meeting) throw new Error("This Meeting no longer exists");
-    if (meeting.state === "recording" || meeting.state === "processing") throw new Error("This Meeting's Transcript is not ready yet");
+    if (meeting.state === "recording" || (meeting.state === "processing" && (!input.allowSummaryProcessing || !meeting.transcript.segments.length))) {
+      throw new Error("This Meeting's Transcript is not ready yet");
+    }
     const revision = transcriptRevision(meeting.transcript);
     const started = performance.now();
     const deadline = AbortSignal.timeout(deadlineMs);
