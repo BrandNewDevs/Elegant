@@ -284,8 +284,10 @@ describe("Meeting chat through AppCore", () => {
   it("cancels active chat and drains model work before shutdown returns", async () => {
     let signal: AbortSignal | undefined;
     const ctx = context(input => new Promise<ChatResult>((_resolve, reject) => {
-      signal = input.signal;
-      input.signal.addEventListener("abort", () => reject(input.signal.reason), { once: true });
+      const currentSignal = input.signal;
+      if (!currentSignal) throw new Error("The queue must pass cancellation to chat");
+      signal = currentSignal;
+      currentSignal.addEventListener("abort", () => reject(currentSignal.reason), { once: true });
     }));
     const id = ctx.saved();
     ctx.core.sendQuestion(id, "shutdown", "What happened?"); await turn();
