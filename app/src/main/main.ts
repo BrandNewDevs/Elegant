@@ -20,8 +20,10 @@ import { STATUS_LABEL } from "./status-label.js";
 
 const RECORDING_SYMBOL = "⏺";
 
-// Dev location of the engine built by `pnpm run build:engine`. Packaging will change this.
-const devEngine = fileURLToPath(new URL("../../../engine/.build/release/engine", import.meta.url));
+// `pnpm run package` embeds the engine at Contents/Helpers; from source it is the one `pnpm run build:engine` built.
+const engineCommand = app.isPackaged
+  ? join(process.resourcesPath, "../Helpers/engine")
+  : fileURLToPath(new URL("../../../engine/.build/release/engine", import.meta.url));
 
 let tray: Tray | undefined;
 let core: AppCore | undefined;
@@ -91,7 +93,7 @@ app.whenReady().then(() => {
   mkdirSync(dataDir, { recursive: true });
 
   const store = openStore(join(dataDir, "meetings.db"));
-  const engine = new ProcessEngine({ command: process.env.MEETING_RECORDER_ENGINE ?? devEngine });
+  const engine = new ProcessEngine({ command: process.env.MEETING_RECORDER_ENGINE ?? engineCommand });
   ignoredAppsPath = join(dataDir, "ignored-apps.json");
   core = new AppCore({
     engine,
@@ -154,6 +156,14 @@ app.whenReady().then(() => {
   });
   render();
   core.start();
+  // The installed app launches at login. It registers only while it has never been registered ("not-found" before the
+  // first registration), so once the user turns it off in System Settings ("requires-approval") it stays off. A run
+  // from source would register the bare Electron binary, so it never registers.
+  if (app.isPackaged) {
+    const { status } = app.getLoginItemSettings();
+    if (status === "not-registered" || status === "not-found") app.setLoginItemSettings({ openAtLogin: true });
+    console.log(`[login item] ${app.getLoginItemSettings().status}`);
+  }
   // Opened by hand, the app shows its window, since the menu-bar item alone is easy to miss. Opened at login it stays quiet.
   if (!app.getLoginItemSettings().wasOpenedAtLogin) meetingsWindow.show();
   // Permissions that were granted before are checked silently once the engine is up. Onboarding opens only when one is

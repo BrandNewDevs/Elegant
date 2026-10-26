@@ -15,6 +15,7 @@
     "pretest": "pnpm run build:engine && pnpm run test:engine",
     "test": "vitest run",
     "start": "pnpm run build && pnpm run build:engine && env -u ELECTRON_RUN_AS_NODE electron .",
+    "package": "scripts/package.sh",
     "eval:baseline": "tsc -p tsconfig.build.json && node dist/evaluation/baseline-cli.js",
     "eval:ai": "tsc -p tsconfig.build.json && node dist/evaluation/cli.js",
     "eval:retrieval": "tsc -p tsconfig.build.json && node dist/evaluation/retrieval-cli.js"
