@@ -201,15 +201,24 @@ describe("Meeting-specific evidence retrieval", () => {
   it("allows a complete combined assessment to establish support after individually insufficient batches", async () => {
     const { store, id, passages } = meeting(long());
     let level = 0;
-    const local = model(request => ({
-      sourceIds: instruction(request).startsWith("Consolidate") ? [data(request).sources!.at(-1)!.id] : data(request).sources!.map(source => source.id),
-      sufficient: level >= 2,
-    }));
+    const reductions: { level: number; sufficient: boolean; sourceIds: string[] }[] = [];
+    const local = model(request => {
+      const reducing = instruction(request).startsWith("Consolidate");
+      const sufficient = level >= 2;
+      if (reducing) reductions.push({ level, sufficient, sourceIds: data(request).sources!.map(source => source.id) });
+      return { sourceIds: reducing ? [data(request).sources!.at(-1)!.id] : data(request).sources!.map(source => source.id), sufficient };
+    });
     const result = await createMeetingEvidence({ store: fixedHits(store, [passages[0]!]), model: local })({
       meetingId: id, question: "Summarize all decisions", fits: byCount(1),
       onStage: stage => { if (stage === "consolidating") level++; },
     });
-    expect(level).toBeGreaterThanOrEqual(2);
+    const partial = reductions.filter(request => request.level === 1);
+    const combined = reductions.filter(request => request.level === 2);
+    expect(partial.length).toBeGreaterThan(1);
+    expect(partial.every(request => !request.sufficient)).toBe(true);
+    expect(combined).toHaveLength(1);
+    expect(combined[0]!.sufficient).toBe(true);
+    expect(combined[0]!.sourceIds).toHaveLength(partial.length);
     expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: true });
   });
 
