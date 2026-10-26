@@ -41,8 +41,13 @@ if (split && split !== "tuning" && split !== "reserved") throw new Error("AI_SPL
 const selected = split ? fixtures.filter(fixture => fixture.split === split) : fixtures;
 if (!selected.length) throw new Error("No fixtures found for this split");
 const implementation = mode!.endsWith("baseline") ? "baseline" : "current";
+const deadlineOverride = process.env.AI_SUMMARY_DEADLINE_MS;
+const summaryDeadlineMs = deadlineOverride === undefined ? 15 * 60_000 : Number(deadlineOverride);
+if (!Number.isSafeInteger(summaryDeadlineMs) || summaryDeadlineMs < 1 || summaryDeadlineMs > 60 * 60_000) {
+  throw new Error("AI_SUMMARY_DEADLINE_MS must be an integer from 1 to 3600000; it changes evaluation only");
+}
 const modelName = process.env.AI_MODEL ?? DEFAULT_SUMMARY_MODEL;
-const metadata = { ...await evaluationMetadata(modelName, implementation), ...(implementation === "current" ? { chatPromptVersion: CHAT_PROMPT_VERSION } : {}) };
+const metadata = { ...await evaluationMetadata(modelName, implementation), ...(implementation === "current" ? { summaryDeadlineMs, evaluationDeadlineOverride: deadlineOverride !== undefined } : {}), ...(implementation === "current" ? { chatPromptVersion: CHAT_PROMPT_VERSION } : {}) };
 const client = new OllamaClient({ model: modelName });
 const baseline = new BaselineOllamaClient({ model: modelName });
 let calls = 0;
@@ -60,7 +65,7 @@ const model: LanguageModel & TextModel = {
     } catch (error) { observation.failed = true; throw error; }
   },
 };
-const summarise = implementation === "baseline" ? createBaselineSummariser({ model }) : createGroundedSummariser({ model });
+const summarise = implementation === "baseline" ? createBaselineSummariser({ model }) : createGroundedSummariser({ model, deadlineMs: summaryDeadlineMs });
 const store = openStore(":memory:");
 const meetingIds = new WeakMap<Transcript, number>();
 const chat = createMeetingChat({ store, model, modelName });

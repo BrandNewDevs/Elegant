@@ -60,6 +60,8 @@ pnpm run eval:ai private-current /absolute/private/manifest.json /absolute/priva
 
 `summary` and `private-summary` measure the production Summary pipeline without generating chat answers. Chat stays skipped, and chat quality remains pending. Current-pipeline results also include an operational `requests` list: serialized bytes, actual prompt/output token counts, timing and transport failure status. It contains no prompt text. Check individual prompt counts against the 6,144-token input allowance (8,192 minus the 2,048-token response reservation); a successful count on one example does not establish a universal tokenizer bound.
 
+For diagnosis on a slow device, `AI_SUMMARY_DEADLINE_MS=1800000` permits a 30-minute Summary evaluation instead of the default 15-minute deadline. The runner records this override; it does not change the shipped app or relax the M4 latency gate. Use an extended run to inspect quality after a default-deadline failure, retaining both results. Valid evaluation limits are 1–3,600,000 milliseconds.
+
 From the repository root:
 
 ```
