@@ -21,6 +21,17 @@ function setup(source = transcript) {
 interface Data { question: string; originalQuestion?: string; priorUserQuestion?: string; history: { question: string; answer: string }[]; sources?: SourceFragment[]; exhaustive?: boolean }
 const contents = (request: TextRequest) => JSON.parse(request.messages.at(-1)!.content) as { instruction: string; data: Data };
 const isAnswer = (request: TextRequest) => "text" in (request.schema as { properties: object }).properties;
+function auditReply(request: TextRequest, ids = contents(request).data.sources!.slice(0, 1).map(source => source.id), supported = true) {
+  const originals = new Map(contents(request).data.sources!.map(source => [source.id, source]));
+  return { checks: ids.map(id => {
+    const source = originals.get(id)!;
+    return { speaker: source.speaker, sourceId: id, quote: source.text.slice(0, 200), relation: "supports" };
+  }), addressesQuestion: true, supported };
+}
+function auditIds(request: TextRequest): string[] {
+  return (request.schema as { properties: { checks: { items: { properties: { sourceId: { enum: string[] } } } } } }).properties.checks.items.properties.sourceId.enum;
+}
+
 function fake(reply: (request: TextRequest, call: number) => unknown, options: {
   audit?: (request: TextRequest, call: number) => unknown;
   resolve?: (request: TextRequest, call: number) => unknown;
@@ -31,7 +42,7 @@ function fake(reply: (request: TextRequest, call: number) => unknown, options: {
     const resolving = "question" in (request.schema as { properties: object }).properties;
     const auditing = "supported" in (request.schema as { properties: object }).properties;
     const result = resolving ? options.resolve?.(request, requests.length) ?? { question: "When will You finish the permission guide?" }
-      : auditing ? options.audit?.(request, requests.length) ?? { supported: true, sourceIds: contents(request).data.sources!.map(source => source.id) } : reply(request, requests.length);
+      : auditing ? options.audit?.(request, requests.length) ?? auditReply(request) : reply(request, requests.length);
     return { text: typeof result === "string" ? result : JSON.stringify(result), metadata: { model: "local:test", elapsedMs: 1, promptTokens: 10, outputTokens: 4 } };
   } };
 }
@@ -177,7 +188,7 @@ describe("grounded Meeting chat", () => {
     expect(invalid.requests).toHaveLength(3);
   });
 
-  it("audits only cited original passages and regenerates an unsupported or irrelevant answer", async () => {
+  it("audits all selected original passages, including uncited evidence, before accepting a draft", async () => {
     const { store, id, expectedRevision } = setup();
     let answers = 0;
     let audits = 0;
@@ -187,9 +198,9 @@ describe("grounded Meeting chat", () => {
         const payload = contents(request).data as Data & { candidateAnswer: string };
         expect(payload).not.toHaveProperty("history");
         expect(payload).not.toHaveProperty("summary");
-        expect(payload.sources!.map(source => source.id)).toEqual(["0:0"]);
+        expect(payload.sources!.map(source => source.id)).toEqual(["0:0", "1:0"]);
         expect(payload.sources![0]!.text).toBe(transcript.segments[0]!.text);
-        return { supported: audits > 1, sourceIds: audits > 1 ? payload.sources!.map(source => source.id) : [] };
+        return auditReply(request, audits > 1 ? ["0:0"] : [], audits > 1);
       },
     });
     const result = await createMeetingChat({ store, model })(input(id, expectedRevision));
@@ -203,11 +214,10 @@ describe("grounded Meeting chat", () => {
   it("publishes only the minimal audited citation subset without changing the answer's claims", async () => {
     const { store, id, expectedRevision } = setup();
     const model = fake(() => ({ ...positive, sourceIds: ["0:0", "1:0"] }), { audit: request => {
-      const schema = request.schema as { properties: { sourceIds: { items: { enum: string[] } } } };
-      expect(schema.properties.sourceIds.items.enum).toEqual(["0:0", "1:0"]);
-      expect(contents(request).instruction).toContain("collectively supports EVERY factual claim");
-      expect(contents(request).instruction).toContain("Do not rewrite or silently drop facts");
-      return { supported: true, sourceIds: ["0:0"] };
+      expect(auditIds(request)).toEqual(["0:0", "1:0"]);
+      expect(contents(request).instruction).toContain("collectively supporting EVERY factual claim");
+      expect(contents(request).instruction).toContain("without rewriting or silently dropping claims");
+      return auditReply(request, ["0:0"]);
     } });
     const result = await createMeetingChat({ store, model })(input(id, expectedRevision));
     expect(result.answer).toEqual({ text: positive.text, refs: [0], sufficient: true });
@@ -215,7 +225,7 @@ describe("grounded Meeting chat", () => {
     expect(model.requests).toHaveLength(2);
   });
 
-  it("retains multiple citations when all are needed to support the answer collectively", async () => {
+  it("repairs missing draft citations using all original context without dropping claims", async () => {
     const { store, id, expectedRevision } = setup();
     const text = "You will write the permission guide by Thursday; Speaker 1 proposed Friday for launch, but no launch date was agreed.";
     let generations = 0;
@@ -223,30 +233,34 @@ describe("grounded Meeting chat", () => {
       audit: request => {
         const ids = contents(request).data.sources!.map(source => source.id);
         // The first candidate claims two facts while citing only the first fact's passage.
-        return ids.includes("1:0") ? { supported: true, sourceIds: ["1:0", "0:0", "1:0"] } : { supported: false, sourceIds: [] };
+        return ids.includes("1:0") ? auditReply(request, ["1:0", "0:0", "1:0"]) : auditReply(request, [], false);
       },
     });
     const result = await createMeetingChat({ store, model })(input(id, expectedRevision));
     expect(result.answer).toEqual({ text, refs: [0, 1], sufficient: true });
-    expect(generations).toBe(2);
-    expect(result.generation.calls).toBe(4);
+    expect(generations).toBe(1);
+    expect(result.generation.calls).toBe(2);
   });
 
-  it("never accepts an empty, unknown or non-candidate citation set from a positive audit", async () => {
+  it("never accepts empty, unknown or mismatched quoted checks from a positive audit", async () => {
     const { store, id, expectedRevision } = setup();
+    const validCheck = { speaker: "You", sourceId: "0:0", quote: transcript.segments[0]!.text, relation: "supports" };
     const invalid = [
-      { supported: true, sourceIds: [] },
-      { supported: true, sourceIds: ["unknown:0"] },
-      { supported: true, sourceIds: ["1:0"] }, // Real Transcript source, but not in the candidate's audited evidence.
+      { supported: true, addressesQuestion: true, checks: [] },
+      { supported: true, addressesQuestion: true, checks: [{ ...validCheck, sourceId: "unknown:0" }] },
+      { supported: true, addressesQuestion: true, checks: [{ ...validCheck, sourceId: "1:0" }] },
       { supported: true },
-      { supported: true, sourceIds: null },
-      { supported: true, sourceIds: "0:0" },
-      { supported: true, sourceIds: [0] },
+      { supported: true, addressesQuestion: true, checks: null },
+      { supported: true, addressesQuestion: true, checks: "0:0" },
+      { supported: true, addressesQuestion: true, checks: [0] },
+      { supported: true, addressesQuestion: true, checks: [{ ...validCheck, quote: "A made-up deadline on Friday." }] },
+      { supported: true, addressesQuestion: true, checks: [{ ...validCheck, speaker: "Speaker 1" }] },
+      { supported: true, addressesQuestion: true, checks: [{ ...validCheck, relation: "agrees" }] },
+      { supported: true, addressesQuestion: true, checks: [{ ...validCheck, quote: "" }] },
     ];
     for (const value of invalid) {
       const model = fake(() => positive, { audit: request => {
-        const schema = request.schema as { properties: { sourceIds: { items: { enum: string[] } } } };
-        expect(schema.properties.sourceIds.items.enum).toEqual(["0:0"]);
+        expect(auditIds(request)).toEqual(["0:0", "1:0"]);
         return value;
       } });
       await expect(createMeetingChat({ store, model })(input(id, expectedRevision))).rejects.toThrow("three attempts");
@@ -255,9 +269,61 @@ describe("grounded Meeting chat", () => {
     }
   });
 
+  it("rejects a pooled stance when a named speaker's exact words contradict it, even if the audit boolean says true", async () => {
+    const source: Transcript = { segments: [
+      { start: 0, end: 5, speaker: "Speaker 1", text: "I prefer keeping audio by default." },
+      { start: 5, end: 10, speaker: "Speaker 2", text: "I disagree. Audio should be deleted after transcription." },
+    ] };
+    const { store, id, expectedRevision } = setup(source);
+    let answers = 0;
+    const model = fake(() => ({ text: ++answers === 1 ? "Speaker 1 and Speaker 2 wanted to retain audio." : "Speaker 1 wanted to retain audio.",
+      sourceIds: ["0:0"], sufficient: true }), { audit: request => {
+      const payload = contents(request).data as Data & { candidateAnswer: string };
+      const serialized = request.messages.at(-1)!.content;
+      expect(serialized.indexOf('"sources"')).toBeLessThan(serialized.indexOf('"candidateAnswer"'));
+      expect(payload.sources!.map(source => source.id)).toEqual(["0:0", "1:0"]);
+      const approved = auditReply(request, ["0:0"]);
+      if (payload.candidateAnswer.includes("Speaker 2")) approved.checks.push({ speaker: "Speaker 2", sourceId: "1:0", quote: source.segments[1]!.text, relation: "contradicts" });
+      return approved;
+    } });
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "Who wanted to retain audio?" });
+    expect(result.answer).toEqual({ text: "Speaker 1 wanted to retain audio.", refs: [0], sufficient: true });
+    expect(answers).toBe(2);
+    expect(contents(model.requests[2]!).instruction).toContain("Keep opposing positions and negation separate");
+  });
+
+  it("requires each named Participant's own quoted support instead of borrowing another speaker's evidence", async () => {
+    const { store, id, expectedRevision } = setup();
+    let answers = 0;
+    const model = fake(() => ++answers === 1 ? { ...positive, text: "You and Speaker 1 will write the permission guide by Thursday." } : positive,
+      { audit: request => auditReply(request, ["0:0"]) });
+    const result = await createMeetingChat({ store, model })(input(id, expectedRevision));
+    expect(result.answer).toEqual({ text: positive.text, refs: [0], sufficient: true });
+    expect(answers).toBe(2);
+    expect(contents(model.requests[2]!).instruction).toContain("Every named Participant needs supporting quoted evidence");
+  });
+
+  it("rejects true facts about another person and accepts an explicitly supported negative answer", async () => {
+    const source: Transcript = { segments: [
+      { start: 0, end: 5, speaker: "Speaker 1", text: "I will add the local test by Tuesday." },
+      { start: 5, end: 10, speaker: "You", text: "No Participant named Morgan took part in this Meeting." },
+    ] };
+    const { store, id, expectedRevision } = setup(source);
+    let answers = 0;
+    const model = fake(() => ++answers === 1
+      ? { text: "Speaker 1 will add the local test by Tuesday.", sourceIds: ["0:0"], sufficient: true }
+      : { text: "No Participant named Morgan took part in this Meeting.", sourceIds: ["1:0"], sufficient: true }, {
+      audit: request => ({ ...auditReply(request, answers === 1 ? ["0:0"] : ["1:0"]), addressesQuestion: answers !== 1 }),
+    });
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "What did Morgan commit to?" });
+    expect(result.answer).toEqual({ text: source.segments[1]!.text, refs: [1], sufficient: true });
+    expect(answers).toBe(2);
+    expect(contents(model.requests[2]!).instruction).toContain("set sufficient false; do not give another true fact");
+  });
+
   it("keeps unsupported answers failed after three generation-and-audit attempts", async () => {
     const { store, id, expectedRevision } = setup();
-    const model = fake(() => positive, { audit: () => ({ supported: false, sourceIds: [] }) });
+    const model = fake(() => positive, { audit: request => auditReply(request, [], false) });
     await expect(createMeetingChat({ store, model })(input(id, expectedRevision))).rejects.toThrow("three attempts");
     expect(model.requests.filter(isAnswer)).toHaveLength(3);
     expect(model.requests.filter(request => "supported" in (request.schema as { properties: object }).properties)).toHaveLength(3);
@@ -272,7 +338,7 @@ describe("grounded Meeting chat", () => {
       expect(payload.question).toBe("When will You finish the permission guide?");
       expect(payload.priorUserQuestion).toBe(question);
       expect(JSON.stringify(request)).not.toContain("PRIVATE EARLIER ASSISTANT DETOUR");
-      return { supported: true, sourceIds: payload.sources!.map(source => source.id) };
+      return auditReply(request, payload.sources!.map(source => source.id));
     } });
     await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "When will they finish it?", history });
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
@@ -330,7 +396,7 @@ describe("grounded Meeting chat", () => {
     const failed = fake(() => positive, { audit: () => { throw new Error("Audit model is unavailable"); } });
     await expect(createMeetingChat({ store, model: failed })(input(id, expectedRevision))).rejects.toThrow("Audit model is unavailable");
     const controller = new AbortController();
-    const cancelled = fake(() => positive, { audit: () => { controller.abort(); return { supported: true, sourceIds: ["0:0"] }; } });
+    const cancelled = fake(() => positive, { audit: request => { controller.abort(); return auditReply(request, ["0:0"]); } });
     await expect(createMeetingChat({ store, model: cancelled })({ ...input(id, expectedRevision), signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
   });
 
@@ -412,7 +478,7 @@ describe("grounded Meeting chat", () => {
     }, { audit: request => {
       expect(contents(request).data).not.toHaveProperty("priorUserQuestion");
       expect(JSON.stringify(request)).not.toContain(unrelated);
-      return { supported: true, sourceIds: ["0:0"] };
+      return auditReply(request, ["0:0"]);
     } });
     const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: independent,
       history: [{ question: unrelated, answer: "Unrelated previous answer ".repeat(100) }] });
