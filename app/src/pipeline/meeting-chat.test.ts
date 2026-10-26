@@ -123,6 +123,24 @@ describe("grounded Meeting chat", () => {
     expect(invalid.requests).toHaveLength(3);
   });
 
+  it("rejects unresolved follow-up pronouns and corrects them without a large grammar repetition bound", async () => {
+    const { store, id, expectedRevision } = setup();
+    let rewrites = 0;
+    const model = fake(() => positive, { resolve: () => ({ question: ++rewrites === 1 ? "When will it be finished?" : "When will You finish the permission guide?" }) });
+    const history = [{ question, answer: "You will write the guide." }];
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "When will they finish it?", history });
+    expect(rewrites).toBe(2);
+    expect(contents(model.requests[1]!).instruction).toContain("Name the task or person from priorUserQuestion explicitly");
+    const schema = model.requests[0]!.schema as { properties: { question: object } };
+    expect(schema.properties.question).not.toHaveProperty("maxLength");
+    expect(result.answer.refs).toEqual([0]);
+    for (const rewritten of ["When will they finish it?", "When will it be finished?", "x".repeat(2001)]) {
+      const invalid = fake(() => positive, { resolve: () => ({ question: rewritten }) });
+      await expect(createMeetingChat({ store, model: invalid })({ ...input(id, expectedRevision), question: "When will they finish it?", history })).rejects.toThrow("standalone question failed validation after three attempts");
+      expect(invalid.requests).toHaveLength(3);
+    }
+  });
+
   it("never supplies a generated Summary as factual evidence and allows a failed Summary's Transcript", async () => {
     const { store, id, expectedRevision } = setup();
     store.saveSummary(id, { tldr: "PRIVATE WRONG SUMMARY OWNER", participants: [{ speaker: "You", said: ["A made-up deadline"] }] });
