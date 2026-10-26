@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppCore } from "./app-core.js";
 import { openStore, type Store } from "../store/store.js";
@@ -37,6 +40,48 @@ function context(summarise: PipelineStages["summarise"]) {
 const replacement: Summary = { tldr: "A replacement Summary.", participants: [{ speaker: "You", said: ["A replacement point."] }] };
 
 describe("AI lifecycle through AppCore", () => {
+  it.each(["cancel", "shutdown"] as const)("retains queued Recording audio for retry after %s", async action => {
+    const heldSummary = deferred<Summary>();
+    let summaryCalls = 0;
+    const ctx = context(async () => ++summaryCalls === 1 ? heldSummary.promise : fixtureSummary);
+    const occupiedId = ctx.saved();
+    const occupied = ctx.core.regenerateSummary(occupiedId);
+    const audioDirectory = mkdtempSync(join(tmpdir(), "queued-recording-test-"));
+    const tracks = { micPath: join(audioDirectory, "mic.wav"), systemPath: join(audioDirectory, "system.wav") };
+    // FakePipeline checks lifecycle and file retention; native audio decoding has its own engine tests.
+    writeFileSync(tracks.micPath, "synthetic"); writeFileSync(tracks.systemPath, "synthetic");
+    let restarted: AppCore | undefined;
+    try {
+      await turn();
+      ctx.engine.emit({ type: "recording_started", app: "Recorded Meeting", startedAt: "2026-10-27T10:01:00Z" });
+      ctx.engine.emit({ type: "tracks_ready", ...tracks, micStartHostTime: 1000, systemStartHostTime: 1000 });
+      const recordedId = ctx.core.listMeetings().find(meeting => meeting.app === "Recorded Meeting")!.id;
+      const queued = ctx.jobs.snapshot.find(job => job.owner === `meeting:${recordedId}`)!;
+      expect(queued.status).toBe("queued");
+      expect(ctx.core.getMeeting(recordedId)?.audio).toEqual(tracks);
+      const stopping = action === "shutdown" ? ctx.core.stop() : undefined;
+      if (action === "cancel") ctx.jobs.cancel(queued.id);
+      await turn();
+      expect(ctx.core.getMeeting(recordedId)).toMatchObject({ state: "failed", audio: tracks });
+      heldSummary.resolve(fixtureSummary); await occupied;
+      if (stopping) await stopping;
+      else await ctx.jobs.idle();
+      // A fresh app owns a fresh queue after shutdown; the saved track paths remain retryable.
+      const retryCore = action === "shutdown"
+        ? (restarted = new AppCore({ store: ctx.store, engine: new FakeEngine(), pipeline: fakePipeline() }))
+        : ctx.core;
+      if (restarted) restarted.start();
+      await retryCore.retryTranscription(recordedId);
+      expect(retryCore.getMeeting(recordedId)).toMatchObject({ state: "done", transcript: fixtureTranscript, audio: null });
+    } finally {
+      heldSummary.resolve(fixtureSummary);
+      await occupied;
+      await restarted?.stop();
+      await ctx.core.stop();
+      rmSync(audioDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("serializes regeneration across Meetings while exposing the queued work", async () => {
     const first = deferred<Summary>();
     let calls = 0;
