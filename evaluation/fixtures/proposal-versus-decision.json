@@ -1,0 +1,116 @@
+{
+  "id": "proposal-versus-decision",
+  "split": "tuning",
+  "synthetic": true,
+  "transcript": {
+    "segments": [
+      {
+        "start": 0,
+        "end": 8,
+        "speaker": "Speaker 1",
+        "text": "I suggest sending an email digest every morning. This is only an idea; we have not approved it."
+      },
+      {
+        "start": 10,
+        "end": 18,
+        "speaker": "You",
+        "text": "I oppose adding email now because the app must work locally. Let us decide only the export format today."
+      },
+      {
+        "start": 20,
+        "end": 28,
+        "speaker": "Speaker 1",
+        "text": "For export I propose Markdown, rather than PDF."
+      },
+      {
+        "start": 30,
+        "end": 38,
+        "speaker": "You",
+        "text": "Markdown is agreed for this release. We will revisit email later, without making a commitment."
+      },
+      {
+        "start": 40,
+        "end": 48,
+        "speaker": "Speaker 1",
+        "text": "Yes, Markdown is our decision. Nobody is assigned to implement export yet."
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "email-proposal",
+      "text": "Email digests were proposed but were not approved.",
+      "speaker": "Speaker 1",
+      "refs": [
+        0
+      ],
+      "critical": true
+    },
+    {
+      "id": "local-objection",
+      "text": "You opposed adding email now because the app must work locally.",
+      "speaker": "You",
+      "refs": [
+        1
+      ],
+      "critical": false
+    },
+    {
+      "id": "markdown",
+      "text": "Markdown export was agreed for this release.",
+      "speaker": "You",
+      "refs": [
+        3
+      ],
+      "critical": true
+    },
+    {
+      "id": "unassigned",
+      "text": "Export implementation has no assigned owner.",
+      "speaker": "Speaker 1",
+      "refs": [
+        4
+      ],
+      "critical": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "email",
+      "question": "Did we agree to send email digests?",
+      "answer": "No. Email was proposed and deferred without a commitment.",
+      "refs": [
+        0,
+        3
+      ],
+      "critical": true
+    },
+    {
+      "id": "format",
+      "question": "Which export format did we agree on?",
+      "answer": "Markdown",
+      "refs": [
+        3,
+        4
+      ],
+      "critical": true
+    },
+    {
+      "id": "implementer",
+      "question": "Who will implement it?",
+      "answer": null,
+      "refs": [
+        4
+      ],
+      "critical": true,
+      "followUpTo": "format"
+    },
+    {
+      "id": "budget",
+      "question": "What is the email service budget?",
+      "answer": null,
+      "refs": [],
+      "critical": false
+    }
+  ]
+}

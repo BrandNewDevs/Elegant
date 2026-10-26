@@ -1,0 +1,126 @@
+{
+  "id": "disagreement",
+  "split": "tuning",
+  "synthetic": true,
+  "transcript": {
+    "segments": [
+      {
+        "start": 0,
+        "end": 8,
+        "speaker": "Speaker 1",
+        "text": "I prefer keeping audio by default so people can check transcription errors."
+      },
+      {
+        "start": 10,
+        "end": 18,
+        "speaker": "Speaker 2",
+        "text": "I disagree. Audio should be deleted after transcription to reduce retained sensitive data."
+      },
+      {
+        "start": 20,
+        "end": 28,
+        "speaker": "You",
+        "text": "Both arguments are on the table. We will not settle the default today."
+      },
+      {
+        "start": 30,
+        "end": 38,
+        "speaker": "Speaker 1",
+        "text": "I still prefer keeping audio. I do not agree to deletion by default."
+      },
+      {
+        "start": 40,
+        "end": 48,
+        "speaker": "Speaker 2",
+        "text": "I still prefer deletion. I will prepare a list of the privacy tradeoffs by Tuesday."
+      },
+      {
+        "start": 50,
+        "end": 58,
+        "speaker": "You",
+        "text": "The only agreement is to review that list next time. There is no agreed audio retention default."
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "keep-position",
+      "text": "Speaker 1 prefers keeping audio by default.",
+      "speaker": "Speaker 1",
+      "refs": [
+        0,
+        3
+      ],
+      "critical": false
+    },
+    {
+      "id": "delete-position",
+      "text": "Speaker 2 prefers deleting audio after transcription.",
+      "speaker": "Speaker 2",
+      "refs": [
+        1,
+        4
+      ],
+      "critical": false
+    },
+    {
+      "id": "unresolved",
+      "text": "No audio retention default was agreed.",
+      "speaker": "You",
+      "refs": [
+        5
+      ],
+      "critical": true
+    },
+    {
+      "id": "tradeoffs",
+      "text": "Speaker 2 will prepare privacy tradeoffs by Tuesday.",
+      "speaker": "Speaker 2",
+      "refs": [
+        4
+      ],
+      "critical": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "default",
+      "question": "What audio retention default did we agree on?",
+      "answer": null,
+      "refs": [
+        2,
+        5
+      ],
+      "critical": true
+    },
+    {
+      "id": "keep",
+      "question": "Who wanted to retain audio?",
+      "answer": "Speaker 1",
+      "refs": [
+        0,
+        3
+      ],
+      "critical": true
+    },
+    {
+      "id": "list",
+      "question": "Who will prepare the privacy tradeoffs?",
+      "answer": "Speaker 2",
+      "refs": [
+        4
+      ],
+      "critical": true
+    },
+    {
+      "id": "list-deadline",
+      "question": "When is that due?",
+      "answer": "Tuesday",
+      "refs": [
+        4
+      ],
+      "critical": true,
+      "followUpTo": "list"
+    }
+  ]
+}
