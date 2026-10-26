@@ -56,6 +56,22 @@ function parseAnswer(json: string, sources: SourceFragment[]): ModelAnswer {
 }
 
 
+function calendarDateAnswerIsTyped(question: string, text: string): boolean {
+  if (!/\bcalendar\s+date\b/i.test(question)) return true;
+  // Explicit missing-date answers still need the normal evidence audit; this guard never creates an absence answer.
+  const missing = /\bno\s+(?:(?:exact|specific|actual|calendar)\s+)*date\b|\b(?:date|calendar date)\b.{0,60}\b(?:unknown|unspecified|unconfirmed|undecided|unset|not (?:been )?(?:set|chosen|specified|given|agreed|established|mentioned|recorded))\b|\b(?:not|never|haven't|hasn't|didn't|wasn't)\s+(?:been\s+)?(?:set|chosen|choose|specified|specify|given|give|agreed|established|mentioned|recorded)\b.{0,60}\b(?:(?:exact|specific|actual|calendar)\s+)*date\b/i;
+  if (missing.test(text)) return true;
+  if (/\b\d{4}-(?:0?[1-9]|1[0-2])-(?:0?[1-9]|[12]\d|3[01])\b/.test(text)) return true;
+  const month = "(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)";
+  const day = "(?:0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?";
+  if (new RegExp(`\\b(?:${month}\\.?\\s+${day}|${day}\\s+${month}\\.?)\\b`, "i").test(text)) return true;
+  for (const match of text.matchAll(/\b(\d{1,2})[/.](\d{1,2})[/.](?:\d{4}|\d{2})\b/g)) {
+    const first = Number(match[1]), second = Number(match[2]);
+    if (first >= 1 && second >= 1 && ((first <= 12 && second <= 31) || (first <= 31 && second <= 12))) return true;
+  }
+  return false;
+}
+
 /** Do not let a short quote remove a sentence's negation, conditional or quoted/test qualifier. */
 function quoteKeepsSentenceContext(source: string, quote: string): boolean {
   const sentences = [...new Intl.Segmenter("en", { granularity: "sentence" }).segment(source)];
@@ -264,6 +280,9 @@ export function createMeetingChat({ store, model, modelName = AI_SETTINGS.model,
         try {
           const candidate = parseAnswer(response.text, context.sources);
           if (candidate.sufficient) {
+            if (!calendarDateAnswerIsTyped(input.question, candidate.text) || !calendarDateAnswerIsTyped(resolvedQuestion, candidate.text)) {
+              throw new InvalidChatAnswer("A weekday alone is not the requested calendar date. Give the stated day/month date, or say no calendar date was given when sources explicitly establish that");
+            }
             return { ...candidate, sourceIds: await audit(context, candidate) };
           }
           return candidate;

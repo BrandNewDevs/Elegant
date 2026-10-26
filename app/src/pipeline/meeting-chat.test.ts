@@ -355,6 +355,36 @@ describe("grounded Meeting chat", () => {
     expect(contents(model.requests[2]!).instruction).toContain("complete source sentence with its qualifiers and negation");
   });
 
+  it("never accepts a weekday as the requested calendar date and can correct to an explicitly supported missing date", async () => {
+    const source: Transcript = { segments: [
+      { start: 0, end: 5, speaker: "You", text: "Friday is the agreed launch day." },
+      { start: 5, end: 10, speaker: "Speaker 1", text: "We did not set a calendar date for Friday." },
+    ] };
+    const { store, id, expectedRevision } = setup(source);
+    let answers = 0;
+    const model = fake(() => ({ text: ++answers === 1 ? "Friday" : "We did not set a calendar date for Friday.", sourceIds: ["1:0"], sufficient: true }),
+      { audit: request => auditReply(request, ["1:0"]) });
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "What calendar date is the launch?" });
+    expect(result.answer).toEqual({ text: source.segments[1]!.text, refs: [1], sufficient: true });
+    expect(result.generation.calls).toBe(3);
+    expect(contents(model.requests[1]!).instruction).toContain("A weekday alone is not the requested calendar date");
+    const invalid = fake(() => ({ text: "Friday", sourceIds: ["0:0"], sufficient: true }));
+    await expect(createMeetingChat({ store, model: invalid })({ ...input(id, expectedRevision), question: "What calendar date is the launch?" })).rejects.toThrow("three attempts");
+    expect(invalid.requests).toHaveLength(3);
+    expect(invalid.requests.every(isAnswer)).toBe(true);
+    const weekday = fake(() => ({ text: "Friday", sourceIds: ["0:0"], sufficient: true }));
+    expect((await createMeetingChat({ store, model: weekday })({ ...input(id, expectedRevision), question: "Which weekday is the launch?" })).answer.text).toBe("Friday");
+  });
+
+  it.each(["30 October 2026", "October 30, 2026", "2026-10-30", "30/10/2026"])("accepts a sourced calendar date in English or numeric notation: %s", async date => {
+    const source: Transcript = { segments: [{ start: 0, end: 5, speaker: "You", text: `The launch date is ${date}.` }] };
+    const { store, id, expectedRevision } = setup(source);
+    const model = fake(() => ({ text: date, sourceIds: ["0:0"], sufficient: true }));
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "What calendar date is the launch?" });
+    expect(result.answer).toEqual({ text: date, refs: [0], sufficient: true });
+    expect(result.generation.calls).toBe(2);
+  });
+
   it("keeps unsupported answers failed after three generation-and-audit attempts", async () => {
     const { store, id, expectedRevision } = setup();
     const model = fake(() => positive, { audit: request => auditReply(request, [], false) });
