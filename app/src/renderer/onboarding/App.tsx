@@ -1,6 +1,7 @@
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowRight, AudioLines, AlertCircle, CheckCircle2, ExternalLink, Loader2, PartyPopper } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import type { SetupViewState } from "../../shared/setup-view-state";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PERMISSIONS, PROMPT_NOTE, type PermissionCopy } from "@/lib/permissions";
 import { useSetup } from "@/lib/use-setup";
@@ -60,6 +61,7 @@ function PermissionStage({ copy, name, view, onContinue }: { copy: PermissionCop
                 Check again
               </Button>
               <Button type="button" variant="link" onClick={() => act(copy.settingsAction)}>
+                <ExternalLink aria-hidden />
                 Open System Settings
               </Button>
             </>
@@ -67,6 +69,7 @@ function PermissionStage({ copy, name, view, onContinue }: { copy: PermissionCop
           {step.status === "done" && (
             <Button type="button" size="lg" onClick={onContinue}>
               Continue
+              <ArrowRight aria-hidden />
             </Button>
           )}
         </>
@@ -82,7 +85,10 @@ function PermissionStage({ copy, name, view, onContinue }: { copy: PermissionCop
       )}
       <div aria-live="polite">
         {step.status === "problem" && step.message && (
-          <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-left text-sm text-destructive">{step.message}</p>
+          <Alert variant="destructive" className="text-left">
+            <AlertCircle className="size-4" aria-hidden />
+            <AlertDescription>{step.message}</AlertDescription>
+          </Alert>
         )}
       </div>
     </StageFrame>
@@ -112,11 +118,12 @@ export function OnboardingApp() {
       </ol>
       {stage === "welcome" && (
         <StageFrame
-          icon={<span aria-hidden className="text-3xl">👋</span>}
+          icon={<AudioLines aria-hidden />}
           title={`Welcome to ${view.name}`}
           actions={
             <Button type="button" size="lg" onClick={() => next("welcome")}>
               Get started
+              <ArrowRight aria-hidden />
             </Button>
           }
         >
@@ -128,8 +135,8 @@ export function OnboardingApp() {
       {stage === "systemAudio" && <PermissionStage copy={PERMISSIONS.systemAudio} name={view.name} view={view} onContinue={() => next("systemAudio")} />}
       {stage === "ready" && (
         <StageFrame
-          icon={<CheckCircle2 aria-hidden />}
           title="You're all set"
+          icon={<PartyPopper aria-hidden />}
           actions={
             <>
               <Button type="button" size="lg" onClick={() => window.electron.setup.act("done")}>

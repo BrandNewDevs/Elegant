@@ -3,7 +3,7 @@ import type { Setup } from "../setup/setup.js";
 import { DISPLAY_NAME } from "../config.js";
 import type { SetupAction } from "../shared/setup-actions.js";
 import type { SetupViewState } from "../shared/setup-view-state.js";
-import { preloadPath, rendererPagePath, type RendererPage } from "./window-ui.js";
+import { preloadPath, rendererPagePath, windowBackground, type RendererPage } from "./window-ui.js";
 
 const SETTINGS_PANE = {
   "settings-microphone": "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
@@ -52,6 +52,7 @@ export class SetupWindow {
         width: this.options.width,
         height: this.options.height,
         title: `${DISPLAY_NAME}: ${this.options.title}`,
+        backgroundColor: windowBackground(),
         webPreferences: { preload: preloadPath(), contextIsolation: true, sandbox: true },
       });
       window.on("closed", () => {

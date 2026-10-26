@@ -3,7 +3,7 @@ import { writeFile } from "node:fs/promises";
 import type { AppCore } from "../core/app-core.js";
 import { DISPLAY_NAME } from "../config.js";
 import type { MeetingsViewState } from "../shared/meetings-view-state.js";
-import { preloadPath, rendererPagePath } from "./window-ui.js";
+import { preloadPath, rendererPagePath, windowBackground } from "./window-ui.js";
 
 type MeetingAction = { type: "regenerate" | "delete"; id: number };
 
@@ -71,6 +71,7 @@ export class MeetingsWindow {
         width: 900,
         height: 640,
         title: `${DISPLAY_NAME}: Meetings`,
+        backgroundColor: windowBackground(),
         webPreferences: { preload: preloadPath(), contextIsolation: true, sandbox: true },
       });
       window.on("closed", () => {

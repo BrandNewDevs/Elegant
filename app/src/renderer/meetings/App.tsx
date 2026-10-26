@@ -1,8 +1,12 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { AlertCircle, CheckCircle2, FileDown, FileText, Inbox, Loader2, MessagesSquare, Radio, RefreshCw, Search, Sparkles, Trash2, Users, type LucideIcon } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Meeting, MeetingListItem, MeetingState } from "../../store/store";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { formatClock, formatWhen } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -13,10 +17,39 @@ const STATE_LABEL: Record<MeetingState, string> = {
   failed: "Failed",
 };
 
-function stateBadgeVariant(state: MeetingState): "warning" | "destructive" | "secondary" {
-  if (state === "failed") return "destructive";
-  if (state === "recording" || state === "processing") return "warning";
-  return "secondary";
+const STATE_BADGE: Record<MeetingState, { variant: "warning" | "destructive" | "success"; icon: LucideIcon; spin?: boolean }> = {
+  recording: { variant: "warning", icon: Radio },
+  processing: { variant: "warning", icon: Loader2, spin: true },
+  done: { variant: "success", icon: CheckCircle2 },
+  failed: { variant: "destructive", icon: AlertCircle },
+};
+
+function StateBadge({ state }: { state: MeetingState }) {
+  const { variant, icon: Icon, spin } = STATE_BADGE[state];
+  return (
+    <Badge variant={variant}>
+      <Icon className={cn("size-3", spin && "animate-spin")} aria-hidden />
+      {STATE_LABEL[state]}
+    </Badge>
+  );
+}
+
+function SectionHeading({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
+  return (
+    <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <Icon className="size-3.5" aria-hidden />
+      {children}
+    </h2>
+  );
+}
+
+function Banner({ variant, icon: Icon, children }: { variant: "warning" | "destructive"; icon: LucideIcon; children: ReactNode }) {
+  return (
+    <Alert variant={variant}>
+      <Icon className="size-4" aria-hidden />
+      <AlertDescription>{children}</AlertDescription>
+    </Alert>
+  );
 }
 
 function MeetingListRow({ meeting, selected }: { meeting: MeetingListItem; selected: boolean }) {
@@ -25,14 +58,15 @@ function MeetingListRow({ meeting, selected }: { meeting: MeetingListItem; selec
       type="button"
       onClick={() => window.electron.meetings.select(meeting.id)}
       className={cn(
-        "w-full border-b px-3 py-2.5 text-left transition-colors hover:bg-accent/60",
+        "w-full border-b px-3 py-2.5 text-left transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
         selected && "bg-accent",
       )}
+      aria-current={selected ? "true" : undefined}
     >
       <span className="block font-semibold">{meeting.app}</span>
-      <span className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+      <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <span>{formatWhen(meeting.startedAt)}</span>
-        <Badge variant={stateBadgeVariant(meeting.state)}>{STATE_LABEL[meeting.state]}</Badge>
+        <StateBadge state={meeting.state} />
       </span>
     </button>
   );
@@ -44,38 +78,45 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-3 border-b pb-5">
+      <header className="space-y-3 pb-1">
         <h1 className="text-xl font-semibold tracking-tight">{meeting.app}</h1>
         <p className="text-sm text-muted-foreground">{formatWhen(meeting.startedAt)}</p>
         {!busy && (
           <div className="flex flex-wrap gap-2">
             {canRegenerate && (
               <Button type="button" variant="secondary" size="sm" onClick={() => void window.electron.meetings.regenerate(meeting.id)}>
+                <RefreshCw aria-hidden />
                 Regenerate Summary
               </Button>
             )}
+            <Button type="button" variant="outline" size="sm" onClick={() => window.electron.meetings.export(meeting.id)}>
+              <FileDown aria-hidden />
+              Export to Markdown…
+            </Button>
             <Button type="button" variant="destructive" size="sm" onClick={() => void window.electron.meetings.delete(meeting.id)}>
+              <Trash2 aria-hidden />
               Delete Meeting
             </Button>
           </div>
         )}
-        <Button type="button" variant="link" className="h-auto p-0" onClick={() => window.electron.meetings.export(meeting.id)}>
-          Export to Markdown…
-        </Button>
       </header>
 
+      <Separator />
+
       {meeting.state === "recording" && (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">This Meeting is being recorded.</p>
+        <Banner variant="warning" icon={Radio}>
+          This Meeting is being recorded.
+        </Banner>
       )}
       {meeting.state === "processing" && (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <Banner variant="warning" icon={Loader2}>
           Transcribing and summarising this Meeting…
-        </p>
+        </Banner>
       )}
       {meeting.state === "failed" && (
-        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <Banner variant="destructive" icon={AlertCircle}>
           Processing failed: {meeting.error ?? "unknown error"}
-        </p>
+        </Banner>
       )}
       {meeting.state === "done" && meeting.transcript.segments.length === 0 && (
         <p className="text-sm text-muted-foreground">No speech was detected in this Recording.</p>
@@ -83,7 +124,7 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
 
       {meeting.participants.length > 0 && (
         <section>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Participants</h2>
+          <SectionHeading icon={Users}>Participants</SectionHeading>
           <div className="space-y-2">
             {meeting.participants.map((p) => (
               <form
@@ -107,7 +148,7 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
 
       {meeting.summary && (
         <section>
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Summary</h2>
+          <SectionHeading icon={Sparkles}>Summary</SectionHeading>
           <p className="text-sm leading-relaxed">{meeting.summary.tldr}</p>
           {meeting.summary.participants.map((p) => (
             <div key={p.speaker} className="mt-4">
@@ -124,7 +165,7 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
 
       {meeting.transcript.segments.length > 0 && (
         <section>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Transcript</h2>
+          <SectionHeading icon={FileText}>Transcript</SectionHeading>
           <div className="space-y-2">
             {meeting.transcript.segments.map((s, i) => (
               <p key={i} className="border-l-2 border-border pl-3 text-sm leading-relaxed">
@@ -160,30 +201,43 @@ export function MeetingsApp() {
   };
 
   return (
-    <div className="flex h-screen min-h-0">
-      <aside className="flex w-72 shrink-0 flex-col border-r bg-muted/40">
-        <form className="border-b p-3" onSubmit={onSearch}>
+    <div className="flex h-screen min-h-0 overflow-hidden">
+      <aside className="flex w-72 shrink-0 flex-col border-r bg-muted/40" aria-label="Meetings">
+        <form className="relative border-b p-3" onSubmit={onSearch} role="search">
+          <Search className="pointer-events-none absolute left-6 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <Input
             type="search"
+            aria-label="Search meetings"
+            className="pl-8"
             placeholder="Search meetings"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onBlur={() => window.electron.meetings.search(query)}
           />
         </form>
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <ScrollArea className="min-h-0 flex-1">
           {meetings.length === 0 ? (
-            <p className="p-4 text-center text-sm text-muted-foreground">
-              {query.trim() ? "No Meetings match." : "No Meetings yet."}
-            </p>
+            <div className="flex flex-col items-center gap-2 p-8 text-center text-sm text-muted-foreground">
+              <Inbox className="size-6" aria-hidden />
+              <p>{query.trim() ? "No Meetings match." : "No Meetings yet."}</p>
+            </div>
           ) : (
             meetings.map((m) => <MeetingListRow key={m.id} meeting={m} selected={selected?.id === m.id} />)
           )}
-        </div>
+        </ScrollArea>
       </aside>
-      <main className="min-h-0 flex-1 overflow-y-auto p-6">
-        {selected ? <MeetingDetail meeting={selected} /> : <p className="text-center text-muted-foreground">Select a Meeting.</p>}
-      </main>
+      <ScrollArea className="min-h-0 flex-1">
+        <main className="p-6">
+          {selected ? (
+            <MeetingDetail meeting={selected} />
+          ) : (
+            <div className="flex flex-col items-center gap-2 pt-24 text-muted-foreground">
+              <MessagesSquare className="size-8" aria-hidden />
+              <p>Select a Meeting.</p>
+            </div>
+          )}
+        </main>
+      </ScrollArea>
     </div>
   );
 }

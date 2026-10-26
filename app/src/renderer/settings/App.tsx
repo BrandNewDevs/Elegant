@@ -1,4 +1,6 @@
+import { AlertCircle, CheckCircle2, Cpu, Download, ExternalLink, Loader2, RefreshCw, Settings, ShieldCheck, Sparkles, XCircle, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,12 +10,38 @@ import { PERMISSIONS, type PermissionCopy, type PermissionStep } from "@/lib/per
 import { useSetup } from "@/lib/use-setup";
 import type { Step } from "../../setup/setup";
 
+const STATUS_ICON: Partial<Record<NonNullable<BadgeProps["variant"]>, LucideIcon>> = {
+  success: CheckCircle2,
+  warning: Loader2,
+  destructive: XCircle,
+};
+
 function Status({ label, variant }: { label: string; variant: BadgeProps["variant"] }) {
-  return <Badge variant={variant}>{label}</Badge>;
+  const Icon = variant ? STATUS_ICON[variant] : undefined;
+  return (
+    <Badge variant={variant}>
+      {Icon && <Icon className={variant === "warning" ? "size-3 animate-spin" : "size-3"} aria-hidden />}
+      {label}
+    </Badge>
+  );
 }
 
 function Problem({ children }: { children: ReactNode }) {
-  return <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{children}</p>;
+  return (
+    <Alert variant="destructive" className="mt-2">
+      <AlertCircle className="size-4" aria-hidden />
+      <AlertDescription>{children}</AlertDescription>
+    </Alert>
+  );
+}
+
+function CardHeading({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
+  return (
+    <CardTitle className="flex items-center gap-2 text-base">
+      <Icon className="size-4 text-muted-foreground" aria-hidden />
+      {children}
+    </CardTitle>
+  );
 }
 
 function PermissionRow({ copy, step, name }: { copy: PermissionCopy; step: PermissionStep; name: string }) {
@@ -33,6 +61,7 @@ function PermissionRow({ copy, step, name }: { copy: PermissionCopy; step: Permi
           <div className="flex items-center gap-2">
             <Status label="Not allowed" variant="destructive" />
             <Button type="button" size="sm" onClick={() => act(copy.action)}>
+              {step.status === "problem" && <RefreshCw aria-hidden />}
               {step.status === "problem" ? "Check again" : "Allow"}
             </Button>
           </div>
@@ -42,6 +71,7 @@ function PermissionRow({ copy, step, name }: { copy: PermissionCopy; step: Permi
         <>
           {step.message && <Problem>{step.message}</Problem>}
           <Button type="button" variant="link" size="sm" className="mt-1 h-auto p-0" onClick={() => act(copy.settingsAction)}>
+            <ExternalLink aria-hidden />
             Open System Settings
           </Button>
         </>
@@ -56,7 +86,7 @@ function ModelsCard({ models, name }: { models: Step & { fraction: number }; nam
     <Card>
       <CardHeader className="flex-row items-start justify-between space-y-0 pb-3">
         <div className="space-y-1.5">
-          <CardTitle className="text-base">Speech and speaker models</CardTitle>
+          <CardHeading icon={Cpu}>Speech and speaker models</CardHeading>
           <CardDescription>
             {name} turns speech into text and tells speakers apart on your Mac, with no cloud service. The models need a one-time download.
           </CardDescription>
@@ -76,6 +106,7 @@ function ModelsCard({ models, name }: { models: Step & { fraction: number }; nam
         {models.status === "problem" && models.message && <Problem>{models.message}</Problem>}
         {(models.status === "todo" || models.status === "problem") && (
           <Button type="button" onClick={() => window.electron.setup.act("models")}>
+            {models.status === "problem" ? <RefreshCw aria-hidden /> : <Download aria-hidden />}
             {models.status === "problem" ? "Try again" : "Download models"}
           </Button>
         )}
@@ -89,7 +120,7 @@ function SummariesCard({ ollama }: { ollama: Step }) {
     <Card>
       <CardHeader className="flex-row items-start justify-between space-y-0 pb-3">
         <div className="space-y-1.5">
-          <CardTitle className="text-base">Summaries</CardTitle>
+          <CardHeading icon={Sparkles}>Summaries</CardHeading>
           <CardDescription>
             Summaries are written by a model running in Ollama on your Mac. Ollama must be running with the model pulled. You can record without it and
             summarise later.
@@ -103,6 +134,7 @@ function SummariesCard({ ollama }: { ollama: Step }) {
         {ollama.status === "problem" && ollama.message && <Problem>{ollama.message}</Problem>}
         {ollama.status !== "working" && (
           <Button type="button" variant={ollama.status === "done" ? "outline" : "default"} onClick={() => window.electron.setup.act("ollama")}>
+            <RefreshCw aria-hidden />
             {ollama.status === "todo" ? "Check Ollama" : "Check again"}
           </Button>
         )}
@@ -118,10 +150,13 @@ export function SettingsApp() {
 
   return (
     <main className="mx-auto max-w-xl space-y-5 p-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+      <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight">
+        <Settings className="size-6 text-muted-foreground" aria-hidden />
+        Settings
+      </h1>
       <Card>
         <CardHeader className="pb-1">
-          <CardTitle className="text-base">Permissions</CardTitle>
+          <CardHeading icon={ShieldCheck}>Permissions</CardHeading>
           <CardDescription>macOS remembers your answer, so each permission is asked for once.</CardDescription>
         </CardHeader>
         <CardContent>
