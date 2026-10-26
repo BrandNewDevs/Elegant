@@ -24,6 +24,7 @@ export class PipelineRunner {
     // Remembered until the audio is deleted, so a failure can be retried without re-recording.
     this.sink.saveAudio(meetingId, tracks);
     try {
+      this.stage(context, "transcribing");
       const transcript = await this.stages.transcribe(tracks, context);
       context.signal?.throwIfAborted();
       this.sink.saveTranscript(meetingId, transcript);
@@ -50,10 +51,15 @@ export class PipelineRunner {
   }
 
   private async summarise(meetingId: number, transcript: Transcript, context: PipelineContext): Promise<void> {
+    this.stage(context, "summarising");
     const summary = await this.stages.summarise(transcript, context);
     context.signal?.throwIfAborted();
     this.sink.saveSummary(meetingId, summary);
     this.sink.setMeetingState(meetingId, "done");
+  }
+
+  private stage(context: PipelineContext, stage: "transcribing" | "summarising"): void {
+    try { context.onStage?.(stage); } catch { /* A progress observer cannot prevent persistence. */ }
   }
 
   private fail(meetingId: number, err: unknown): void {

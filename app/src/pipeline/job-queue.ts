@@ -65,6 +65,15 @@ export class AIJobQueue {
     return result;
   }
 
+  /** Progress can change a native pipeline job into Summary work once its Transcript is saved. */
+  updateKind(id: string, kind: string): boolean {
+    if (typeof kind !== "string" || !kind.trim()) throw new Error("An AI job needs a kind");
+    const entry = this.active?.job.id === id ? this.active : this.waiting.find(waiting => waiting.job.id === id);
+    if (!entry) return false;
+    if (entry.job.kind !== kind) { entry.job.kind = kind; this.notify(); }
+    return true;
+  }
+
   cancel(id: string): boolean {
     if (this.active?.job.id === id) {
       if (this.active.controller.signal.aborted) return true;

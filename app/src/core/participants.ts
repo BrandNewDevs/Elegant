@@ -29,3 +29,37 @@ function mentionsOf(participants: Participant[]): RegExp {
   const labels = participants.map((p) => p.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).sort((a, b) => b.length - a.length);
   return new RegExp(`(?<![\\w])(?:${labels.join("|")})(?![\\w])`, "g");
 }
+
+
+/** Display generated text using current names; stored labels and source references stay stable. */
+export function displayParticipantMentions(text: string, participants: Participant[]): string {
+  if (!participants.length) return text;
+  const names = new Map(participants.filter(participant => participant.name).map(participant => [participant.label, participant.name!]));
+  return text.replace(mentionsOf(participants), label => names.get(label) ?? label);
+}
+
+/** Resolve unambiguous display names at submission, then persist canonical labels for later renames. */
+export function canonicaliseParticipantMentions(text: string, participants: Participant[]): string {
+  const aliases = new Map<string, { name: string; labels: Set<string> }>();
+  const labels = new Map(participants.map(participant => [participant.label.toLowerCase(), participant.label]));
+  for (const participant of participants) {
+    if (!participant.name) continue;
+    const key = participant.name.toLowerCase();
+    const entry = aliases.get(key) ?? { name: participant.name, labels: new Set<string>() };
+    entry.labels.add(participant.label);
+    aliases.set(key, entry);
+  }
+  if (!aliases.size) return text;
+  const escaped = [...aliases.values()].map(alias => alias.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .sort((a, b) => b.length - a.length);
+  const expression = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${escaped.join("|")})(?![\\p{L}\\p{N}_])`, "giu");
+  return text.replace(expression, name => {
+    const entry = aliases.get(name.toLowerCase())!;
+    const canonical = [...entry.labels][0]!;
+    const collidingLabel = labels.get(name.toLowerCase());
+    if (entry.labels.size !== 1 || (collidingLabel && collidingLabel !== canonical)) {
+      throw new Error(`The Participant name "${entry.name}" is ambiguous. Give Participants distinct names before asking about them.`);
+    }
+    return canonical;
+  });
+}
