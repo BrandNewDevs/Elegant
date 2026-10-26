@@ -39,9 +39,11 @@ Fixture `refs` are zero-based segment ordinals, not database IDs. Answers and ex
 
 Copy `private-manifest.example.json` outside the repository and fill in paths only after creating the examples. Its four examples are pending, not recorded or evaluated. `path` must point to a private fixture JSON with the same shape above and `synthetic: false`; it does not point directly to audio. Keep both that fixture and the filled manifest outside Git.
 
-On the Mac, record approximately 5-, 10-, 20- and 60-minute Meetings with people who agree to be recorded. Run each through the actual app, then export its ordered Transcript segments to the fixture's Transcript JSON shape. The current Markdown export is not a JSON fixture; copy the structured Transcript through local tooling rather than treating Markdown as machine-readable fixture input. Do not upload it to a cloud tool. The real audio-to-Transcript end-to-end checks remain pending until run on the Mac.
+On the Mac, record approximately 5-, 10-, 20- and 60-minute Meetings with people who agree to be recorded. Run each through the actual app, then use the read-only `evaluation/export_private.py` tool to export a draft fixture from the local database to a new file outside Git. See [the private export procedure](../docs/ai-testing.md) for commands. The current Markdown export is not a JSON fixture. Do not upload private material to a cloud tool. The real audio-to-Transcript end-to-end checks remain pending until run on the Mac.
 
 Use 5 and 20 minutes for tuning, and reserve 10 and 60 minutes for final evaluation. For every example, add expected points, critical decisions, supporting segment ordinals, answerable questions, absent-answer questions and contextual follow-ups. Hand-correct representative excerpts for recognition and speaker attribution scoring, and review all passages supporting critical decisions. Do not overwrite the original model Transcript with the corrected reference: retain both privately so errors can be measured.
+
+Exported drafts have `expectationsPrepared: false`. The runner refuses them before any model call. Fill and review their expected points and questions, then set it to `true` and add the private path to your external manifest. Exporting a Transcript does not create a reviewed test set.
 
 Commit only synthetic fixtures, tooling and reports that contain no private content. Do not commit filled manifests with private paths, Recordings, real people's Transcripts, or generated answers derived from them.
 
