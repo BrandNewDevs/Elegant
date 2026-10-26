@@ -152,7 +152,7 @@ class Sampler:
 
 
 def stop_group(process: subprocess.Popen, grace: float = 1.0) -> None:
-    """Stop only the new process group owned by this wrapper, including orphaned descendants."""
+    """Stop only the new process group owned by this wrapper, including orphaned descendants that remain in that group."""
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
@@ -235,6 +235,7 @@ def measure(command: list[str], *, interval: float = 0.5, label: str | None = No
             "scope": ["RSS sums can double count shared pages; they are not unique physical memory or a total device peak.",
                       "Existing model servers are outside the command process tree; optional Ollama measurements are separate and may overlap it.",
                       "System swap and GPU usage include other applications. Sampling can miss short-lived peaks.",
+                      "Process-group cleanup cannot control a command that deliberately detaches into a new session.",
                       "The run label is operator supplied; the wrapper does not unload models or establish a cold/warm state.",
                       "Command output and arguments are not captured. These observations do not establish quality or M4 acceptance."],
             "warnings": sorted(sampler.warnings), "samples": samples}
