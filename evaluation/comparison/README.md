@@ -29,10 +29,31 @@ An implementation spot check found that the Gemma 3 warm baseline TL;DR suggests
 
 `gemma4-current-before-final-summary.json` is an exploratory production-v1 tuning observation: its per-Participant list omits Speaker 1's review commitment and uncertainty, while repeating You's points. It is retained as a failure observation. A quick response or valid JSON is not a quality pass.
 
+## Production short Summary comparison
+
+The same `straightforward` fixture and production-v2 Summary prompt were used for both models, with 8,192 context tokens, 2,048 maximum output tokens, a 5,500-byte complete-request bound and temperature zero. Cold/warm model residency was controlled as above; background applications and OS caches were not controlled.
+
+| Model | Cold | Warm | Calls per run | Sampled Ollama RSS peak, cold / warm |
+| --- | ---: | ---: | ---: | ---: |
+| Gemma 3 | 57.72 s | 48.36 s | 4 | 3.45 / 3.44 GiB |
+| Gemma 4 e2b | 23.56 s | 16.23 s | 2 | 3.29 / 2.96 GiB |
+
+The Gemma 3 runs preserved all four predefined critical points in the Participant list. Their optional refinement exhausted validation attempts and retained the valid initial draft; the extra calls are a latency cost. This spot check does not establish the full 90% gate. The candidate's cold output again omitted Speaker 1's points. Its warm output included both Participants, but the TL;DR cites refs 1/2/3 while mentioning the Thursday commitment established in ref 0. Faster output therefore does not pass the same quality requirements.
+
+Resource JSON files retain sampled peaks, initial/peak/last swap, warnings and sample counts. Full time-series samples were omitted from the committed reports. RSS may count shared pages; GPU observations include the desktop and other processes, and swap includes earlier workload. Do not add these columns into a device-memory total.
+
+## Long Summary deadline failure
+
+`gemma3-long-default-deadline.json` records a failed production-v2 run of the synthetic long fixture: 900.0 seconds and 50 calls, with no partial Summary published. The first 29 extraction calls consumed most of the time; later bounded comparisons were still progressing when the deadline expired. This is a compute/latency failure on the laptop, not proof of a passed long-Meeting quality gate.
+
+The associated resource report sampled 9.30 GiB peak Ollama process-tree RSS and 3,080 MiB NVIDIA usage. System swap began at 2.33 GiB, peaked near the full 4 GiB swap allocation and ended at 1.94 GiB. These observations include shared mappings and other applications; they are not unique physical-memory totals or M4 measurements. An extended evaluation deadline is used separately to inspect whether the algorithm completes and preserves the final decisions. It does not change the shipped 15-minute deadline or relax the M4 gate.
+
 ## Release status
 
 Keep Gemma 3 as the default. One short comparison does not establish candidate superiority, and neither model has passed the agreed target-M4 gates here.
 
 Automated seam tests cover request bounds, validation, source identity, queue cancellation, history isolation, restart interruption, replacement/deletion guards, IPC validation, renderer controls and citation navigation. Fake-model tests establish those behaviors; they do not establish generated factual correctness.
+
+At the final PR's initial code head, CI passed typechecking and production builds, 410 Node/renderer tests on Linux, 414 app/integration tests on macOS, 44 Swift tests and 33 Python tests. Later report-only changes still require the latest head's checks before merge.
 
 Independent human-reviewed 90% key-point coverage, every critical final decision, attribution and citation support remain pending. The four self-recorded Meetings are not available in this environment. No real 60-minute Recording, native offline flow, M4 latency, memory-pressure or retained Swift-model measurement is claimed. Use [the device checklist](../../docs/ai-testing.md), correct private references outside Git and retain failed outcomes until fixed and rerun.
