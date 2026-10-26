@@ -1,7 +1,7 @@
 import { BrowserWindow } from "electron";
 import type { AppCore } from "../core/app-core.js";
 import { DISPLAY_NAME } from "../config.js";
-import { meetingIdFromLink, renderMeetingsPage } from "./meetings-page.js";
+import { meetingIdFromLink, renameFromLink, renderMeetingsPage } from "./meetings-page.js";
 
 /** The Meetings window: a list on the left, the selected Meeting on the right. Redraws when Meetings change. */
 export class MeetingsWindow {
@@ -20,6 +20,15 @@ export class MeetingsWindow {
       // The page is plain HTML; clicking a Meeting navigates to its link, which we turn into a selection.
       window.webContents.on("will-navigate", (event, url) => {
         event.preventDefault();
+        const rename = renameFromLink(url);
+        if (rename) {
+          try {
+            this.core.renameParticipant(rename.meetingId, rename.label, rename.name);
+          } catch (err) {
+            console.error("[meetings] rename failed", err);
+          }
+          return; // the rename redraws the window through onMeetingsChanged
+        }
         const id = meetingIdFromLink(url);
         if (id === undefined) return;
         this.selectedId = id;
@@ -35,7 +44,7 @@ export class MeetingsWindow {
 
   private draw(): void {
     if (!this.window) return;
-    const selected = this.selectedId === undefined ? undefined : this.core.getMeeting(this.selectedId);
+    const selected = this.selectedId === undefined ? undefined : this.core.getMeetingForDisplay(this.selectedId);
     const html = renderMeetingsPage(this.core.listMeetings(), selected);
     void this.window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
   }

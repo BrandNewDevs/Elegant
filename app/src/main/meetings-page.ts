@@ -18,6 +18,18 @@ export function meetingIdFromLink(url: string): number | undefined {
   return match ? Number(match[1]) : undefined;
 }
 
+/** The page's rename form submits to this link; the window reads it back with `renameFromLink`. */
+const renameAction = (id: number): string => `rename:${id}`;
+
+export function renameFromLink(url: string): { meetingId: number; label: string; name: string } | undefined {
+  const match = /^rename:(\d+)\?(.*)$/.exec(url);
+  if (!match) return undefined;
+  const params = new URLSearchParams(match[2]);
+  const label = params.get("label");
+  const name = params.get("name");
+  return label === null || name === null ? undefined : { meetingId: Number(match[1]), label, name };
+}
+
 const clock = (seconds: number): string => {
   const s = Math.floor(seconds);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -65,7 +77,23 @@ function detail(m: Meeting): string {
         )
         .join("")}`
     : "";
-  return head + body + summary + transcript;
+  return head + body + participants(m) + summary + transcript;
+}
+
+/** One row per Participant to give them a name. The stored label stays; only what is shown changes. */
+function participants(m: Meeting): string {
+  if (!m.participants.length) return "";
+  const rows = m.participants
+    .map(
+      (p) => `<form class="participant" action="${renameAction(m.id)}" method="get">
+        <input type="hidden" name="label" value="${esc(p.label)}">
+        <label>${esc(p.label)}</label>
+        <input type="text" name="name" value="${esc(p.name ?? "")}" placeholder="Name">
+        <button type="submit">Rename</button>
+      </form>`,
+    )
+    .join("");
+  return `<h2>Participants</h2>${rows}`;
 }
 
 const STYLE = `
@@ -83,6 +111,8 @@ const STYLE = `
   .notice { padding: 8px 12px; border-radius: 6px; }
   .notice.failed { background: #ffe5e8; color: #c4001a; }
   .notice.recording, .notice.processing { background: #fff1d6; color: #7a4500; }
+  form.participant { margin: 4px 0; display: flex; gap: 8px; align-items: center; }
+  form.participant label { width: 90px; color: #6e6e73; }
   .segment { margin: 4px 0; }
   .time { color: #6e6e73; font-variant-numeric: tabular-nums; }
   .empty { color: #6e6e73; padding: 16px; }

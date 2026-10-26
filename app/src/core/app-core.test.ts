@@ -88,7 +88,7 @@ describe("a recorded meeting", () => {
     expect(meeting.state).toBe("done");
     expect(meeting.transcript.segments).toEqual(fixtureTranscript.segments);
     expect(meeting.summary).toEqual(fixtureSummary);
-    expect(meeting.participants.map((p) => p.label)).toEqual(["You", "Others"]);
+    expect(meeting.participants.map((p) => p.label)).toEqual(["You", "Speaker 1"]);
   });
 
   it("is done, with no Summary and no failure, when the Recording has no speech", async () => {

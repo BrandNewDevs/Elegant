@@ -10,7 +10,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "engine",
-            dependencies: [.product(name: "WhisperKit", package: "argmax-oss-swift")],
+            dependencies: [
+                .product(name: "WhisperKit", package: "argmax-oss-swift"),
+                .product(name: "SpeakerKit", package: "argmax-oss-swift"),
+            ],
             path: "Sources/engine"
         ),
         .testTarget(name: "engineTests", dependencies: ["engine"], path: "Tests/engineTests"),

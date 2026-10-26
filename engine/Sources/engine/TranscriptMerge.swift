@@ -20,16 +20,20 @@ struct TranscriptSegment: Codable, Equatable {
 }
 
 let micSpeaker = "You"
-let systemSpeaker = "Others"
 
 /// Above this a segment is a repetition loop, not speech (Whisper's own default threshold).
 let maxCompressionRatio = 2.4
 
 /// Labels each track's segments, drops what is not speech, and orders the result by start time.
+/// The mic track is You; the system track's voices are told apart by `turns` and labelled Speaker 1, Speaker 2 and so on.
 /// Overlapping segments are kept: people do talk over each other.
-func mergeTracks(mic: [RecognisedSegment], system: [RecognisedSegment]) -> [TranscriptSegment] {
-    let labelled = mic.compactMap { label($0, as: micSpeaker) } + system.compactMap { label($0, as: systemSpeaker) }
-    return labelled.sorted(by: inOrder)
+func mergeTracks(mic: [RecognisedSegment], system: [RecognisedSegment], turns: [SpeakerTurn] = []) -> [TranscriptSegment] {
+    // Speech only, so a dropped hallucination never takes a Speaker number.
+    let speech = system.compactMap { label($0, as: "") }
+    let others = zip(speech, assignSpeakers(to: speech, turns: turns)).map { segment, speaker in
+        TranscriptSegment(start: segment.start, end: segment.end, speaker: speaker, text: segment.text)
+    }
+    return (mic.compactMap { label($0, as: micSpeaker) } + others).sorted(by: inOrder)
 }
 
 private func label(_ segment: RecognisedSegment, as speaker: String) -> TranscriptSegment? {
