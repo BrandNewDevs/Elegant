@@ -1,5 +1,6 @@
 import { readFile, readdir, writeFile, realpath } from "node:fs/promises";
-import { resolve, relative, isAbsolute } from "node:path";
+import { resolve } from "node:path";
+import { isOutside, privateOutputPath } from "./private-path.js";
 import { fileURLToPath } from "node:url";
 import { createBaselineSummariser } from "./baseline.js";
 import { createSummariser } from "../pipeline/summariser.js";
@@ -12,13 +13,14 @@ const [mode, source, output] = process.argv.slice(2);
 if (!source || !output || !["baseline", "current", "private-baseline", "private-current"].includes(mode ?? "")) throw new Error("Usage: eval:ai <baseline|current|private-baseline|private-current> <fixtures-dir|private-manifest.json> <results.json>");
 const privateRun = mode!.startsWith("private-");
 const root = await realpath(fileURLToPath(new URL("../../../", import.meta.url)));
-const outside = (path: string) => { const rel = relative(root, path); return rel.startsWith("../") || isAbsolute(rel); };
+const outside = (path: string) => isOutside(root, path);
+let destination = resolve(output);
 let paths: string[];
 if (privateRun) {
   const manifest = JSON.parse(await readFile(source, "utf8")) as { examples: { path: string | null; status: string }[] };
   paths = manifest.examples.filter(e => e.path !== null).map(e => resolve(e.path!));
   if (!paths.length) throw new Error("No private fixtures supplied; real-data evaluation remains pending");
-  if (!outside(resolve(output))) throw new Error("Private evaluation output must be outside the repository");
+  destination = await privateOutputPath(root, output);
 } else paths = (await readdir(source)).filter(p => p.endsWith(".json")).sort().map(p => resolve(source, p));
 const fixtures = [];
 for (const path of paths) {
@@ -43,6 +45,6 @@ const runs = [];
 for (const fixture of selected) {
   runs.push(await evaluateFixture(fixture, { summarise }, () => calls));
   // Keep results even if a later fixture fails or the process is interrupted. Content stays at the selected local path.
-  await writeFile(output, JSON.stringify({ metadata, runs }, null, 2) + "\n");
+  await writeFile(destination, JSON.stringify({ metadata, runs }, null, 2) + "\n");
   console.log(`${fixture.id}: ${runs.at(-1)?.error ? "failed" : "generated; human review pending"}`);
 }

@@ -43,18 +43,21 @@ export function validateFixture(value: unknown): EvaluationFixture {
   const fixture = value as EvaluationFixture;
   if (!fixture || typeof fixture.id !== "string" || !["tuning", "reserved"].includes(fixture.split) || typeof fixture.synthetic !== "boolean"
       || !Array.isArray(fixture.transcript?.segments) || !Array.isArray(fixture.points) || !Array.isArray(fixture.questions)) throw new Error("Invalid evaluation fixture");
+  const nonempty = (s: unknown): s is string => typeof s === "string" && s.trim().length > 0;
+  let previousStart = -Infinity;
   fixture.transcript.segments.forEach(s => {
-    if (!s || typeof s.text !== "string" || !s.speaker || !Number.isFinite(s.start) || !Number.isFinite(s.end) || s.end < s.start) throw new Error(`Invalid segment in ${fixture.id}`);
+    if (!s || typeof s.text !== "string" || !nonempty(s.speaker) || !Number.isFinite(s.start) || !Number.isFinite(s.end) || s.start < 0 || s.start < previousStart || s.end < s.start) throw new Error(`Invalid segment in ${fixture.id}`);
+    previousStart = s.start;
   });
   const validRefs = (refs: number[]) => Array.isArray(refs) && refs.every(ref => Number.isInteger(ref) && ref >= 0 && ref < fixture.transcript.segments.length);
   const pointIds = new Set<string>();
   for (const p of fixture.points) {
-    if (!p.id || pointIds.has(p.id) || !p.text || typeof p.critical !== "boolean" || !validRefs(p.refs) || !p.refs.length || !p.refs.some(i => fixture.transcript.segments[i]?.speaker === p.speaker)) throw new Error(`Invalid expected point in ${fixture.id}`);
+    if (!nonempty(p.id) || pointIds.has(p.id) || !nonempty(p.text) || typeof p.critical !== "boolean" || !validRefs(p.refs) || !p.refs.length || !p.refs.some(i => fixture.transcript.segments[i]?.speaker === p.speaker)) throw new Error(`Invalid expected point in ${fixture.id}`);
     pointIds.add(p.id);
   }
   const questionIds = new Set<string>();
   for (const q of fixture.questions) {
-    if (!q.id || questionIds.has(q.id) || !q.question || typeof q.critical !== "boolean" || !(q.answer === null || typeof q.answer === "string") || !validRefs(q.refs) || (q.followUpTo && !questionIds.has(q.followUpTo))) throw new Error(`Invalid expected question in ${fixture.id}`);
+    if (!nonempty(q.id) || questionIds.has(q.id) || !nonempty(q.question) || typeof q.critical !== "boolean" || !(q.answer === null || typeof q.answer === "string") || !validRefs(q.refs) || (q.followUpTo && !questionIds.has(q.followUpTo))) throw new Error(`Invalid expected question in ${fixture.id}`);
     questionIds.add(q.id);
   }
   return fixture;
