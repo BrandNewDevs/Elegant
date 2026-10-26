@@ -400,6 +400,27 @@ describe("grounded Meeting chat", () => {
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
+  it("drops an unrelated long prior question instead of poisoning an independent question's audit budget", async () => {
+    const { store, id, expectedRevision } = setup();
+    const independent = question + " Please focus on the permission guide. ".repeat(25);
+    const unrelated = "Unrelated previous subject ".repeat(80).slice(0, 1989);
+    const model = fake(request => {
+      expect(contents(request).data.question).toBe(independent);
+      expect(contents(request).data.history).toEqual([]);
+      expect(contents(request).data).not.toHaveProperty("priorUserQuestion");
+      return positive;
+    }, { audit: request => {
+      expect(contents(request).data).not.toHaveProperty("priorUserQuestion");
+      expect(JSON.stringify(request)).not.toContain(unrelated);
+      return { supported: true, sourceIds: ["0:0"] };
+    } });
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: independent,
+      history: [{ question: unrelated, answer: "Unrelated previous answer ".repeat(100) }] });
+    expect(result.answer).toEqual({ text: positive.text, refs: [0], sufficient: true });
+    expect(result.generation.calls).toBe(2);
+    expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
   it("requires trusted authorization to use a completed Transcript while Summary processing is pending", async () => {
     const { store, id, expectedRevision } = setup(); store.setMeetingState(id, "processing");
     const model = fake(() => positive);
