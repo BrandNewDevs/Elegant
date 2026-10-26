@@ -1,6 +1,17 @@
 import { createHash } from "node:crypto";
 import type { Transcript, TranscriptSegment } from "./pipeline.js";
 
+/** Original Transcript text split for bounded evidence requests; references remain segment ordinals. */
+export interface SourceFragment {
+  id: string;
+  ref: number;
+  part: number;
+  speaker: string;
+  start: number;
+  end: number;
+  text: string;
+}
+
 export interface SummaryEvidence {
   revision: string;
   tldr: number[];

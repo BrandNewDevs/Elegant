@@ -1,6 +1,7 @@
 import { InvalidSummaryError } from "./validate-summary.js";
 
-export interface SourcePiece { id: string; ref: number; part: number; speaker: string; start: number; end: number; text: string }
+export type { SourceFragment as SourcePiece } from "./evidence.js";
+import type { SourceFragment as SourcePiece } from "./evidence.js";
 export type FactKind = "proposal" | "decision" | "commitment" | "disagreement" | "unresolved" | "update";
 export interface SupportedPoint { speaker: string; text: string; refs: number[] }
 export interface SupportedFact extends SupportedPoint { kind: FactKind; sources: SourcePiece[] }

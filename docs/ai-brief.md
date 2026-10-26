@@ -10,7 +10,7 @@ For whoever builds the AI side. Read [`design.md`](./design.md) and [`GLOSSARY.m
 
 Production AI logic lives in the Electron app's TypeScript pipeline. Swift owns transcription and diarization. Ollama serves Gemma. Python only collects evaluation results and calculates metrics; it is not a production runtime. Evaluation must invoke the same TypeScript modules as the app, not a separate Python implementation.
 
-The delivery order is evidence-backed Summaries, then Meeting chat. English Meetings up to 60 minutes are the initial target. Evidence-backed Summary generation and its supporting request infrastructure are implemented. Meeting chat and citation navigation in the UI remain upcoming work. Quality and target-device gates below remain unverified until their evaluations are completed.
+The delivery order is evidence-backed Summaries, then Meeting chat. English Meetings up to 60 minutes are the initial target. Evidence-backed Summary generation, shared request infrastructure and Meeting-specific original-evidence selection are implemented. Persisted Meeting chat and citation navigation in the UI remain upcoming work. Quality and target-device gates below remain unverified until their evaluations are completed.
 
 ## What you can and can't conclude from Linux
 
@@ -93,15 +93,27 @@ The public `createGroundedSummariser` interface in `pipeline/grounded-summariser
 
 Short inputs are summarized in one request. Larger inputs use bounded extraction and consolidation while preserving original segment references and relevant source text. Structural validation rejects unknown labels and references, duplicate Participants and empty points; factual accuracy still requires review. Empty Transcripts complete without a Summary. Failed regeneration leaves the last successful Summary and sidecars intact.
 
-The additive schema version 3 migration creates `summary_artifacts`, `chat_requests`, `passages` and `passage_index`. Summary artifacts are wired now and saved atomically with Summary text. The chat and passage tables establish storage for later deliveries; they do not mean chat or retrieval is already available. Existing version 2 data and legacy Summaries without artifacts remain readable; regeneration adds evidence.
+The additive schema version 3 migration creates `summary_artifacts`, `chat_requests`, `passages` and `passage_index`. Summary artifacts are saved atomically with Summary text. Passage storage is now wired and existing Transcripts are backfilled when the store opens, without another migration. The chat table remains reserved for its later delivery. Existing version 2 data and legacy Summaries without artifacts remain readable; regeneration adds evidence.
 
 Clickable evidence references will be added in the later UI delivery. Until then, stored references and evaluation output can be inspected through application interfaces. Passing structural tests is not a claim that the human-reviewed Summary quality or M4 performance gates have passed.
+
+## Meeting-specific evidence retrieval
+
+`pipeline/passages.ts` derives passages targeting 1,500 characters from original Transcript fragments. Oversized segments split at word boundaries where possible, retaining Unicode, segment ordinals and fragment IDs. SQLite passage FTS5 is separate from Meeting-list search. Transcript replacement rebuilds passages and their index atomically; old Transcripts receive missing derived records on store open. Lookups require both Meeting ID and current revision.
+
+`createMeetingEvidence` in `pipeline/meeting-evidence.ts` returns original fragments, their revision, selection mode, model-call count and completeness flags. It checks stored fragment IDs against the current Transcript and returns canonical source text rather than trusting index text as evidence. Missing or changed evidence produces an incomplete result, never a claim that a fact was absent.
+
+Use the full Transcript when it fits the caller's complete answer-request budget. Otherwise, ranked FTS5 lookup adds neighboring passages and the final passage as a guard for late corrections. One bounded query rewrite is allowed for an empty lookup or a contextual follow-up, using at most four recent exchanges. History helps resolve the question; generated answers are not factual sources. Returned fragments are deduplicated and chronological.
+
+Broad questions or insufficient targeted evidence scan all passages in bounded batches. Selection and consolidation return source IDs from original fragments, never generated replacement prose. An exhaustive result requires visiting the entire current Transcript. Deadline, call-limit or budget failures return incomplete evidence; user cancellation remains a cancelled operation. Neither incomplete retrieval nor a cancelled scan establishes that the answer is absent. The `sufficient` flag describes usable selected context; the chat answer still needs its own factual and citation validation. No embeddings or vector database are used.
+
+Retrieval is available through the production module and evaluation tooling. Chat history, answer generation, application controls and UI citation navigation remain separate upcoming work. Automated retrieval checks do not pass the real-Meeting, human-review or M4 release gates.
 
 ## Planned Meeting chat contract
 
 Chat becomes available once a Meeting's Transcript is complete, even if Summary generation failed. Each answer contains text, supporting references and an evidence-sufficiency result. Facts come from the original Transcript, never from earlier generated answers. Missing owners, dates and agreements must not be guessed.
 
-Use the full Transcript when it fits; otherwise use Meeting- and revision-scoped passage FTS5 retrieval, neighbors and chronological evidence. Allow one bounded query rewrite for empty lookup or a follow-up. Broad or insufficient lookup scans all passages in bounded batches; an interrupted scan cannot claim an exhaustive answer.
+Chat will use the implemented evidence selector above, then validate answer support against the selected original fragments. An interrupted or incomplete selection cannot support an exhaustive answer.
 
 Persist the full visible history per Meeting. Send only the latest four completed exchanges, dropping oldest context first to fit the request budget. Store statuses, references, revision and model metadata. Failed, cancelled and interrupted requests remain distinct; restart marks unfinished work interrupted. Clearing chat or deleting a Meeting cancels related work before removing records. Late results must not recreate it. Transcript replacement clears chat and derived evidence; renames and Summary regeneration preserve it.
 

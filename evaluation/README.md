@@ -73,3 +73,15 @@ Optional `--speech /private/speech-review.json` accepts `{"excerpts":[{"referenc
 `baseline/linux-suite.json` records all eight synthetic examples with the frozen implementation and installed Gemma 3 tag, before prompt tuning. All eight returned structurally valid Summaries in 13 calls. The long example took 557.7 seconds across six calls; short examples took 7.3–14.3 seconds. Model loading was uncontrolled, so these are neither uniformly warm nor target-M4 measurements. This corpus is synthetic and its reserved cases were visible during baseline work.
 
 A manual spot check found an unsupported commitment in `changed-decision`: the TL;DR adds that Speaker 1 will confirm the launch date, while the source only commits them to rerunning the offline test. The long output also retains many repeated per-Participant points. Full human scoring remains pending; successful JSON generation does not pass the quality gate. These observations motivate evidence validation and consolidation, not a quality claim.
+
+## Inspect retrieval independently
+
+From `app/`:
+
+```
+AI_MODEL=gemma3:4b-it-q4_K_M AI_SPLIT=tuning pnpm run eval:retrieval ../evaluation/fixtures /tmp/retrieval.json
+```
+
+This standalone command accepts synthetic fixtures only. It records selected original references, expected-reference recall, query mode, exhaustive/incomplete state, calls and latency. It never supplies expected answers to the model. Short complete Transcripts need no retrieval model call. A reference being present is not evidence that a generated answer is correct; use `eval:ai` and source review for that. Private end-to-end examples use `private-current` and stay outside Git.
+
+`retrieval/linux-short-fixtures.json` records 16 short-fixture questions. All used the complete-Transcript path with no inference calls. These observations do not validate long retrieval, generated answers, real Meetings or M4 latency.
