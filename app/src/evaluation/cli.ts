@@ -28,7 +28,10 @@ for (const path of paths) {
   if (!fixture.synthetic && !outside(canonical)) throw new Error("Real Transcripts must be kept outside the repository");
   fixtures.push(fixture);
 }
-if (!fixtures.length) throw new Error("No fixtures found");
+const split = process.env.AI_SPLIT;
+if (split && split !== "tuning" && split !== "reserved") throw new Error("AI_SPLIT must be tuning or reserved");
+const selected = split ? fixtures.filter(fixture => fixture.split === split) : fixtures;
+if (!selected.length) throw new Error("No fixtures found for this split");
 const implementation = mode!.endsWith("baseline") ? "baseline" : "current";
 const modelName = process.env.AI_MODEL ?? DEFAULT_SUMMARY_MODEL;
 const metadata = await evaluationMetadata(modelName, implementation);
@@ -37,7 +40,7 @@ let calls = 0;
 const model: LanguageModel = { generate: request => { calls++; return client.generate(request); } };
 const summarise = (implementation === "baseline" ? createBaselineSummariser : createSummariser)({ model });
 const runs = [];
-for (const fixture of fixtures) {
+for (const fixture of selected) {
   runs.push(await evaluateFixture(fixture, { summarise }, () => calls));
   // Keep results even if a later fixture fails or the process is interrupted. Content stays at the selected local path.
   await writeFile(output, JSON.stringify({ metadata, runs }, null, 2) + "\n");
