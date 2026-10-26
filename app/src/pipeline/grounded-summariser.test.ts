@@ -23,7 +23,7 @@ function fake(reply: (request: TextRequest, call: number) => unknown): TextModel
   } };
 }
 interface Piece { id: string; ref: number; part: number; speaker: string; text: string }
-interface Fact { speaker: string; text: string; refs?: number[]; sourceIds: string[]; kind: string }
+interface Fact { id: number; speaker: string; text: string; refs?: number[]; sourceIds: string[]; kind: string }
 interface Payload { sources?: Piece[]; primary?: Piece[]; context?: Piece[]; candidates?: Fact[]; draft?: unknown }
 const payload = (request: TextRequest): Payload => (JSON.parse(request.messages[1]!.content) as { data: Payload }).data;
 
@@ -32,10 +32,9 @@ function hierarchicalReply(request: TextRequest): unknown {
   const input = payload(request);
   if (input.primary) return { facts: input.primary.map(source => ({ speaker: source.speaker, text: `Important point from ${source.id}.`,
     sourceIds: [source.id], kind: "update" })) };
-  if ("facts" in (request.schema as { properties: object }).properties) return { facts: [input.candidates!.at(-1)] };
+  if ("facts" in (request.schema as { properties: object }).properties) return { facts: input.candidates!.map(fact => ({ ...fact, covers: [fact.id] })) };
   const source = input.sources!.at(-1)!;
-  return { tldr: "The final supported point is retained.", tldrRefs: [source.ref],
-    points: [{ speaker: source.speaker, text: "The final supported point.", refs: [source.ref] }] };
+  return { tldr: "The final supported point is retained.", sourceIds: [source.id] };
 }
 const longTranscript = (): Transcript => ({ segments: Array.from({ length: 36 }, (_, index) => ({ start: index * 40, end: index * 40 + 35,
   speaker: index % 2 ? "Speaker 1" : "You", text: (`Discussion of item ${index}: local permissions and the pending launch decision. `).repeat(15) })) });
@@ -209,7 +208,7 @@ describe("evidence-backed Summary generation", () => {
     await expect(createGroundedSummariser({ model })({ segments: [] })).rejects.toThrow("Transcript is empty");
   });
 
-  it("carries original passages through multiple reduction levels within every request budget", async () => {
+  it("carries original passages through bounded comparisons and TLDR selection within every request budget", async () => {
     const source = longTranscript();
     const model = fake(hierarchicalReply);
     const result = await createGroundedSummariser({ model })(source);
@@ -274,6 +273,9 @@ describe("evidence-backed Summary generation", () => {
         expect(properties).not.toHaveProperty("refs");
         expect(new Set(properties.sourceIds!.items!.enum)).toEqual(new Set(sources.map(source => source.id)));
         expect(new Set(properties.speaker!.enum)).toEqual(new Set((input.primary ?? sources).map(source => source.speaker)));
+        if (input.candidates) expect(properties.covers!.items!.enum).toEqual(input.candidates.map((_, index) => index));
+      } else if (schema.properties.sourceIds) {
+        expect(new Set(schema.properties.sourceIds.items!.enum)).toEqual(new Set(sources.map(source => source.id)));
       } else {
         expect(new Set(schema.properties.tldrRefs!.items!.enum)).toEqual(new Set(sources.map(source => source.ref)));
         expect(new Set(schema.properties.points!.items!.properties!.refs!.items!.enum)).toEqual(new Set(sources.map(source => source.ref)));
@@ -305,16 +307,14 @@ describe("evidence-backed Summary generation", () => {
       return hierarchicalReply(request);
     });
     await createGroundedSummariser({ model })(source);
-    expect(captured.map(fact => fact.text)).toEqual(["Deploy branch Alpha", "Deploy branch alpha"]);
+    expect(new Set(captured.map(fact => fact.text))).toEqual(new Set(["Deploy branch Alpha", "Deploy branch alpha"]));
   });
 
-  it("fails clearly when reductions do not converge instead of concatenating chunk results", async () => {
-    const model = fake(request => {
-      const input = payload(request);
-      if (input.candidates) return { facts: input.candidates };
-      return hierarchicalReply(request);
-    });
-    await expect(createGroundedSummariser({ model })(longTranscript())).rejects.toThrow("did not reduce");
+  it("accepts a completed unchanged comparison round while retaining every supported point", async () => {
+    const model = fake(hierarchicalReply);
+    const result = await createGroundedSummariser({ model })(longTranscript());
+    const expected = model.requests.flatMap(request => payload(request).primary ?? []).map(source => `Important point from ${source.id}.`);
+    expect(new Set(result.participants.flatMap(participant => participant.said))).toEqual(new Set(expected));
     expect(model.requests.length).toBeLessThan(128);
   });
 

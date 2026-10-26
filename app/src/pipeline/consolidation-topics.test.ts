@@ -5,7 +5,7 @@ import { createGroundedSummariser } from "./grounded-summariser.js";
 import { requestBytes } from "./model-request.js";
 
 interface Piece { id: string; ref: number; part: number; speaker: string; text: string }
-interface Candidate { speaker: string; text: string; sourceIds: string[]; kind: string }
+interface Candidate { id: number; speaker: string; text: string; sourceIds: string[]; kind: string }
 interface Payload { primary?: Piece[]; candidates?: Candidate[]; sources?: Piece[] }
 const input = (request: TextRequest): Payload => {
   const value = JSON.parse(request.messages[1]!.content) as Payload & { data?: Payload };
@@ -36,21 +36,17 @@ function topicModel(nameFor: (text: string) => string = topic) {
       const original = new Map(payload.sources!.map(piece => [piece.id, piece]));
       reductions.push({ topics: facts.map(fact => nameFor(fact.text)),
         refs: facts.map(fact => Math.max(...fact.sourceIds.map(id => original.get(id)!.ref))) });
-      const latest = new Map<string, Candidate>();
+      const latest = new Map<string, { fact: Candidate; covers: number[] }>();
       for (const fact of facts) {
         // Every source in this fixture states the same requirement for its topic.
         // The latest repeated statement is sufficient evidence; other topics are never discarded.
         expect(fact.sourceIds.every(id => original.get(id)?.text.includes(nameFor(fact.text)))).toBe(true);
-        latest.set(nameFor(fact.text), fact);
+        const name = nameFor(fact.text);
+        latest.set(name, { fact, covers: [...(latest.get(name)?.covers ?? []), fact.id] });
       }
-      output = { facts: [...latest.values()] };
+      output = { facts: [...latest.values()].map(({ fact, covers }) => ({ ...fact, covers })) };
     } else {
-      const original = new Map(payload.sources!.map(piece => [piece.id, piece]));
-      const facts = payload.candidates!;
-      const points = facts.map(fact => ({ speaker: fact.speaker, text: fact.text,
-        refs: [...new Set(fact.sourceIds.map(id => original.get(id)!.ref))] }));
-      output = { tldr: "The reviewed requirements remain fully local.",
-        tldrRefs: [...new Set(points.flatMap(point => point.refs))], points };
+      output = { tldr: "The reviewed requirements remain fully local.", sourceIds: payload.sources!.map(piece => piece.id) };
     }
     return { text: JSON.stringify(output), metadata: { model: "faithful-topics:test", elapsedMs: 1 } };
   } };
