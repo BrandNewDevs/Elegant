@@ -2,12 +2,13 @@ import { BrowserWindow, dialog } from "electron";
 import { writeFile } from "node:fs/promises";
 import type { AppCore } from "../core/app-core.js";
 import { DISPLAY_NAME } from "../config.js";
-import { exportIdFromLink, meetingActionFromLink, meetingIdFromLink, renderMeetingsPage, type MeetingAction } from "./meetings-page.js";
+import { exportIdFromLink, meetingActionFromLink, meetingIdFromLink, renderMeetingsPage, searchFromLink, type MeetingAction } from "./meetings-page.js";
 
 /** The Meetings window: a list on the left, the selected Meeting on the right. Redraws when Meetings change. */
 export class MeetingsWindow {
   private window: BrowserWindow | undefined;
   private selectedId: number | undefined;
+  private query = "";
 
   constructor(private readonly core: AppCore) {
     core.onMeetingsChanged(() => this.draw());
@@ -28,6 +29,12 @@ export class MeetingsWindow {
         }
         const action = meetingActionFromLink(url);
         if (action) return void this.perform(action, window);
+        const query = searchFromLink(url);
+        if (query !== undefined) {
+          this.query = query;
+          this.draw();
+          return;
+        }
         const id = meetingIdFromLink(url);
         if (id === undefined) return;
         this.selectedId = id;
@@ -81,7 +88,7 @@ export class MeetingsWindow {
   private draw(): void {
     if (!this.window) return;
     const selected = this.selectedId === undefined ? undefined : this.core.getMeeting(this.selectedId);
-    const html = renderMeetingsPage(this.core.listMeetings(), selected);
+    const html = renderMeetingsPage(this.query.trim() ? this.core.searchMeetings(this.query) : this.core.listMeetings(), selected, this.query);
     void this.window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
   }
 }
