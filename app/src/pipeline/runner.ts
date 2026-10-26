@@ -28,6 +28,7 @@ export class PipelineRunner {
       const transcript = await this.stages.transcribe(tracks, context);
       context.signal?.throwIfAborted();
       this.sink.saveTranscript(meetingId, transcript);
+      if (transcript.segments.length) this.stage(context, "summarising");
       if (!this.options.keepAudio?.()) {
         await discardAudio(tracks);
         this.sink.clearAudio(meetingId);
