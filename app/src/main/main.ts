@@ -5,11 +5,11 @@ import { join } from "node:path";
 import { AppCore } from "../core/app-core.js";
 import { formatElapsed } from "../core/elapsed.js";
 import { ProcessEngine } from "../engine/process-engine.js";
+import { createEngineTranscriber } from "../pipeline/engine-transcriber.js";
 import { OllamaClient } from "../pipeline/ollama.js";
 import { createSummariser } from "../pipeline/summariser.js";
-import { unimplementedPipeline } from "../pipeline/unimplemented.js";
 import { openStore } from "../store/store.js";
-import { DISPLAY_NAME } from "../config.js";
+import { DISPLAY_NAME, SPEECH_MODEL } from "../config.js";
 import { showPrompt } from "./prompt-window.js";
 import { MeetingsWindow } from "./meetings-window.js";
 import { STATUS_LABEL } from "./status-label.js";
@@ -59,7 +59,10 @@ app.whenReady().then(() => {
   core = new AppCore({
     engine,
     store,
-    pipeline: { ...unimplementedPipeline, summarise: createSummariser({ model: new OllamaClient() }) },
+    pipeline: {
+      transcribe: createEngineTranscriber(engine, { model: SPEECH_MODEL, modelsDirectory: join(dataDir, "models") }),
+      summarise: createSummariser({ model: new OllamaClient() }),
+    },
   });
 
   meetingsWindow = new MeetingsWindow(core);
