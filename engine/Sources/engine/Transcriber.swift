@@ -8,10 +8,12 @@ import WhisperKit
 
 enum TranscriptionError: Error, CustomStringConvertible {
     case unreadable(String)
+    case busy
     case tracksDiffer(mic: Int, system: Int)
 
     var description: String {
         switch self {
+        case .busy: return "the speech models are busy; wait for the current operation to finish"
         case .unreadable(let why): return "cannot read the audio: \(why)"
         case .tracksDiffer(let mic, let system):
             return "the two tracks differ in length (\(mic) and \(system) samples), but the Recording should have aligned them"
@@ -22,14 +24,18 @@ enum TranscriptionError: Error, CustomStringConvertible {
 /// How far apart the tracks' lengths may be, in samples, before the Recording counts as misaligned (10 ms).
 let trackLengthTolerance = outputSampleRate / 100
 
-/// Holds the loaded model between Recordings and runs one transcription at a time.
+/// Owns speech models and rejects overlapping operations, including across actor suspension points.
 actor Transcriber {
     private var kit: WhisperKit?
     private var loadedModel: String?
     private var speakerKit: SpeakerKit?
+    private var busy = false
 
     /// `model` is a WhisperKit variant name; models and tokenizers are kept under `modelsDirectory`.
     func transcribe(micPath: String, systemPath: String, model: String, modelsDirectory: URL) async throws -> [TranscriptSegment] {
+        guard !busy else { throw TranscriptionError.busy }
+        busy = true
+        defer { busy = false }
         let mic = try loadTrack(micPath)
         let system = try loadTrack(systemPath)
         guard abs(mic.count - system.count) <= trackLengthTolerance else {
@@ -100,10 +106,26 @@ actor Transcriber {
 
     /// Prepares both models before the first Recording. Each download occupies half the progress range.
     func prepare(model: String, modelsDirectory: URL, progress: @escaping @Sendable (Double) -> Void) async throws {
+        guard !busy else { throw TranscriptionError.busy }
+        busy = true
+        defer { busy = false }
         _ = try await loadedKit(model: model, modelsDirectory: modelsDirectory) { progress($0 / 2) }
         progress(0.5)
         _ = try await loadedSpeakerKit(modelsDirectory: modelsDirectory) { progress(0.5 + $0 / 2) }
         progress(1)
+    }
+
+    /// Unload native model allocations before Ollama starts. Downloads and tokenizers stay on disk.
+    /// Await both APIs before acknowledging release; clearing only our references is not an unload guarantee.
+    func releaseModels() async throws {
+        guard !busy else { throw TranscriptionError.busy }
+        busy = true
+        defer { busy = false }
+        await kit?.unloadModels()
+        await speakerKit?.unloadModels()
+        kit = nil
+        loadedModel = nil
+        speakerKit = nil
     }
 
     private func loadedKit(model: String, modelsDirectory: URL, progress: (@Sendable (Double) -> Void)? = nil) async throws -> WhisperKit {

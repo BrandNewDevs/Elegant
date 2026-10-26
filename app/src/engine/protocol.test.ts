@@ -29,3 +29,18 @@ describe("parsing first-run setup events", () => {
     expect(() => parseEngineEvent(JSON.stringify({ type: "permission_result", permission: "microphone", granted: "yes" }))).toThrow(/granted/);
   });
 });
+
+
+describe("speech model release events", () => {
+  it("accepts correlated release success and failure", () => {
+    expect(parseEngineEvent(JSON.stringify({ type: "models_released", id: "release-1" }))).toEqual({ type: "models_released", id: "release-1" });
+    expect(parseEngineEvent(JSON.stringify({ type: "model_release_failed", id: "release-2", message: "busy" }))).toMatchObject({ id: "release-2", message: "busy" });
+  });
+
+  it("rejects missing, empty and oversized request ids", () => {
+    for (const id of [undefined, "", "x".repeat(129), "é".repeat(65), 1]) {
+      expect(() => parseEngineEvent(JSON.stringify({ type: "models_released", id }))).toThrow(/id/);
+    }
+    expect(() => parseEngineEvent(JSON.stringify({ type: "model_release_failed", id: "1" }))).toThrow(/message/);
+  });
+});

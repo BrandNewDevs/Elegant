@@ -87,3 +87,25 @@ describe("transcription in the real Swift engine", () => {
   });
 });
 
+
+
+describe("speech model release in the real Swift engine", () => {
+  it("acknowledges repeated idle release commands without downloading a model", async () => {
+    const engine = new ProcessEngine({ command: engineBinary });
+    const events: EngineEvent[] = [];
+    engine.onEvent((event) => events.push(event));
+    engine.start();
+    try {
+      await until(() => events.some((event) => event.type === "ready"));
+      for (const id of ["release-1", "release-2"]) {
+        engine.send({ type: "release_models", id });
+        await until(() => events.some((event) => event.type === "models_released" && event.id === id));
+      }
+      engine.send({ type: "release_models", id: "" });
+      await until(() => events.some((event) => event.type === "error" && event.message.includes("malformed release_models")));
+      expect(events.filter((event) => event.type === "model_release_failed")).toEqual([]);
+    } finally {
+      await engine.stop();
+    }
+  });
+});
