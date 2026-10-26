@@ -1154,17 +1154,14 @@ describe("regenerating a Summary", () => {
     const answer = { current: () => reply("First attempt.") };
     const { core, store, id } = await summarised(answer, dbPath);
 
-    // Renaming is stored on the Participant; the Summary only ever holds labels.
-    const db = new DatabaseSync(dbPath);
-    db.prepare("UPDATE participants SET name = 'Alice' WHERE meeting_id = ? AND label = 'Others'").run(id);
-    db.close();
+    core.renameParticipant(id, "Speaker 1", "Alice");
 
     answer.current = () => reply("After the rename.");
     await core.regenerateSummary(id);
 
     const meeting = core.getMeeting(id)!;
     expect(meeting).toMatchObject({ state: "done", summary: reply("After the rename.") });
-    expect(meeting.participants).toContainEqual({ label: "Others", name: "Alice" });
+    expect(meeting.participants).toContainEqual({ label: "Speaker 1", name: "Alice" });
     store.close();
   });
 
@@ -1311,18 +1308,14 @@ describe("exporting a Meeting to Markdown", () => {
 
   it("shows a renamed Participant by name in the Summary and the Transcript, and leaves the others as labelled", async () => {
     const { id, core, path, dir } = seeded();
-    // Stand-in for the rename feature: the name is stored per Meeting, and the Summary keeps labels.
-    const { DatabaseSync } = await import("node:sqlite");
-    const db = new DatabaseSync(path);
-    db.prepare("UPDATE participants SET name = 'Priya' WHERE label = 'Speaker 1'").run();
-    db.close();
+    core.renameParticipant(id, "Speaker 1", "Priya");
 
     const { markdown } = core.exportMeeting(id);
     rmSync(dir, { recursive: true });
 
     expect(markdown).toContain("### Priya");
     expect(markdown).toContain("**Priya** (0:03): Agreed");
-    expect(markdown).not.toContain("Others");
+    expect(markdown).not.toContain("Speaker 1");
     expect(markdown).toContain("### You");
   });
 
