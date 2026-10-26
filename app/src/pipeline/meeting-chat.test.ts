@@ -278,13 +278,51 @@ describe("grounded Meeting chat", () => {
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
-  it("does not publish unaudited answers when the audit input cannot fit", async () => {
+  it("rejects oversized answer prose with bounded corrective retries before auditing or publishing it", async () => {
     const { store, id, expectedRevision } = setup();
     const model = fake(() => ({ ...positive, text: "Supported but oversized prose ".repeat(1000) }));
-    const result = await createMeetingChat({ store, model })(input(id, expectedRevision));
-    expect(result.answer).toEqual({ text: CHAT_INCOMPLETE, refs: [], sufficient: false });
-    expect(result.generation.exhaustive).toBe(false);
-    expect(model.requests).toHaveLength(1);
+    await expect(createMeetingChat({ store, model })(input(id, expectedRevision))).rejects.toThrow("concise enough for evidence verification");
+    expect(model.requests).toHaveLength(3);
+    expect(model.requests.every(isAnswer)).toBe(true);
+    expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it("accounts for Unicode and nested escape expansion in the reserved audit text limit", async () => {
+    const { store, id, expectedRevision } = setup();
+    for (const text of ["😀".repeat(500), "Claim " + String.fromCharCode(92, 10).repeat(400)]) {
+      expect(text.length).toBeLessThan(2000);
+      const model = fake((_request, call) => call === 1 ? { ...positive, text } : positive);
+      const result = await createMeetingChat({ store, model })(input(id, expectedRevision));
+      expect(result.answer).toEqual({ text: positive.text, refs: [0], sufficient: true });
+      expect(result.generation.calls).toBe(3);
+      expect(contents(model.requests[1]!).instruction).toContain("concise enough for evidence verification");
+      expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+    }
+  });
+
+  it("narrows evidence before generating when a long question and full context would leave no audit room", async () => {
+    const source: Transcript = { segments: [
+      { start: 0, end: 5, speaker: "You", text: transcript.segments[0]!.text + " Supporting context about the existing local task. ".repeat(12) },
+      { start: 5, end: 10, speaker: "Speaker 1", text: "Coffee supplies are in the kitchen. " + " Unrelated office furniture and supplies were discussed. ".repeat(11) },
+      { start: 10, end: 15, speaker: "Speaker 1", text: "Parking is on the east side. " + " Unrelated travel arrangements and signs were discussed. ".repeat(11) },
+    ] };
+    const { store, id, expectedRevision } = setup(source);
+    const longQuestion = question + " Please consider the stated permission guide task. ".repeat(20);
+    const model = fake(request => {
+      const data = contents(request).data;
+      if (isAnswer(request)) {
+        expect(data.sources!.map(source => source.ref)).toEqual([0]);
+        expect(data.question).toBe(longQuestion);
+        return positive;
+      }
+      const selected = data.sources!.filter(source => source.ref === 0);
+      return { sourceIds: selected.map(source => source.id), sufficient: selected.length > 0 };
+    });
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: longQuestion });
+    expect(isAnswer(model.requests[0]!)).toBe(false);
+    expect(result.answer).toEqual({ text: positive.text, refs: [0], sufficient: true });
+    expect(result.generation.retrievalCalls).toBeGreaterThan(0);
+    expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
   it("propagates audit connection failures and cancellation instead of publishing a candidate", async () => {
@@ -309,7 +347,9 @@ describe("grounded Meeting chat", () => {
         return data.exhaustive ? { text: "You will write the launch guide by Wednesday.", sourceIds: [data.sources!.find(source => source.ref === 4)!.id], sufficient: true }
           : { text: "Not enough evidence", sourceIds: [], sufficient: false };
       }
-      const selected = data.sources!.filter(source => source.ref === 4);
+      const matched = data.sources!.filter(source => source.ref === 4);
+      // A targeted selector may overestimate partial topic context; the answer must still trigger the full-scan fallback.
+      const selected = matched.length ? matched : data.sources!.slice(0, 1);
       return { sourceIds: selected.map(source => source.id), sufficient: selected.length > 0 };
     });
     const stages: string[] = [];
