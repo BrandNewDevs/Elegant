@@ -58,6 +58,7 @@ function MeetingListRow({ meeting, selected }: { meeting: MeetingListItem; selec
 
 export function MeetingsApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showInDock, setShowInDock] = useState(false);
   const [query, setQuery] = useState("");
   const [meetings, setMeetings] = useState<MeetingListItem[]>([]);
   const [selected, setSelected] = useState<Meeting | undefined>();
@@ -71,6 +72,7 @@ export function MeetingsApp() {
       setChat(state.chat);
       setJobs(state.jobs);
       setSettingsOpen(state.settingsOpen);
+      setShowInDock(state.showInDock);
       setQuery(state.query);
       setMeetings(state.meetings);
       setSelected(state.selected);
@@ -129,7 +131,7 @@ export function MeetingsApp() {
           )}
         </main>
       </ScrollArea>
-      <SettingsDialog open={settingsOpen} onOpenChange={(open) => window.electron.meetings.settings(open)} />
+      <SettingsDialog open={settingsOpen} showInDock={showInDock} onOpenChange={(open) => window.electron.meetings.settings(open)} />
     </div>
   );
 }

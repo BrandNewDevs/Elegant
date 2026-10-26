@@ -54,6 +54,7 @@ export class MeetingsWindow {
     private readonly bridge: SetupBridge,
   ) {
     core.onMeetingsChanged(() => this.pushState());
+    core.onShowInDockChange(() => this.pushState());
     core.onChatChanged(() => this.pushState());
     core.jobs.onChange(() => this.pushState());
     setup.onUserNameChange(() => this.pushState());
@@ -76,6 +77,10 @@ export class MeetingsWindow {
     ipcMain.on("meetings:settings", (event, open: boolean) => {
       if (!this.fromThis(event.sender) || typeof open !== "boolean") return;
       this.setSettingsOpen(open);
+    });
+    ipcMain.on("meetings:show-in-dock", (event, show: unknown) => {
+      if (!this.fromThis(event.sender) || typeof show !== "boolean") return;
+      this.core.setShowInDock(show);
     });
     ipcMain.on("meetings:select", (event, id: number) => {
       if (!this.fromThis(event.sender) || !validMeetingId(id)) return;
@@ -232,7 +237,12 @@ export class MeetingsWindow {
     if (!this.window || this.window.isDestroyed() || !this.pageLoaded) return;
     const selected = this.selectedId === undefined ? undefined : this.core.getMeetingForDisplay(this.selectedId);
     const meetings = this.query.trim() ? this.core.searchMeetings(this.query) : this.core.listMeetings();
-    const payload: MeetingsViewState = { settingsOpen: this.settingsOpen, meetings, selected, query: this.query,
+    const payload: MeetingsViewState = {
+      settingsOpen: this.settingsOpen,
+      showInDock: this.core.showInDock,
+      meetings,
+      selected,
+      query: this.query,
       jobs: this.core.jobs.snapshot,
       ...(selected ? { chat: { history: this.core.getChatHistoryForDisplay(selected.id),
         available: this.core.isChatAvailable(selected.id), revision: this.core.getTranscriptRevision(selected.id) } } : {}),

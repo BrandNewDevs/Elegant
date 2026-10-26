@@ -15,7 +15,7 @@ const meeting: Meeting = { id: 4, app: "Synthetic Meeting", startedAt: "2026-10-
 const record: ChatRecord = { id: "question-1", meetingId: 4, revision: "revision-a", question: "Who will test export?", status: "completed", error: null,
   answer: { text: "Priya will test the export.", refs: [0], sufficient: true }, generation: null, createdAt: "2026-10-24T10:00:00.000Z" };
 function setup(patch: Partial<MeetingsViewState> = {}) {
-  let state: MeetingsViewState = { settingsOpen: false, meetings: [meeting], selected: meeting, query: "", chat: { available: true, history: [], revision: "revision-a" }, ...patch };
+  let state: MeetingsViewState = { settingsOpen: false, showInDock: false, meetings: [meeting], selected: meeting, query: "", chat: { available: true, history: [], revision: "revision-a" }, ...patch };
   let notify: (value: MeetingsViewState) => void = () => {};
   const api = createMeetingsApi({ onState: callback => { notify = callback; callback(state); return () => {}; } });
   window.electron = { meetings: api, setup: {} as Window["electron"]["setup"], prompt: {} as Window["electron"]["prompt"] };

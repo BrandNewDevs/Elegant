@@ -1595,3 +1595,25 @@ describe("searching Meetings", () => {
     expect(core.searchMeetings("launch").map((m) => m.id)).toEqual([launch]);
   });
 });
+
+describe("show in Dock", () => {
+  it("is off until the user turns it on, and each change is announced once", () => {
+    const { core } = setup();
+    const changes: boolean[] = [];
+    core.onShowInDockChange((show) => changes.push(show));
+    expect(core.showInDock).toBe(false);
+
+    core.setShowInDock(true);
+    core.setShowInDock(true);
+    expect(core.showInDock).toBe(true);
+    core.setShowInDock(false);
+    expect(core.showInDock).toBe(false);
+    expect(changes).toEqual([true, false]);
+  });
+
+  it("is remembered by the store, so it survives a restart", () => {
+    const store = openStore(":memory:");
+    new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).setShowInDock(true);
+    expect(new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).showInDock).toBe(true);
+  });
+});

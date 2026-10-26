@@ -104,3 +104,17 @@ it("scrolls its body but not the header or the close button, so they stay in vie
   expect(scroller!.contains(screen.getByRole("heading", { name: "Settings" }))).toBe(false);
   expect(screen.getByRole("dialog").classList.contains("overflow-y-auto")).toBe(false);
 });
+
+it("turns Show in Dock on and off, starting from the stored setting", () => {
+  const send = pushSetupState(nothingDone);
+  const { rerender } = render(<SettingsDialog open onOpenChange={() => {}} showInDock={false} />);
+  const toggle = screen.getByRole("switch", { name: "Show in Dock" });
+  expect(toggle.getAttribute("aria-checked")).toBe("false");
+  fireEvent.click(toggle);
+  expect(send.setShowInDock).toHaveBeenLastCalledWith(true);
+
+  rerender(<SettingsDialog open onOpenChange={() => {}} showInDock />);
+  expect(toggle.getAttribute("aria-checked")).toBe("true");
+  fireEvent.click(toggle);
+  expect(send.setShowInDock).toHaveBeenLastCalledWith(false);
+});
