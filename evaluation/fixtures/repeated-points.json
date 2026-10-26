@@ -1,0 +1,119 @@
+{
+  "id": "repeated-points",
+  "split": "tuning",
+  "synthetic": true,
+  "transcript": {
+    "segments": [
+      {
+        "start": 0,
+        "end": 8,
+        "speaker": "You",
+        "text": "I will test the permission flow on the Mac by Thursday."
+      },
+      {
+        "start": 10,
+        "end": 18,
+        "speaker": "Speaker 1",
+        "text": "I will review the Markdown export on Friday."
+      },
+      {
+        "start": 20,
+        "end": 28,
+        "speaker": "You",
+        "text": "To repeat my only assignment: I will test the permission flow on the Mac by Thursday. This is the same task, not another one."
+      },
+      {
+        "start": 30,
+        "end": 38,
+        "speaker": "Speaker 1",
+        "text": "Repeating my earlier commitment: I will review Markdown export on Friday. There is only one export review."
+      },
+      {
+        "start": 40,
+        "end": 48,
+        "speaker": "You",
+        "text": "The permission test remains my Thursday task. No additional task has been added."
+      },
+      {
+        "start": 50,
+        "end": 58,
+        "speaker": "Speaker 1",
+        "text": "Our release date is not set. The Friday review is not the release date."
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "permission-once",
+      "text": "You will test the Mac permission flow by Thursday, as one task.",
+      "speaker": "You",
+      "refs": [
+        0,
+        2,
+        4
+      ],
+      "critical": true
+    },
+    {
+      "id": "review-once",
+      "text": "Speaker 1 will review Markdown export on Friday, as one task.",
+      "speaker": "Speaker 1",
+      "refs": [
+        1,
+        3
+      ],
+      "critical": true
+    },
+    {
+      "id": "no-release",
+      "text": "The release date remains unset; Friday refers to the review.",
+      "speaker": "Speaker 1",
+      "refs": [
+        5
+      ],
+      "critical": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "tasks",
+      "question": "What are the two distinct commitments?",
+      "answer": "You will test the Mac permission flow by Thursday; Speaker 1 will review Markdown export on Friday.",
+      "refs": [
+        0,
+        1
+      ],
+      "critical": true
+    },
+    {
+      "id": "release",
+      "question": "Is the release scheduled for Friday?",
+      "answer": "No. Friday is the review day; the release date is not set.",
+      "refs": [
+        5
+      ],
+      "critical": true
+    },
+    {
+      "id": "review-day",
+      "question": "When is the export review?",
+      "answer": "Friday",
+      "refs": [
+        1,
+        3
+      ],
+      "critical": false
+    },
+    {
+      "id": "review-owner",
+      "question": "Who will do it?",
+      "answer": "Speaker 1",
+      "refs": [
+        1,
+        3
+      ],
+      "critical": true,
+      "followUpTo": "review-day"
+    }
+  ]
+}

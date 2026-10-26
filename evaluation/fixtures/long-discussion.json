@@ -1,0 +1,1254 @@
+{
+  "id": "long-discussion",
+  "split": "reserved",
+  "synthetic": true,
+  "transcript": {
+    "segments": [
+      {
+        "start": 0.0,
+        "end": 18.57,
+        "speaker": "You",
+        "text": "For the initial release plan we provisionally choose Monday and PDF export. These choices are subject to the final offline review."
+      },
+      {
+        "start": 19.57,
+        "end": 38.13,
+        "speaker": "Speaker 1",
+        "text": "I accept Monday and PDF provisionally. We will revisit both at the end after checking the offline results."
+      },
+      {
+        "start": 39.13,
+        "end": 57.7,
+        "speaker": "You",
+        "text": "Review round 1, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 58.7,
+        "end": 77.26,
+        "speaker": "Speaker 1",
+        "text": "Review round 1, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 78.26,
+        "end": 96.83,
+        "speaker": "Speaker 2",
+        "text": "Review round 1, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 97.83,
+        "end": 116.39,
+        "speaker": "You",
+        "text": "Review round 1, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 117.39,
+        "end": 135.96,
+        "speaker": "Speaker 1",
+        "text": "Review round 1, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 136.96,
+        "end": 155.52,
+        "speaker": "Speaker 2",
+        "text": "Review round 1, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 156.52,
+        "end": 175.09,
+        "speaker": "You",
+        "text": "Review round 1, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 176.09,
+        "end": 194.65,
+        "speaker": "Speaker 1",
+        "text": "Review round 1, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 195.65,
+        "end": 214.22,
+        "speaker": "Speaker 2",
+        "text": "Review round 2, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 215.22,
+        "end": 233.78,
+        "speaker": "You",
+        "text": "Review round 2, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 234.78,
+        "end": 253.35,
+        "speaker": "Speaker 1",
+        "text": "Review round 2, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 254.35,
+        "end": 272.91,
+        "speaker": "Speaker 2",
+        "text": "Review round 2, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 273.91,
+        "end": 292.48,
+        "speaker": "You",
+        "text": "Review round 2, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 293.48,
+        "end": 312.04,
+        "speaker": "Speaker 1",
+        "text": "Review round 2, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 313.04,
+        "end": 331.61,
+        "speaker": "Speaker 2",
+        "text": "Review round 2, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 332.61,
+        "end": 351.17,
+        "speaker": "You",
+        "text": "Review round 2, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 352.17,
+        "end": 370.74,
+        "speaker": "Speaker 1",
+        "text": "Review round 3, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 371.74,
+        "end": 390.3,
+        "speaker": "Speaker 2",
+        "text": "Review round 3, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 391.3,
+        "end": 409.87,
+        "speaker": "You",
+        "text": "Review round 3, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 410.87,
+        "end": 429.43,
+        "speaker": "Speaker 1",
+        "text": "Review round 3, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 430.43,
+        "end": 449.0,
+        "speaker": "Speaker 2",
+        "text": "Review round 3, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 450.0,
+        "end": 468.57,
+        "speaker": "You",
+        "text": "Review round 3, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 469.57,
+        "end": 488.13,
+        "speaker": "Speaker 1",
+        "text": "Review round 3, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 489.13,
+        "end": 507.7,
+        "speaker": "Speaker 2",
+        "text": "Review round 3, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 508.7,
+        "end": 527.26,
+        "speaker": "You",
+        "text": "Review round 4, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 528.26,
+        "end": 546.83,
+        "speaker": "Speaker 1",
+        "text": "Review round 4, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 547.83,
+        "end": 566.39,
+        "speaker": "Speaker 2",
+        "text": "Review round 4, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 567.39,
+        "end": 585.96,
+        "speaker": "You",
+        "text": "Review round 4, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 586.96,
+        "end": 605.52,
+        "speaker": "Speaker 1",
+        "text": "Review round 4, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 606.52,
+        "end": 625.09,
+        "speaker": "Speaker 2",
+        "text": "Review round 4, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 626.09,
+        "end": 644.65,
+        "speaker": "You",
+        "text": "Review round 4, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 645.65,
+        "end": 664.22,
+        "speaker": "Speaker 1",
+        "text": "Review round 4, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 665.22,
+        "end": 683.78,
+        "speaker": "Speaker 2",
+        "text": "Review round 5, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 684.78,
+        "end": 703.35,
+        "speaker": "You",
+        "text": "Review round 5, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 704.35,
+        "end": 722.91,
+        "speaker": "Speaker 1",
+        "text": "Review round 5, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 723.91,
+        "end": 742.48,
+        "speaker": "Speaker 2",
+        "text": "Review round 5, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 743.48,
+        "end": 762.04,
+        "speaker": "You",
+        "text": "Review round 5, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 763.04,
+        "end": 781.61,
+        "speaker": "Speaker 1",
+        "text": "Review round 5, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 782.61,
+        "end": 801.17,
+        "speaker": "Speaker 2",
+        "text": "Review round 5, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 802.17,
+        "end": 820.74,
+        "speaker": "You",
+        "text": "Review round 5, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 821.74,
+        "end": 840.3,
+        "speaker": "Speaker 1",
+        "text": "Review round 6, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 841.3,
+        "end": 859.87,
+        "speaker": "Speaker 2",
+        "text": "Review round 6, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 860.87,
+        "end": 879.43,
+        "speaker": "You",
+        "text": "Review round 6, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 880.43,
+        "end": 899.0,
+        "speaker": "Speaker 1",
+        "text": "Review round 6, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 900.0,
+        "end": 918.57,
+        "speaker": "Speaker 2",
+        "text": "Review round 6, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 919.57,
+        "end": 938.13,
+        "speaker": "You",
+        "text": "Review round 6, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 939.13,
+        "end": 957.7,
+        "speaker": "Speaker 1",
+        "text": "Review round 6, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 958.7,
+        "end": 977.26,
+        "speaker": "Speaker 2",
+        "text": "Review round 6, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 978.26,
+        "end": 996.83,
+        "speaker": "You",
+        "text": "Review round 7, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 997.83,
+        "end": 1016.39,
+        "speaker": "Speaker 1",
+        "text": "Review round 7, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 1017.39,
+        "end": 1035.96,
+        "speaker": "Speaker 2",
+        "text": "Review round 7, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 1036.96,
+        "end": 1055.52,
+        "speaker": "You",
+        "text": "Review round 7, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 1056.52,
+        "end": 1075.09,
+        "speaker": "Speaker 1",
+        "text": "Review round 7, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 1076.09,
+        "end": 1094.65,
+        "speaker": "Speaker 2",
+        "text": "Review round 7, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 1095.65,
+        "end": 1114.22,
+        "speaker": "You",
+        "text": "Review round 7, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 1115.22,
+        "end": 1133.78,
+        "speaker": "Speaker 1",
+        "text": "Review round 7, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 1134.78,
+        "end": 1153.35,
+        "speaker": "Speaker 2",
+        "text": "Review round 8, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 1154.35,
+        "end": 1172.91,
+        "speaker": "You",
+        "text": "Review round 8, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 1173.91,
+        "end": 1192.48,
+        "speaker": "Speaker 1",
+        "text": "Review round 8, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 1193.48,
+        "end": 1212.04,
+        "speaker": "Speaker 2",
+        "text": "Review round 8, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 1213.04,
+        "end": 1231.61,
+        "speaker": "You",
+        "text": "Review round 8, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 1232.61,
+        "end": 1251.17,
+        "speaker": "Speaker 1",
+        "text": "Review round 8, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 1252.17,
+        "end": 1270.74,
+        "speaker": "Speaker 2",
+        "text": "Review round 8, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 1271.74,
+        "end": 1290.3,
+        "speaker": "You",
+        "text": "Review round 8, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 1291.3,
+        "end": 1309.87,
+        "speaker": "Speaker 1",
+        "text": "Review round 9, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 1310.87,
+        "end": 1329.43,
+        "speaker": "Speaker 2",
+        "text": "Review round 9, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 1330.43,
+        "end": 1349.0,
+        "speaker": "You",
+        "text": "Review round 9, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 1350.0,
+        "end": 1368.57,
+        "speaker": "Speaker 1",
+        "text": "Review round 9, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 1369.57,
+        "end": 1388.13,
+        "speaker": "Speaker 2",
+        "text": "Review round 9, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 1389.13,
+        "end": 1407.7,
+        "speaker": "You",
+        "text": "Review round 9, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 1408.7,
+        "end": 1427.26,
+        "speaker": "Speaker 1",
+        "text": "Review round 9, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 1428.26,
+        "end": 1446.83,
+        "speaker": "Speaker 2",
+        "text": "Review round 9, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 1447.83,
+        "end": 1466.39,
+        "speaker": "You",
+        "text": "Review round 10, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 1467.39,
+        "end": 1485.96,
+        "speaker": "Speaker 1",
+        "text": "Review round 10, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 1486.96,
+        "end": 1505.52,
+        "speaker": "Speaker 2",
+        "text": "Review round 10, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 1506.52,
+        "end": 1525.09,
+        "speaker": "You",
+        "text": "Review round 10, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 1526.09,
+        "end": 1544.65,
+        "speaker": "Speaker 1",
+        "text": "Review round 10, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 1545.65,
+        "end": 1564.22,
+        "speaker": "Speaker 2",
+        "text": "Review round 10, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 1565.22,
+        "end": 1583.78,
+        "speaker": "You",
+        "text": "Review round 10, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 1584.78,
+        "end": 1603.35,
+        "speaker": "Speaker 1",
+        "text": "Review round 10, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 1604.35,
+        "end": 1622.91,
+        "speaker": "Speaker 2",
+        "text": "Review round 11, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 1623.91,
+        "end": 1642.48,
+        "speaker": "You",
+        "text": "Review round 11, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 1643.48,
+        "end": 1662.04,
+        "speaker": "Speaker 1",
+        "text": "Review round 11, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 1663.04,
+        "end": 1681.61,
+        "speaker": "Speaker 2",
+        "text": "Review round 11, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 1682.61,
+        "end": 1701.17,
+        "speaker": "You",
+        "text": "Review round 11, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 1702.17,
+        "end": 1720.74,
+        "speaker": "Speaker 1",
+        "text": "Review round 11, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 1721.74,
+        "end": 1740.3,
+        "speaker": "Speaker 2",
+        "text": "Review round 11, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 1741.3,
+        "end": 1759.87,
+        "speaker": "You",
+        "text": "Review round 11, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 1760.87,
+        "end": 1779.43,
+        "speaker": "Speaker 1",
+        "text": "Review round 12, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 1780.43,
+        "end": 1799.0,
+        "speaker": "Speaker 2",
+        "text": "Review round 12, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 1800.0,
+        "end": 1818.57,
+        "speaker": "You",
+        "text": "Review round 12, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 1819.57,
+        "end": 1838.13,
+        "speaker": "Speaker 1",
+        "text": "Review round 12, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 1839.13,
+        "end": 1857.7,
+        "speaker": "Speaker 2",
+        "text": "Review round 12, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 1858.7,
+        "end": 1877.26,
+        "speaker": "You",
+        "text": "Review round 12, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 1878.26,
+        "end": 1896.83,
+        "speaker": "Speaker 1",
+        "text": "Review round 12, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 1897.83,
+        "end": 1916.39,
+        "speaker": "Speaker 2",
+        "text": "Review round 12, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 1917.39,
+        "end": 1935.96,
+        "speaker": "You",
+        "text": "Review round 13, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 1936.96,
+        "end": 1955.52,
+        "speaker": "Speaker 1",
+        "text": "Review round 13, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 1956.52,
+        "end": 1975.09,
+        "speaker": "Speaker 2",
+        "text": "Review round 13, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 1976.09,
+        "end": 1994.65,
+        "speaker": "You",
+        "text": "Review round 13, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 1995.65,
+        "end": 2014.22,
+        "speaker": "Speaker 1",
+        "text": "Review round 13, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 2015.22,
+        "end": 2033.78,
+        "speaker": "Speaker 2",
+        "text": "Review round 13, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 2034.78,
+        "end": 2053.35,
+        "speaker": "You",
+        "text": "Review round 13, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 2054.35,
+        "end": 2072.91,
+        "speaker": "Speaker 1",
+        "text": "Review round 13, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 2073.91,
+        "end": 2092.48,
+        "speaker": "Speaker 2",
+        "text": "Review round 14, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 2093.48,
+        "end": 2112.04,
+        "speaker": "You",
+        "text": "Review round 14, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 2113.04,
+        "end": 2131.61,
+        "speaker": "Speaker 1",
+        "text": "Review round 14, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 2132.61,
+        "end": 2151.17,
+        "speaker": "Speaker 2",
+        "text": "Review round 14, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 2152.17,
+        "end": 2170.74,
+        "speaker": "You",
+        "text": "Review round 14, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 2171.74,
+        "end": 2190.3,
+        "speaker": "Speaker 1",
+        "text": "Review round 14, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 2191.3,
+        "end": 2209.87,
+        "speaker": "Speaker 2",
+        "text": "Review round 14, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 2210.87,
+        "end": 2229.43,
+        "speaker": "You",
+        "text": "Review round 14, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 2230.43,
+        "end": 2249.0,
+        "speaker": "Speaker 1",
+        "text": "Review round 15, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 2250.0,
+        "end": 2268.57,
+        "speaker": "Speaker 2",
+        "text": "Review round 15, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 2269.57,
+        "end": 2288.13,
+        "speaker": "You",
+        "text": "Review round 15, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 2289.13,
+        "end": 2307.7,
+        "speaker": "Speaker 1",
+        "text": "Review round 15, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 2308.7,
+        "end": 2327.26,
+        "speaker": "Speaker 2",
+        "text": "Review round 15, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 2328.26,
+        "end": 2346.83,
+        "speaker": "You",
+        "text": "Review round 15, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 2347.83,
+        "end": 2366.39,
+        "speaker": "Speaker 1",
+        "text": "Review round 15, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 2367.39,
+        "end": 2385.96,
+        "speaker": "Speaker 2",
+        "text": "Review round 15, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 2386.96,
+        "end": 2405.52,
+        "speaker": "You",
+        "text": "Review round 16, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 2406.52,
+        "end": 2425.09,
+        "speaker": "Speaker 1",
+        "text": "Review round 16, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 2426.09,
+        "end": 2444.65,
+        "speaker": "Speaker 2",
+        "text": "Review round 16, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 2445.65,
+        "end": 2464.22,
+        "speaker": "You",
+        "text": "Review round 16, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 2465.22,
+        "end": 2483.78,
+        "speaker": "Speaker 1",
+        "text": "Review round 16, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 2484.78,
+        "end": 2503.35,
+        "speaker": "Speaker 2",
+        "text": "Review round 16, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 2504.35,
+        "end": 2522.91,
+        "speaker": "You",
+        "text": "Review round 16, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 2523.91,
+        "end": 2542.48,
+        "speaker": "Speaker 1",
+        "text": "Review round 16, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 2543.48,
+        "end": 2562.04,
+        "speaker": "Speaker 2",
+        "text": "Review round 17, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 2563.04,
+        "end": 2581.61,
+        "speaker": "You",
+        "text": "Review round 17, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 2582.61,
+        "end": 2601.17,
+        "speaker": "Speaker 1",
+        "text": "Review round 17, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 2602.17,
+        "end": 2620.74,
+        "speaker": "Speaker 2",
+        "text": "Review round 17, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 2621.74,
+        "end": 2640.3,
+        "speaker": "You",
+        "text": "Review round 17, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 2641.3,
+        "end": 2659.87,
+        "speaker": "Speaker 1",
+        "text": "Review round 17, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 2660.87,
+        "end": 2679.43,
+        "speaker": "Speaker 2",
+        "text": "Review round 17, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 2680.43,
+        "end": 2699.0,
+        "speaker": "You",
+        "text": "Review round 17, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 2700.0,
+        "end": 2718.57,
+        "speaker": "Speaker 1",
+        "text": "Review round 18, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 2719.57,
+        "end": 2738.13,
+        "speaker": "Speaker 2",
+        "text": "Review round 18, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 2739.13,
+        "end": 2757.7,
+        "speaker": "You",
+        "text": "Review round 18, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 2758.7,
+        "end": 2777.26,
+        "speaker": "Speaker 1",
+        "text": "Review round 18, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 2778.26,
+        "end": 2796.83,
+        "speaker": "Speaker 2",
+        "text": "Review round 18, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 2797.83,
+        "end": 2816.39,
+        "speaker": "You",
+        "text": "Review round 18, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 2817.39,
+        "end": 2835.96,
+        "speaker": "Speaker 1",
+        "text": "Review round 18, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 2836.96,
+        "end": 2855.52,
+        "speaker": "Speaker 2",
+        "text": "Review round 18, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 2856.52,
+        "end": 2875.09,
+        "speaker": "You",
+        "text": "Review round 19, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 2876.09,
+        "end": 2894.65,
+        "speaker": "Speaker 1",
+        "text": "Review round 19, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 2895.65,
+        "end": 2914.22,
+        "speaker": "Speaker 2",
+        "text": "Review round 19, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 2915.22,
+        "end": 2933.78,
+        "speaker": "You",
+        "text": "Review round 19, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 2934.78,
+        "end": 2953.35,
+        "speaker": "Speaker 1",
+        "text": "Review round 19, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 2954.35,
+        "end": 2972.91,
+        "speaker": "Speaker 2",
+        "text": "Review round 19, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 2973.91,
+        "end": 2992.48,
+        "speaker": "You",
+        "text": "Review round 19, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 2993.48,
+        "end": 3012.04,
+        "speaker": "Speaker 1",
+        "text": "Review round 19, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 3013.04,
+        "end": 3031.61,
+        "speaker": "Speaker 2",
+        "text": "Review round 20, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 3032.61,
+        "end": 3051.17,
+        "speaker": "You",
+        "text": "Review round 20, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 3052.17,
+        "end": 3070.74,
+        "speaker": "Speaker 1",
+        "text": "Review round 20, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 3071.74,
+        "end": 3090.3,
+        "speaker": "Speaker 2",
+        "text": "Review round 20, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 3091.3,
+        "end": 3109.87,
+        "speaker": "You",
+        "text": "Review round 20, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 3110.87,
+        "end": 3129.43,
+        "speaker": "Speaker 1",
+        "text": "Review round 20, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 3130.43,
+        "end": 3149.0,
+        "speaker": "Speaker 2",
+        "text": "Review round 20, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 3150.0,
+        "end": 3168.57,
+        "speaker": "You",
+        "text": "Review round 20, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 3169.57,
+        "end": 3188.13,
+        "speaker": "Speaker 1",
+        "text": "Review round 21, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 3189.13,
+        "end": 3207.7,
+        "speaker": "Speaker 2",
+        "text": "Review round 21, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 3208.7,
+        "end": 3227.26,
+        "speaker": "You",
+        "text": "Review round 21, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 3228.26,
+        "end": 3246.83,
+        "speaker": "Speaker 1",
+        "text": "Review round 21, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 3247.83,
+        "end": 3266.39,
+        "speaker": "Speaker 2",
+        "text": "Review round 21, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 3267.39,
+        "end": 3285.96,
+        "speaker": "You",
+        "text": "Review round 21, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 3286.96,
+        "end": 3305.52,
+        "speaker": "Speaker 1",
+        "text": "Review round 21, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 3306.52,
+        "end": 3325.09,
+        "speaker": "Speaker 2",
+        "text": "Review round 21, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 3326.09,
+        "end": 3344.65,
+        "speaker": "You",
+        "text": "Review round 22, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline."
+      },
+      {
+        "start": 3345.65,
+        "end": 3364.22,
+        "speaker": "Speaker 1",
+        "text": "Review round 22, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment."
+      },
+      {
+        "start": 3365.22,
+        "end": 3383.78,
+        "speaker": "Speaker 2",
+        "text": "Review round 22, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim."
+      },
+      {
+        "start": 3384.78,
+        "end": 3403.35,
+        "speaker": "You",
+        "text": "Review round 22, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task."
+      },
+      {
+        "start": 3404.35,
+        "end": 3422.91,
+        "speaker": "Speaker 1",
+        "text": "Review round 22, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices."
+      },
+      {
+        "start": 3423.91,
+        "end": 3442.48,
+        "speaker": "Speaker 2",
+        "text": "Review round 22, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant."
+      },
+      {
+        "start": 3443.48,
+        "end": 3462.04,
+        "speaker": "You",
+        "text": "Review round 22, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim."
+      },
+      {
+        "start": 3463.04,
+        "end": 3481.61,
+        "speaker": "Speaker 1",
+        "text": "Review round 22, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result."
+      },
+      {
+        "start": 3482.61,
+        "end": 3501.17,
+        "speaker": "Speaker 2",
+        "text": "The final offline review failed for the PDF path. Markdown export passed that check. These are test outcomes for this synthetic discussion, not measurements of the actual app."
+      },
+      {
+        "start": 3502.17,
+        "end": 3520.74,
+        "speaker": "Speaker 1",
+        "text": "Given that result, I propose Friday instead of Monday, and Markdown instead of PDF. My earlier agreement was provisional."
+      },
+      {
+        "start": 3521.74,
+        "end": 3540.3,
+        "speaker": "You",
+        "text": "Final decision: launch on Friday with Markdown export. Friday replaces Monday and Markdown replaces PDF. The provisional plan is withdrawn."
+      },
+      {
+        "start": 3541.3,
+        "end": 3559.87,
+        "speaker": "Speaker 1",
+        "text": "I agree to Friday and Markdown as the final plan. I will update the demo guide by Wednesday."
+      },
+      {
+        "start": 3560.87,
+        "end": 3579.43,
+        "speaker": "Speaker 2",
+        "text": "I will rerun the offline workflow on Thursday. No one has measured the M4 memory peak yet."
+      },
+      {
+        "start": 3580.43,
+        "end": 3599.0,
+        "speaker": "You",
+        "text": "Agreed. We have no calendar date for Friday and no assigned owner for packaging. Do not infer either from this discussion."
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "final-day",
+      "text": "Friday replaces the provisional Monday launch.",
+      "speaker": "You",
+      "refs": [
+        180
+      ],
+      "critical": true
+    },
+    {
+      "id": "final-format",
+      "text": "Markdown replaces PDF as the final export format.",
+      "speaker": "You",
+      "refs": [
+        180
+      ],
+      "critical": true
+    },
+    {
+      "id": "offline-result",
+      "text": "The final offline review failed for PDF and passed for Markdown in this synthetic discussion.",
+      "speaker": "Speaker 2",
+      "refs": [
+        178
+      ],
+      "critical": true
+    },
+    {
+      "id": "guide",
+      "text": "Speaker 1 will update the demo guide by Wednesday.",
+      "speaker": "Speaker 1",
+      "refs": [
+        181
+      ],
+      "critical": true
+    },
+    {
+      "id": "offline-retest",
+      "text": "Speaker 2 will rerun the offline workflow on Thursday.",
+      "speaker": "Speaker 2",
+      "refs": [
+        182
+      ],
+      "critical": true
+    },
+    {
+      "id": "memory-unknown",
+      "text": "No M4 memory peak has been measured.",
+      "speaker": "Speaker 2",
+      "refs": [
+        182
+      ],
+      "critical": false
+    },
+    {
+      "id": "unassigned-packaging",
+      "text": "Packaging has no assigned owner.",
+      "speaker": "You",
+      "refs": [
+        183
+      ],
+      "critical": true
+    },
+    {
+      "id": "date-unknown",
+      "text": "No calendar date for Friday was established.",
+      "speaker": "You",
+      "refs": [
+        183
+      ],
+      "critical": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "final-plan",
+      "question": "What is the final launch plan?",
+      "answer": "Friday with Markdown export; Monday and PDF were provisional and were replaced.",
+      "refs": [
+        180,
+        181
+      ],
+      "critical": true
+    },
+    {
+      "id": "guide-owner",
+      "question": "Who will update the demo guide?",
+      "answer": "Speaker 1",
+      "refs": [
+        181
+      ],
+      "critical": true
+    },
+    {
+      "id": "guide-deadline",
+      "question": "When will they do that?",
+      "answer": "Wednesday",
+      "refs": [
+        181
+      ],
+      "critical": true,
+      "followUpTo": "guide-owner"
+    },
+    {
+      "id": "retest",
+      "question": "Who will rerun the offline workflow, and when?",
+      "answer": "Speaker 2 on Thursday.",
+      "refs": [
+        182
+      ],
+      "critical": true
+    },
+    {
+      "id": "packaging",
+      "question": "Who owns packaging?",
+      "answer": null,
+      "refs": [
+        183
+      ],
+      "critical": true
+    },
+    {
+      "id": "peak",
+      "question": "What was the measured M4 memory peak?",
+      "answer": null,
+      "refs": [
+        182
+      ],
+      "critical": true
+    },
+    {
+      "id": "date",
+      "question": "What is the calendar date of launch?",
+      "answer": null,
+      "refs": [
+        183
+      ],
+      "critical": true
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+{
+  "id": "ambiguous-ownership",
+  "split": "reserved",
+  "synthetic": true,
+  "transcript": {
+    "segments": [
+      {
+        "start": 0,
+        "end": 8,
+        "speaker": "You",
+        "text": "The permission guide needs an update before the demo, but I cannot take it on."
+      },
+      {
+        "start": 10,
+        "end": 18,
+        "speaker": "Speaker 1",
+        "text": "Maybe Speaker 2 could update it, if they have time. That is a suggestion, not an assignment."
+      },
+      {
+        "start": 20,
+        "end": 28,
+        "speaker": "Speaker 2",
+        "text": "I need to check my workload before I can say yes. Please do not list me as the owner."
+      },
+      {
+        "start": 30,
+        "end": 38,
+        "speaker": "You",
+        "text": "Understood. The guide is unassigned and we have not set a deadline. I will ask the team about ownership tomorrow."
+      },
+      {
+        "start": 40,
+        "end": 48,
+        "speaker": "Speaker 1",
+        "text": "I can commit to reviewing the guide after someone writes it. I am not committing to writing it."
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "unassigned",
+      "text": "The permission guide remains unassigned, without a deadline.",
+      "speaker": "You",
+      "refs": [
+        3
+      ],
+      "critical": true
+    },
+    {
+      "id": "no-acceptance",
+      "text": "Speaker 2 did not accept ownership.",
+      "speaker": "Speaker 2",
+      "refs": [
+        2
+      ],
+      "critical": true
+    },
+    {
+      "id": "ask-team",
+      "text": "You will ask the team about ownership tomorrow.",
+      "speaker": "You",
+      "refs": [
+        3
+      ],
+      "critical": false
+    },
+    {
+      "id": "review-only",
+      "text": "Speaker 1 committed to reviewing, not writing, the guide.",
+      "speaker": "Speaker 1",
+      "refs": [
+        4
+      ],
+      "critical": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "guide-owner",
+      "question": "Who owns the permission guide?",
+      "answer": null,
+      "refs": [
+        2,
+        3
+      ],
+      "critical": true
+    },
+    {
+      "id": "guide-deadline",
+      "question": "What is its deadline?",
+      "answer": null,
+      "refs": [
+        3
+      ],
+      "critical": true,
+      "followUpTo": "guide-owner"
+    },
+    {
+      "id": "reviewer",
+      "question": "Who agreed to review the guide?",
+      "answer": "Speaker 1",
+      "refs": [
+        4
+      ],
+      "critical": true
+    },
+    {
+      "id": "acceptance",
+      "question": "Did Speaker 2 accept the suggested assignment?",
+      "answer": "No. Speaker 2 explicitly did not accept it.",
+      "refs": [
+        2
+      ],
+      "critical": true
+    }
+  ]
+}

@@ -1,0 +1,110 @@
+{
+  "id": "straightforward",
+  "split": "tuning",
+  "synthetic": true,
+  "transcript": {
+    "segments": [
+      {
+        "start": 0,
+        "end": 8,
+        "speaker": "You",
+        "text": "The desktop settings screen is ready. I will write the permission guide by Thursday."
+      },
+      {
+        "start": 10,
+        "end": 18,
+        "speaker": "Speaker 1",
+        "text": "I completed the search tests. I will review your permission guide on Friday."
+      },
+      {
+        "start": 20,
+        "end": 28,
+        "speaker": "You",
+        "text": "We agree to keep the first release English only. We are not adding calendar integration."
+      },
+      {
+        "start": 30,
+        "end": 38,
+        "speaker": "Speaker 1",
+        "text": "Agreed. The release date is still undecided."
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "permission-guide",
+      "text": "You will write the permission guide by Thursday.",
+      "speaker": "You",
+      "refs": [
+        0
+      ],
+      "critical": true
+    },
+    {
+      "id": "guide-review",
+      "text": "Speaker 1 will review the permission guide on Friday.",
+      "speaker": "Speaker 1",
+      "refs": [
+        1
+      ],
+      "critical": true
+    },
+    {
+      "id": "scope",
+      "text": "The first release is English only, with no calendar integration.",
+      "speaker": "You",
+      "refs": [
+        2
+      ],
+      "critical": true
+    },
+    {
+      "id": "release-date",
+      "text": "The release date remains undecided.",
+      "speaker": "Speaker 1",
+      "refs": [
+        3
+      ],
+      "critical": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "owner",
+      "question": "Who will write the permission guide?",
+      "answer": "You",
+      "refs": [
+        0
+      ],
+      "critical": true
+    },
+    {
+      "id": "deadline",
+      "question": "When will they finish it?",
+      "answer": "Thursday",
+      "refs": [
+        0
+      ],
+      "critical": true,
+      "followUpTo": "owner"
+    },
+    {
+      "id": "release",
+      "question": "What is the release date?",
+      "answer": null,
+      "refs": [
+        3
+      ],
+      "critical": true
+    },
+    {
+      "id": "calendar",
+      "question": "Is calendar integration included?",
+      "answer": "No, calendar integration is excluded.",
+      "refs": [
+        2
+      ],
+      "critical": true
+    }
+  ]
+}

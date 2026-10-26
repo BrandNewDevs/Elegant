@@ -1,0 +1,131 @@
+{
+  "id": "changed-decision",
+  "split": "reserved",
+  "synthetic": true,
+  "transcript": {
+    "segments": [
+      {
+        "start": 0,
+        "end": 8,
+        "speaker": "You",
+        "text": "My initial proposal is to launch on Monday with PDF export."
+      },
+      {
+        "start": 10,
+        "end": 18,
+        "speaker": "Speaker 1",
+        "text": "I agree with Monday and PDF for now, provided the offline test passes."
+      },
+      {
+        "start": 20,
+        "end": 28,
+        "speaker": "You",
+        "text": "The offline test failed. We need to revise both choices."
+      },
+      {
+        "start": 30,
+        "end": 38,
+        "speaker": "Speaker 1",
+        "text": "Then I propose Friday instead, and Markdown export because that already works without an external service."
+      },
+      {
+        "start": 40,
+        "end": 48,
+        "speaker": "You",
+        "text": "Agreed. Friday replaces Monday, and Markdown replaces PDF. These are the final decisions."
+      },
+      {
+        "start": 50,
+        "end": 58,
+        "speaker": "Speaker 1",
+        "text": "I will run the offline test again on Wednesday. We did not set a calendar date for Friday."
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "final-day",
+      "text": "Friday replaces the provisional Monday launch.",
+      "speaker": "You",
+      "refs": [
+        4
+      ],
+      "critical": true
+    },
+    {
+      "id": "final-format",
+      "text": "Markdown replaces PDF as the final export choice.",
+      "speaker": "You",
+      "refs": [
+        4
+      ],
+      "critical": true
+    },
+    {
+      "id": "retest",
+      "text": "Speaker 1 will rerun the offline test on Wednesday.",
+      "speaker": "Speaker 1",
+      "refs": [
+        5
+      ],
+      "critical": true
+    },
+    {
+      "id": "reason",
+      "text": "The failed offline test caused the original choices to be revised.",
+      "speaker": "You",
+      "refs": [
+        2
+      ],
+      "critical": false
+    }
+  ],
+  "questions": [
+    {
+      "id": "launch",
+      "question": "What is the final launch day?",
+      "answer": "Friday, replacing Monday.",
+      "refs": [
+        4
+      ],
+      "critical": true
+    },
+    {
+      "id": "export",
+      "question": "Is PDF still the final export choice?",
+      "answer": "No. Markdown replaces PDF.",
+      "refs": [
+        4
+      ],
+      "critical": true
+    },
+    {
+      "id": "retest-owner",
+      "question": "Who will rerun the offline test?",
+      "answer": "Speaker 1",
+      "refs": [
+        5
+      ],
+      "critical": true
+    },
+    {
+      "id": "retest-when",
+      "question": "When will they do that?",
+      "answer": "Wednesday",
+      "refs": [
+        5
+      ],
+      "critical": true,
+      "followUpTo": "retest-owner"
+    },
+    {
+      "id": "date",
+      "question": "What calendar date is the launch?",
+      "answer": null,
+      "refs": [
+        5
+      ],
+      "critical": true
+    }
+  ]
+}
