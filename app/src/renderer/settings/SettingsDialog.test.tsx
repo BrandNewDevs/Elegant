@@ -94,3 +94,13 @@ it("does not put focus on the close button when it opens, even though the conten
   act(() => push(nothingDone));
   expect(screen.getByRole("dialog")).toBe(document.activeElement);
 });
+
+it("scrolls its body but not the header or the close button, so they stay in view", () => {
+  pushSetupState(nothingDone);
+  render(<SettingsDialog open onOpenChange={() => {}} />);
+  const scroller = screen.getByLabelText("Name").closest(".overflow-y-auto");
+  expect(scroller).toBeTruthy();
+  expect(scroller!.contains(screen.getByRole("button", { name: "Close" }))).toBe(false);
+  expect(scroller!.contains(screen.getByRole("heading", { name: "Settings" }))).toBe(false);
+  expect(screen.getByRole("dialog").classList.contains("overflow-y-auto")).toBe(false);
+});

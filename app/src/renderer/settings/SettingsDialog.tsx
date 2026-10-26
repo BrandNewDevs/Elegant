@@ -205,7 +205,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-h-[88vh] max-w-xl overflow-y-auto"
+        className="flex max-h-[88vh] max-w-xl flex-col gap-0 overflow-hidden p-0"
         // The content below arrives a moment after the dialog opens, so by default focus would land on the close button, the
         // only thing there yet. Put it on the dialog itself instead: Esc and Tab work, and nothing looks focused.
         onOpenAutoFocus={(event) => {
@@ -213,14 +213,17 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           (event.currentTarget as HTMLElement).focus();
         }}
       >
-        <DialogHeader>
+        {/* The frame does not scroll, so the header and the close button stay put; only the body below does. */}
+        <DialogHeader className="border-b p-6 pr-12">
           <DialogTitle className="flex items-center gap-2.5 text-xl">
             <Settings className="size-5 text-muted-foreground" aria-hidden />
             Settings
           </DialogTitle>
           <DialogDescription>Your name, the permissions, and what summaries need.</DialogDescription>
         </DialogHeader>
-        <SettingsContent />
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">
+          <SettingsContent />
+        </div>
       </DialogContent>
     </Dialog>
   );
