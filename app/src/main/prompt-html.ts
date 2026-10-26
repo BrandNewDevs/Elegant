@@ -1,5 +1,6 @@
 export const RECORD_URL = "prompt://record";
 export const NOT_NOW_URL = "prompt://not-now";
+export const NEVER_URL = "prompt://never";
 
 export function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -41,6 +42,6 @@ export function promptHtml(app: string): string {
       <h1>${escapeHtml(app)} is using your microphone</h1>
       <p>Record this Meeting? Nothing is kept unless you do.</p>
     </div>
-    <div class="buttons"><a class="record" href="${RECORD_URL}">Record</a><a href="${NOT_NOW_URL}">Not now</a></div>
+    <div class="buttons"><a class="record" href="${RECORD_URL}">Record</a><a href="${NOT_NOW_URL}">Not now</a><a href="${NEVER_URL}">Never for this app</a></div>
   </div>`;
 }
