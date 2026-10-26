@@ -37,6 +37,20 @@ export function factsSchema(sources: SourcePiece[], speakers = sources) {
   } } } } };
 }
 
+/** Consolidation must account for every candidate without moving contributions between speakers. */
+export function reductionSchema(sources: SourcePiece[], candidates: SupportedFact[]) {
+  const schema = factsSchema(sources);
+  const facts = schema.properties.facts;
+  return { ...schema, properties: { facts: { ...facts, items: { ...facts.items, properties: { ...facts.items.properties,
+    covers: { type: "array", minItems: 1, uniqueItems: true, items: { type: "integer", enum: candidates.map((_, index) => index) } },
+  }, required: [...facts.items.required, "covers"] } } } };
+}
+export function tldrSchema(sources: SourcePiece[]) {
+  return { type: "object", properties: { tldr: { type: "string" },
+    sourceIds: { type: "array", minItems: 1, uniqueItems: true, items: { type: "string", enum: sources.map(source => source.id) } },
+  }, required: ["tldr", "sourceIds"] };
+}
+
 /** Refinement cites draft point IDs; application code carries their original evidence forward. */
 export function refinementSchema(points: SupportedPoint[]) {
   return { type: "object", properties: { points: { type: "array", items: { type: "object", properties: {
@@ -102,6 +116,29 @@ export function parseFacts(json: string, sources: SourcePiece[], primary?: Sourc
     if (primary && !selected.some(source => source.speaker === p.speaker && primary.some(piece => piece.id === source.id))) return problem("Extract only points made by speakers in the primary source pieces");
     return { ...p, kind: value.kind as FactKind, sources: selected };
   });
+}
+
+export function parseReducedFacts(json: string, sources: SourcePiece[], candidates: SupportedFact[]): SupportedFact[] {
+  const value = object(json);
+  const facts = parseFacts(json, sources);
+  const covered = new Set<number>();
+  (value.facts as unknown[]).forEach((raw, index) => {
+    if (!record(raw) || !Array.isArray(raw.covers) || !raw.covers.length
+        || !raw.covers.every(id => Number.isInteger(id) && id >= 0 && id < candidates.length)) return problem("Use the supplied candidate IDs in covers");
+    for (const id of new Set(raw.covers as number[])) {
+      if (covered.has(id)) return problem("Every candidate must be covered exactly once");
+      if (candidates[id]!.speaker !== facts[index]!.speaker) return problem("Cover only candidates by the same speaker; other speakers' sources may clarify corrections");
+      covered.add(id);
+    }
+  });
+  if (covered.size !== candidates.length) return problem("Every input candidate must be represented in covers; do not discard distinct facts");
+  return facts;
+}
+export function parseTldrSources(json: string, sources: SourcePiece[]): { tldr: string; tldrRefs: number[] } {
+  const value = object(json);
+  if (!Array.isArray(value.sourceIds) || !value.sourceIds.length
+      || !value.sourceIds.every(id => typeof id === "string" && sources.some(source => source.id === id))) return problem("Cite original sourceIds supplied with the TLDR facts");
+  return { tldr: text(value.tldr), tldrRefs: [...new Set(sources.filter(source => (value.sourceIds as string[]).includes(source.id)).map(source => source.ref))].sort((a, b) => a - b) };
 }
 
 /** Source pieces are original text, never generated intermediate prose. */
