@@ -9,10 +9,17 @@ export default defineConfig({
     projects: [
       {
         test: {
+          name: "native-engine",
+          environment: "node",
+          include: ["src/engine/real-engine.test.ts"],
+        },
+      },
+      {
+        test: {
           name: "node",
           environment: "node",
           include: ["src/**/*.test.ts"],
-          exclude: ["src/renderer/**"],
+          exclude: ["src/renderer/**", "src/engine/real-engine.test.ts"],
         },
       },
       {

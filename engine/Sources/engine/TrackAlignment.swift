@@ -76,7 +76,14 @@ func wavHeader(dataBytes: Int, sampleRate: Int = outputSampleRate) -> Data {
     func u16(_ v: Int) -> [UInt8] { (0..<2).map { UInt8((v >> (8 * $0)) & 0xff) } }
     var h = Data()
     h += Data("RIFF".utf8) + u32(36 + dataBytes) + Data("WAVE".utf8)
-    h += Data("fmt ".utf8) + u32(16) + u16(1) + u16(1) + u32(sampleRate) + u32(sampleRate * 2) + u16(2) + u16(16)
+    h += Data("fmt ".utf8)
+    h += u32(16)
+    h += u16(1)
+    h += u16(1)
+    h += u32(sampleRate)
+    h += u32(sampleRate * 2)
+    h += u16(2)
+    h += u16(16)
     h += Data("data".utf8) + u32(dataBytes)
     return h
 }
