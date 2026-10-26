@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { Meeting } from "../../store/store";
 import type { MeetingsViewState } from "../../shared/meetings-view-state";
-import { nothingDone } from "@/lib/test-electron";
+import { createMeetingsApi, nothingDone } from "@/lib/test-electron";
 import { MeetingsApp } from "./App";
 
 const meeting: Meeting = {
@@ -23,17 +23,7 @@ const meeting: Meeting = {
 
 beforeEach(() => {
   window.electron = {
-    meetings: {
-      ready: vi.fn(),
-      onState: vi.fn(() => () => {}),
-      settings: vi.fn(),
-      select: vi.fn(),
-      search: vi.fn(),
-      rename: vi.fn(),
-      export: vi.fn(),
-      regenerate: vi.fn(),
-      delete: vi.fn(),
-    },
+    meetings: createMeetingsApi(),
     setup: {} as Window["electron"]["setup"],
     prompt: {} as Window["electron"]["prompt"],
   };

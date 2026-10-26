@@ -10,7 +10,7 @@ For whoever builds the AI side. Read [`design.md`](./design.md) and [`GLOSSARY.m
 
 Production AI logic lives in the Electron app's TypeScript pipeline. Swift owns transcription and diarization. Ollama serves Gemma. Python only collects evaluation results and calculates metrics; it is not a production runtime. Evaluation must invoke the same TypeScript modules as the app, not a separate Python implementation.
 
-The delivery order is evidence-backed Summaries, then Meeting chat. English Meetings up to 60 minutes are the initial target. Evidence-backed Summary generation, shared request infrastructure, Meeting-specific original-evidence selection and persisted Meeting chat are implemented in the backend. The React chat view, user controls and citation navigation remain upcoming work. Quality and target-device gates below remain unverified until their evaluations are completed.
+The delivery order is evidence-backed Summaries, then Meeting chat. English Meetings up to 60 minutes are the initial target. Evidence-backed Summary generation, shared request infrastructure, Meeting-specific original-evidence selection and persisted Meeting chat are implemented in the backend. The React chat view, user controls, citation navigation and Summary evidence timestamps in Markdown exports are implemented. Quality and target-device gates below remain unverified until their evaluations are completed.
 
 ## What you can and can't conclude from Linux
 
@@ -83,7 +83,7 @@ Output: a Summary as JSON.
 
 `pipeline/evidence.ts` computes ordered Transcript revisions and resolves segment ordinals, rejecting stale references. `OllamaClient.complete` supports system/user messages, schema output, bounded requests, cancellation through body reading, timeouts and token/timing metadata. `generate` remains the compatibility adapter. The frozen evaluation baseline has its own original transport and validator.
 
-`AppCore.jobs` serializes pipeline work; Settings model preparation shares that queue. Cancelling an active job keeps its resource slot occupied until the underlying work settles. Shutdown cancels jobs, stops the engine, waits for work to settle, then closes storage. Successful transcription waits for `models_released` before returning; preparation unloads models too. Mac memory measurements remain pending. Queue display and user controls arrive with the UI integration.
+`AppCore.jobs` serializes pipeline work; Settings model preparation shares that queue. Cancelling an active job keeps its resource slot occupied until the underlying work settles. Shutdown cancels jobs, stops the engine, waits for work to settle, then closes storage. Successful transcription waits for `models_released` before returning; preparation unloads models too. Mac memory measurements remain pending. The Meetings window now shows queued and running AI work. It allows cancellation of queued work and active Summary/chat jobs, while active transcription remains owned until it settles.
 
 ## Evidence-backed Summary implementation
 
@@ -95,7 +95,7 @@ Short inputs use one Summary request and optional bounded refinement. Refinement
 
 The additive schema version 3 migration creates `summary_artifacts`, `chat_requests`, `passages` and `passage_index`. Summary artifacts are saved atomically with Summary text. Passage storage is now wired and existing Transcripts are backfilled when the store opens, without another migration. The chat table now stores per-Meeting requests, statuses, validated answers and generation metadata, using the same additive migration. Existing version 2 data and legacy Summaries without artifacts remain readable; regeneration adds evidence.
 
-Clickable evidence references will be added in the later UI delivery. Until then, stored references and evaluation output can be inspected through application interfaces. Passing structural tests is not a claim that the human-reviewed Summary quality or M4 performance gates have passed.
+The React Summary and Chat views show timestamp references. Main-process validation resolves the current revision before the UI opens and highlights the Transcript passage. Markdown exports add supporting timestamps to the TL;DR and per-Participant points; evidence is checked against raw labels before display-name projection. Legacy Summaries export without invented references, and stale or invalid evidence produces no misleading timestamp. Neither UI navigation nor Markdown timestamps requires retained audio. Passing structural tests is not a claim that the human-reviewed Summary quality or M4 performance gates have passed.
 
 ## Meeting-specific evidence retrieval
 
@@ -107,7 +107,7 @@ Use the full Transcript when it fits the caller's complete answer-request budget
 
 Broad questions, explicit final/latest/eventual questions and insufficient targeted evidence scan all passages in bounded batches. Selection and consolidation return source IDs from original fragments, never generated replacement prose. An exhaustive result requires visiting the entire current Transcript. Deadline, call-limit or budget failures return incomplete evidence; user cancellation remains a cancelled operation. Neither incomplete retrieval nor a cancelled scan establishes that the answer is absent. The `sufficient` flag describes usable selected context; the chat answer still needs its own factual and citation validation. No embeddings or vector database are used.
 
-Retrieval, answer generation and persisted history are available through production modules and evaluation tooling. Application operations are implemented; the React view and citation navigation remain upcoming work. Automated retrieval and chat checks do not pass the real-Meeting, human-review or M4 release gates.
+Retrieval, answer generation and persisted history are available through production modules and evaluation tooling. Application operations, the React view and citation navigation are implemented. Automated retrieval and chat checks do not pass the real-Meeting, human-review or M4 release gates.
 
 ## Meeting chat implementation
 
@@ -123,7 +123,15 @@ The total generation deadline is five minutes, including retrieval, with a 128-c
 
 SQLite preserves the full history, statuses, citations, revision and generation metadata. Questions are canonicalized to stable Participant labels before storage; display projection substitutes current names in questions and answers. Ambiguous display-name mentions are rejected. Duplicate request IDs cannot create duplicate messages. Failed, cancelled and interrupted requests remain distinct; restart marks unfinished work interrupted. Clear chat and Meeting deletion cancel related work before deleting records. Request-lifetime and revision checks stop late results from recreating cleared history. Transcript replacement clears chat and rebuilds derived evidence; renames and Summary regeneration preserve chat.
 
-The upcoming React integration must add typed, sender-checked preload IPC, Chat controls and citation navigation. Questions are capped at 2,000 characters. Generated text must remain escaped, and only completed validated answers are displayed. Citations open Transcript segments without retained audio. Chat export and token streaming remain deferred. Human-reviewed reserved examples, real Recordings and M4 performance measurements remain pending until performed.
+## React Meeting experience
+
+The Meetings window has Summary, Transcript and Chat tabs. Chat displays restored per-Meeting history and queued, retrieving, generating, completed, failed, cancelled and interrupted states. Send, Cancel, Retry and Clear chat call the application operations through the typed `MeetingsApi` preload interface. The local AI queue displays work and cancellation controls. Completed answers appear after validation; there is no token streaming or partial-answer publication.
+
+Timestamp buttons on TL;DR evidence, per-Participant points and chat answers request main-process reference validation, then open the Transcript, scroll to the segment and highlight it. Navigation uses segment ordinals and revision fingerprints, not retained audio. Names are projected from current Participant settings while source identity remains stable. Markdown exports include supporting timestamps and current names but preserve spoken Transcript words; chat export remains deferred.
+
+The sandboxed bridge exposes only the declared operations. Main-process handlers require the current Meetings window as sender and validate Meeting IDs, request IDs, revisions, reference lists and payload fields. The trusted Summary-processing authorization is not part of the renderer interface. Questions are capped at 2,000 characters in the renderer and main process, with visible validation feedback. Generated content is rendered as escaped text without raw HTML.
+
+The existing Settings dialog, onboarding and packaging workflow remain in place. Human-reviewed reserved examples, real Recordings, offline native-app checks and M4 performance measurements remain pending until performed. Renderer and IPC tests establish behavior at those interfaces, not native permissions, speaker accuracy or factual quality.
 
 ## Evaluation and acceptance
 
