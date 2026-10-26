@@ -43,7 +43,7 @@ const baseline = new BaselineOllamaClient({ model: modelName });
 let calls = 0;
 const model: LanguageModel & TextModel = {
   generate: request => { calls++; return baseline.generate(request); },
-  complete: request => { calls++; return client.complete(request); },
+  complete: request => { calls++; console.log(`Local model request ${calls}`); return client.complete(request); },
 };
 const summarise = implementation === "baseline" ? createBaselineSummariser({ model }) : createGroundedSummariser({ model });
 const runs = [];
