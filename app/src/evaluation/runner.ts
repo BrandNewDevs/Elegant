@@ -10,7 +10,7 @@ export interface EvaluationFixture {
 }
 export interface EvaluationAnswer { text: string; refs: number[]; sufficient: boolean; revision?: string; generation?: import("../shared/meeting-chat.js").ChatGeneration }
 export interface EvaluationPipeline {
-  summarise(transcript: Transcript): Promise<Summary>;
+  summarise?(transcript: Transcript): Promise<Summary>;
   answer?(transcript: Transcript, question: string, history: { question: string; answer: EvaluationAnswer }[]): Promise<EvaluationAnswer>;
 }
 
@@ -20,7 +20,7 @@ export async function evaluateFixture(fixture: EvaluationFixture, pipeline: Eval
   const initialCalls = callCount();
   let summary: Summary | undefined;
   let error: string | undefined;
-  try { summary = await pipeline.summarise(fixture.transcript); }
+  try { if (pipeline.summarise) summary = await pipeline.summarise(fixture.transcript); }
   catch (problem) { error = problem instanceof Error ? problem.message : String(problem); }
   const summaryElapsedMs = performance.now() - started;
   const summaryCalls = callCount() - initialCalls;
@@ -36,7 +36,7 @@ export async function evaluateFixture(fixture: EvaluationFixture, pipeline: Eval
       completed.set(question.id, [...history, { question: question.question, answer }]);
     } catch (problem) { chat.push({ questionId: question.id, error: problem instanceof Error ? problem.message : String(problem), elapsedMs: performance.now() - queryStarted, calls: callCount() - beforeQuery }); }
   }
-  return { id: fixture.id, split: fixture.split, synthetic: fixture.synthetic, summary, error, chat,
+  return { id: fixture.id, split: fixture.split, synthetic: fixture.synthetic, summary, error, chat, summarySkipped: !pipeline.summarise,
     elapsedMs: performance.now() - started, calls: callCount() - initialCalls, summaryElapsedMs, summaryCalls,
     peakRssKiB: process.resourceUsage().maxRSS };
 }
