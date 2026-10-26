@@ -49,7 +49,7 @@ function render(): void {
         : []),
       { label: text, enabled: false },
       { type: "separator" },
-      { label: "Meetings…", click: () => meetingsWindow?.show({ settings: false }) },
+      { label: `Open ${DISPLAY_NAME}`, click: () => meetingsWindow?.show() },
       { label: "Settings…", accelerator: "Command+,", click: () => meetingsWindow?.show({ settings: true }) },
       {
         label: "Keep audio after transcription",
