@@ -198,6 +198,21 @@ describe("Meeting-specific evidence retrieval", () => {
     expect(stuck.reason).toContain("without losing support");
   });
 
+  it("allows a complete combined assessment to establish support after individually insufficient batches", async () => {
+    const { store, id, passages } = meeting(long());
+    let level = 0;
+    const local = model(request => ({
+      sourceIds: instruction(request).startsWith("Consolidate") ? [data(request).sources!.at(-1)!.id] : data(request).sources!.map(source => source.id),
+      sufficient: level >= 2,
+    }));
+    const result = await createMeetingEvidence({ store: fixedHits(store, [passages[0]!]), model: local })({
+      meetingId: id, question: "Summarize all decisions", fits: byCount(1),
+      onStage: stage => { if (stage === "consolidating") level++; },
+    });
+    expect(level).toBeGreaterThanOrEqual(2);
+    expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: true });
+  });
+
   it("propagates cancellation and never labels an interrupted scan exhaustive", async () => {
     const { store, id, passages } = meeting(long());
     const controller = new AbortController();
