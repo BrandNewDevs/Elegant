@@ -49,7 +49,14 @@ function render(): void {
   );
 }
 
+// One instance owns the engine, the store and the microphone watch. Launching again just brings its window forward.
+const isFirstInstance = app.requestSingleInstanceLock();
+if (!isFirstInstance) app.quit();
+app.on("second-instance", () => meetingsWindow?.show());
+app.on("activate", () => meetingsWindow?.show());
+
 app.whenReady().then(() => {
+  if (!isFirstInstance) return; // quitting; must not start a second engine
   app.dock?.hide(); // a menu-bar app has no dock icon
   const dataDir = app.getPath("userData");
   mkdirSync(dataDir, { recursive: true });
@@ -94,6 +101,8 @@ app.whenReady().then(() => {
   });
   render();
   core.start();
+  // Opened by hand, the app shows its window, since the menu-bar item alone is easy to miss. Opened at login it stays quiet.
+  if (!app.getLoginItemSettings().wasOpenedAtLogin) meetingsWindow.show();
 
   let quitting = false;
   app.on("before-quit", (event) => {
