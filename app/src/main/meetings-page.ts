@@ -48,7 +48,7 @@ function detail(m: Meeting): string {
       body = `<p class="notice failed">Processing failed: ${esc(m.error ?? "unknown error")}</p>`;
       break;
     case "done":
-      body = "";
+      body = m.transcript.segments.length ? "" : `<p class="notice">No speech was detected in this Recording.</p>`;
       break;
   }
   const summary = m.summary

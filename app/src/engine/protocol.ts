@@ -1,4 +1,5 @@
 // The wire protocol between the Swift engine and the app: one JSON object per line over stdio.
+import type { TranscriptSegment } from "../pipeline/pipeline.js";
 
 /** Events the engine sends up to the app. */
 export type EngineEvent =
@@ -11,6 +12,10 @@ export type EngineEvent =
    * instant. The start times are each track's first-sample time on the host clock, in seconds, from before alignment.
    */
   | { type: "tracks_ready"; micPath: string; systemPath: string; micStartHostTime: number; systemStartHostTime: number }
+  /** The Transcript for a `transcribe` command, with its segments ordered by start. An empty list means no speech. */
+  | { type: "transcript_ready"; id: string; segments: TranscriptSegment[] }
+  /** The `transcribe` command with this id failed; the audio is untouched. */
+  | { type: "transcription_failed"; id: string; message: string }
   /** The Recording cannot finish; nothing usable was written. */
   | { type: "recording_failed"; message: string }
   | { type: "error"; message: string };
@@ -21,6 +26,11 @@ export type EngineCommand =
   | { type: "start_recording"; app: string }
   | { type: "discard_buffer" }
   | { type: "stop_recording" }
+  /**
+   * Transcribe a Recording's tracks, in English, on this machine. `model` is a WhisperKit variant name; the engine
+   * downloads it into `modelsDirectory` the first time it is needed. Answered by `transcript_ready` or `transcription_failed`.
+   */
+  | { type: "transcribe"; id: string; micPath: string; systemPath: string; model: string; modelsDirectory: string }
   | { type: "shutdown" };
 
 export interface EngineExit {
@@ -37,12 +47,14 @@ export interface Engine {
   stop(): Promise<void>;
 }
 
-const EVENT_FIELDS: Record<EngineEvent["type"], Record<string, "string" | "number">> = {
+const EVENT_FIELDS: Record<EngineEvent["type"], Record<string, "string" | "number" | "array">> = {
   ready: { version: "string" },
   mic_in_use_started: { app: "string", pid: "number" },
   mic_in_use_stopped: { app: "string", pid: "number" },
   recording_started: { app: "string", startedAt: "string" },
   tracks_ready: { micPath: "string", systemPath: "string", micStartHostTime: "number", systemStartHostTime: "number" },
+  transcript_ready: { id: "string", segments: "array" },
+  transcription_failed: { id: "string", message: "string" },
   recording_failed: { message: "string" },
   error: { message: "string" },
 };
@@ -60,9 +72,22 @@ export function parseEngineEvent(line: string): EngineEvent {
   const fields = EVENT_FIELDS[obj.type as EngineEvent["type"]];
   if (!fields) throw new Error(`unknown engine event type: ${String(obj.type)}`);
   for (const [name, kind] of Object.entries(fields)) {
-    if (typeof obj[name] !== kind) throw new Error(`engine event "${obj.type}" is missing ${kind} field "${name}"`);
+    const ok = kind === "array" ? Array.isArray(obj[name]) : typeof obj[name] === kind;
+    if (!ok) throw new Error(`engine event "${obj.type}" is missing ${kind} field "${name}"`);
   }
+  if (obj.type === "transcript_ready") checkSegments(obj.segments as unknown[]);
   return obj as EngineEvent;
+}
+
+function checkSegments(segments: unknown[]): void {
+  segments.forEach((segment, i) => {
+    const s = segment as Partial<Record<keyof TranscriptSegment, unknown>> | null;
+    const ok =
+      typeof s === "object" && s !== null &&
+      typeof s.start === "number" && typeof s.end === "number" &&
+      typeof s.speaker === "string" && typeof s.text === "string";
+    if (!ok) throw new Error(`engine event "transcript_ready" has a malformed segment at index ${i}`);
+  });
 }
 
 export function encodeCommand(command: EngineCommand): string {

@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Engine } from "../engine/protocol.js";
 import type { PipelineStages } from "../pipeline/pipeline.js";
@@ -91,6 +92,7 @@ export class AppCore {
           if (this.stopping) {
             // The app is quitting, so the pipeline would be cut off. Keep the audio and say where it is.
             const where = dirname(event.micPath);
+            this.store.saveAudio(id, { micPath: event.micPath, systemPath: event.systemPath });
             this.store.setMeetingState(id, "failed", `the app quit before this Recording was processed; the audio is in ${where}`);
           } else {
             this.track(this.runner.run(id, { micPath: event.micPath, systemPath: event.systemPath }));
@@ -188,6 +190,18 @@ export class AppCore {
     if (meeting.state !== "failed") throw new Error(`only a failed Meeting can be retried, and this one is ${meeting.state}`);
     if (meeting.transcript.segments.length === 0) throw new Error("this Meeting has no Transcript to summarise");
     await this.track(this.runner.resummarise(id, meeting.transcript));
+  }
+
+  /** Transcribes a failed Meeting again from its kept audio, without re-recording. */
+  async retryTranscription(id: number): Promise<void> {
+    const meeting = this.deps.store.getMeeting(id);
+    if (!meeting) throw new Error(`no such Meeting: ${id}`);
+    if (meeting.state !== "failed") throw new Error(`only a failed Meeting can be retried, and this one is ${meeting.state}`);
+    if (!meeting.audio) throw new Error("this Meeting has no audio to transcribe");
+    for (const path of [meeting.audio.micPath, meeting.audio.systemPath]) {
+      if (!existsSync(path)) throw new Error(`the audio is no longer there: ${path}`);
+    }
+    await this.track(this.runner.run(id, meeting.audio));
   }
 
   /** Resolves when no Recording is being processed. */

@@ -65,6 +65,33 @@ func stopRecording() {
     }
 }
 
+let transcriber = Transcriber()
+
+func transcribe(_ command: [String: Any]) {
+    guard let id = command["id"] as? String,
+          let micPath = command["micPath"] as? String,
+          let systemPath = command["systemPath"] as? String,
+          let model = command["model"] as? String,
+          let modelsDirectory = command["modelsDirectory"] as? String else {
+        send(["type": "error", "message": "malformed transcribe command"])
+        return
+    }
+    Task {
+        do {
+            let segments = try await transcriber.transcribe(
+                micPath: micPath, systemPath: systemPath, model: model, modelsDirectory: URL(fileURLWithPath: modelsDirectory)
+            )
+            send([
+                "type": "transcript_ready",
+                "id": id,
+                "segments": segments.map { ["start": $0.start, "end": $0.end, "speaker": $0.speaker, "text": $0.text] },
+            ])
+        } catch {
+            send(["type": "transcription_failed", "id": id, "message": "\(error)"])
+        }
+    }
+}
+
 func handle(command line: String) {
     guard let data = line.data(using: .utf8),
           let command = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -79,6 +106,8 @@ func handle(command line: String) {
         startRecording(app: command["app"] as? String ?? "")
     case "stop_recording":
         stopRecording()
+    case "transcribe":
+        transcribe(command)
     case "discard_buffer":
         break // nothing is buffered before a Recording starts yet
     default:

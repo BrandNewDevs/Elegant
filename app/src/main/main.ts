@@ -5,11 +5,11 @@ import { join } from "node:path";
 import { AppCore } from "../core/app-core.js";
 import { formatElapsed } from "../core/elapsed.js";
 import { ProcessEngine } from "../engine/process-engine.js";
+import { createEngineTranscriber } from "../pipeline/engine-transcriber.js";
 import { OllamaClient } from "../pipeline/ollama.js";
 import { createSummariser } from "../pipeline/summariser.js";
-import { unimplementedPipeline } from "../pipeline/unimplemented.js";
 import { openStore } from "../store/store.js";
-import { DISPLAY_NAME } from "../config.js";
+import { DISPLAY_NAME, SPEECH_MODEL } from "../config.js";
 import { showPrompt } from "./prompt-window.js";
 import { MeetingsWindow } from "./meetings-window.js";
 import { STATUS_LABEL } from "./status-label.js";
@@ -49,7 +49,14 @@ function render(): void {
   );
 }
 
+// One instance owns the engine, the store and the microphone watch. Launching again just brings its window forward.
+const isFirstInstance = app.requestSingleInstanceLock();
+if (!isFirstInstance) app.quit();
+app.on("second-instance", () => meetingsWindow?.show());
+app.on("activate", () => meetingsWindow?.show());
+
 app.whenReady().then(() => {
+  if (!isFirstInstance) return; // quitting; must not start a second engine
   app.dock?.hide(); // a menu-bar app has no dock icon
   const dataDir = app.getPath("userData");
   mkdirSync(dataDir, { recursive: true });
@@ -59,7 +66,10 @@ app.whenReady().then(() => {
   core = new AppCore({
     engine,
     store,
-    pipeline: { ...unimplementedPipeline, summarise: createSummariser({ model: new OllamaClient() }) },
+    pipeline: {
+      transcribe: createEngineTranscriber(engine, { model: SPEECH_MODEL, modelsDirectory: join(dataDir, "models") }),
+      summarise: createSummariser({ model: new OllamaClient() }),
+    },
   });
 
   meetingsWindow = new MeetingsWindow(core);
@@ -91,6 +101,8 @@ app.whenReady().then(() => {
   });
   render();
   core.start();
+  // Opened by hand, the app shows its window, since the menu-bar item alone is easy to miss. Opened at login it stays quiet.
+  if (!app.getLoginItemSettings().wasOpenedAtLogin) meetingsWindow.show();
 
   let quitting = false;
   app.on("before-quit", (event) => {
