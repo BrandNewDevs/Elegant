@@ -10,6 +10,40 @@ The app runs on macOS; Linux can exercise the TypeScript pipeline and evaluation
 4. Make a short actual Meeting Recording while online, with speech on both tracks. Confirm transcription and diarization complete. This exercises tokenizer/model assets that a download-only check might miss. Settings model readiness alone does not prove the complete offline workflow.
 5. Keep private audio, original Transcripts, corrected references and evaluation fixture JSON outside the repository. Prepare the four pending examples in `evaluation/private-manifest.example.json`: 5 and 20 minutes for tuning, 10 and 60 minutes reserved for final review. Use only people who agree to be recorded.
 
+## Export an actual Transcript for evaluation
+
+The database path is `join(app.getPath("userData"), "meetings.db")` in `app/src/main/main.ts`. Use the **running build's actual userData directory**; the working display name can change, so do not hard-code it into a path. On macOS the default location is under `~/Library/Application Support/`, but the directory name depends on the build. Read `app.getPath("userData")` locally in the Electron main-process debugger if needed. Do not choose an unrelated copy of the database.
+
+Wait for Recording and transcription to finish. A Meeting marked failed can still be exported when it has a completed Transcript, such as after Summary failure. The exporter rejects Recording/processing states and empty Transcripts. Quit the app after completion for the simplest snapshot; the tool also uses a consistent SQLite read transaction if the app is open.
+
+From the repository root, inspect only IDs and state, without printing any spoken words:
+
+```sh
+AI_DATABASE="/absolute/path/to/the/running-build-userData/meetings.db"
+python3 - "$AI_DATABASE" <<'PYIDS'
+from pathlib import Path
+import sqlite3, sys
+connection = sqlite3.connect(Path(sys.argv[1]).resolve().as_uri() + "?mode=ro", uri=True)
+for meeting in connection.execute("SELECT id, state FROM meetings ORDER BY id DESC"):
+    print(*meeting)
+connection.close()
+PYIDS
+```
+
+Choose the corresponding Meeting ID and an existing private directory **outside the repository**, then export a new draft:
+
+```sh
+python3 evaluation/export_private.py \
+  --database "$AI_DATABASE" --meeting 7 --split tuning \
+  --output /absolute/private/evaluation/5m.json
+```
+
+Replace ID 7 and the output path with the intended example. Use `reserved` for the 10- and 60-minute examples. The source database must also be outside the repository. The tool checks lexical and resolved paths, including symlinks and dangling output links. It opens the database read-only, creates a new file with owner-only permissions (`0600`), refuses overwrite and never prints Transcript content. Choose another output name if a file already exists.
+
+The draft preserves the original segment order, timestamps and stable labels such as `You` and `Speaker 1`; it deliberately does not substitute Participant display names. Its `points` and `questions` lists start empty and `expectationsPrepared` is false. Review the Transcript privately, add expected important points, final decisions, source ordinals and questions using the schema in [the evaluation guide](../evaluation/README.md), then set `expectationsPrepared` to true. Until that review is done the evaluation runner refuses the draft. References are zero-based positions in the exported segment array, not SQLite row IDs.
+
+Keep the original export unchanged as a private reference copy before preparing expectations. Store manually corrected speech excerpts separately for recognition/attribution scoring; do not silently replace the model Transcript when evaluating its Summary. Put the prepared fixture path into a filled private manifest outside Git. The example manifest's pending paths do not represent completed Recordings or evaluations.
+
 ## Measure performance and memory
 
 `evaluation/measure.py` is a Python standard-library wrapper for an existing local command. It discards the command's stdout and stderr rather than saving Meeting content. Let the command write its own evaluation results to a private path. The measurement report contains resource observations, not questions, answers, command arguments or private file paths.
