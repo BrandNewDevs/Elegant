@@ -1,0 +1,32 @@
+{
+  "examples": [
+    {
+      "id": "private-5m",
+      "split": "tuning",
+      "durationMinutes": 5,
+      "path": null,
+      "status": "pending"
+    },
+    {
+      "id": "private-10m",
+      "split": "reserved",
+      "durationMinutes": 10,
+      "path": null,
+      "status": "pending"
+    },
+    {
+      "id": "private-20m",
+      "split": "tuning",
+      "durationMinutes": 20,
+      "path": null,
+      "status": "pending"
+    },
+    {
+      "id": "private-60m",
+      "split": "reserved",
+      "durationMinutes": 60,
+      "path": null,
+      "status": "pending"
+    }
+  ]
+}
