@@ -61,9 +61,10 @@ actor Transcriber {
             clipTimestamps: regions.flatMap { [Float($0.start), Float($0.end)] }
         )
         let results = try await kit.transcribe(audioArray: samples, decodeOptions: options)
-        return results.flatMap(\.segments).map {
+        let segments = results.flatMap(\.segments).map {
             RecognisedSegment(start: Double($0.start), end: Double($0.end), text: $0.text, compressionRatio: Double($0.compressionRatio))
         }
+        return constrain(segments, to: regions)
     }
 
     private func loadedKit(model: String, modelsDirectory: URL) async throws -> WhisperKit {

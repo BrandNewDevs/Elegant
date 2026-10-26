@@ -84,3 +84,20 @@ private func widened(_ region: SpeechRegion, to minimum: Double, within duration
     if end > duration { start = max(0, start - (end - duration)); end = duration }
     return SpeechRegion(start: start, end: end)
 }
+
+/// How far before a region a segment may start and still belong to it. Whisper's timestamps are coarse.
+let regionStartTolerance = 0.5
+
+/// Keeps each segment inside the speech region it came from. Whisper can end a segment well past the speech (even past
+/// the end of the track), and text that starts outside every region was not spoken, so it is dropped.
+func constrain(_ segments: [RecognisedSegment], to regions: [SpeechRegion]) -> [RecognisedSegment] {
+    segments.compactMap { segment in
+        guard let region = regions.first(where: { segment.start >= $0.start - regionStartTolerance && segment.start < $0.end }) else {
+            return nil
+        }
+        var clamped = segment
+        clamped.start = max(segment.start, region.start)
+        clamped.end = max(clamped.start, min(segment.end, region.end))
+        return clamped
+    }
+}

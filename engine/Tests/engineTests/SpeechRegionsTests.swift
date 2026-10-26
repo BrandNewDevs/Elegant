@@ -62,3 +62,34 @@ private func close(_ a: Double, _ b: Double) -> Bool { abs(a - b) < 0.11 }
         #expect(region.start <= 5 && region.end >= 5.3)
     }
 }
+
+@Suite struct ConstrainTests {
+    private func seg(_ start: Double, _ end: Double, _ text: String = "x") -> RecognisedSegment {
+        RecognisedSegment(start: start, end: end, text: text)
+    }
+    private let regions = [SpeechRegion(start: 0.7, end: 5.8), SpeechRegion(start: 11.2, end: 14)]
+
+    @Test func aSegmentEndingPastItsRegionIsCutToTheRegionEnd() {
+        #expect(constrain([seg(0.7, 7.7)], to: regions) == [seg(0.7, 5.8)])
+    }
+
+    @Test func aSegmentEndingPastTheTrackIsCutToTheTrackEnd() {
+        #expect(constrain([seg(11.2, 18.2)], to: regions) == [seg(11.2, 14)])
+    }
+
+    @Test func aSegmentStartingJustBeforeItsRegionIsPulledInsideIt() {
+        #expect(constrain([seg(0.4, 3)], to: regions) == [seg(0.7, 3)])
+    }
+
+    @Test func aSegmentStartingOutsideEveryRegionIsDropped() {
+        #expect(constrain([seg(7, 9, "invented"), seg(20, 21)], to: regions).isEmpty)
+    }
+
+    @Test func aSegmentInsideItsRegionIsUntouched() {
+        #expect(constrain([seg(1, 2), seg(12, 13)], to: regions) == [seg(1, 2), seg(12, 13)])
+    }
+
+    @Test func noRegionsMeansNothingIsKept() {
+        #expect(constrain([seg(1, 2)], to: []).isEmpty)
+    }
+}
