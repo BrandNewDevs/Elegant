@@ -40,6 +40,11 @@ export interface Store {
   getMeeting(id: number): Meeting | undefined;
   /** Newest first. */
   listMeetings(): MeetingListItem[];
+  /**
+   * The Meetings whose Transcript or Summary contains every word of the query (the last one as a prefix, so a
+   * search works while it is being typed), newest first. A query with no words matches nothing.
+   */
+  searchMeetings(query: string): MeetingListItem[];
   close(): void;
 }
 
@@ -83,6 +88,23 @@ const SCHEMA = `
   );
 `;
 
+/**
+ * One row per Meeting, holding the text of its Transcript and of its Summary. It is not tied to the Meeting by a
+ * foreign key, so every write and delete below keeps it in step by hand.
+ */
+const SEARCH_INDEX = `
+  CREATE VIRTUAL TABLE search_index USING fts5(
+    meeting_id UNINDEXED, transcript, summary, tokenize = 'porter unicode61'
+  );
+`;
+
+/** An FTS5 query for the words in what the user typed, or undefined if there are none. */
+function searchExpression(query: string): string | undefined {
+  const words = query.match(/[\p{L}\p{N}]+/gu);
+  if (!words) return undefined;
+  return words.map((w, i) => (i === words.length - 1 ? `"${w}"*` : `"${w}"`)).join(" ");
+}
+
 export function openStore(path: string): Store {
   const db = new DatabaseSync(path);
   db.exec("PRAGMA foreign_keys = ON");
@@ -95,6 +117,27 @@ export function openStore(path: string): Store {
     db.exec("ALTER TABLE meetings ADD COLUMN mic_path TEXT");
     db.exec("ALTER TABLE meetings ADD COLUMN system_path TEXT");
     db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  }
+
+  // Created apart from the versions above, so it also appears in a database that predates it.
+  const hasSearchIndex = db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'search_index'").get() !== undefined;
+  if (!hasSearchIndex) db.exec(SEARCH_INDEX);
+
+  const reindex = (id: number): void => {
+    const transcript = (db.prepare("SELECT text FROM segments WHERE meeting_id = ? ORDER BY idx").all(id) as { text: string }[])
+      .map((s) => s.text)
+      .join("\n");
+    const row = db.prepare("SELECT tldr, participants_json FROM summaries WHERE meeting_id = ?").get(id) as
+      | { tldr: string; participants_json: string }
+      | undefined;
+    const summary = row
+      ? [row.tldr, ...(JSON.parse(row.participants_json) as Summary["participants"]).flatMap((p) => p.said)].join("\n")
+      : "";
+    db.prepare("DELETE FROM search_index WHERE meeting_id = ?").run(id);
+    db.prepare("INSERT INTO search_index (meeting_id, transcript, summary) VALUES (?, ?, ?)").run(id, transcript, summary);
+  };
+  if (!hasSearchIndex) {
+    for (const { id } of db.prepare("SELECT id FROM meetings").all() as { id: number }[]) reindex(id);
   }
 
   const inTransaction = <T>(fn: () => T): T => {
@@ -137,6 +180,7 @@ export function openStore(path: string): Store {
           insertParticipant.run(id, s.speaker);
           insertSegment.run(id, i, s.start, s.end, s.speaker, s.text);
         });
+        reindex(id);
       });
     },
 
@@ -144,6 +188,7 @@ export function openStore(path: string): Store {
       db.prepare(
         "INSERT OR REPLACE INTO summaries (meeting_id, tldr, participants_json) VALUES (?, ?, ?)",
       ).run(id, summary.tldr, JSON.stringify(summary.participants));
+      reindex(id);
     },
 
     saveAudio(id, tracks) {
@@ -155,7 +200,10 @@ export function openStore(path: string): Store {
     },
 
     deleteMeeting(id) {
-      db.prepare("DELETE FROM meetings WHERE id = ?").run(id);
+      inTransaction(() => {
+        db.prepare("DELETE FROM search_index WHERE meeting_id = ?").run(id);
+        db.prepare("DELETE FROM meetings WHERE id = ?").run(id);
+      });
     },
 
     getSetting(key) {
@@ -199,7 +247,18 @@ export function openStore(path: string): Store {
         .all() as unknown as Pick<MeetingRow, "id" | "app" | "started_at" | "state">[];
       return rows.map((r) => ({ id: r.id, app: r.app, startedAt: r.started_at, state: r.state }));
     },
-
+    searchMeetings(query) {
+      const expression = searchExpression(query);
+      if (!expression) return [];
+      const rows = db
+        .prepare(
+          `SELECT m.id, m.app, m.started_at, m.state FROM search_index
+           JOIN meetings m ON m.id = search_index.meeting_id
+           WHERE search_index MATCH ? ORDER BY m.started_at DESC, m.id DESC`,
+        )
+        .all(expression) as unknown as Pick<MeetingRow, "id" | "app" | "started_at" | "state">[];
+      return rows.map((r) => ({ id: r.id, app: r.app, startedAt: r.started_at, state: r.state }));
+    },
 
     close() {
       db.close();

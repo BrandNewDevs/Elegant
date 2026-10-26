@@ -32,6 +32,14 @@ export function meetingActionFromLink(url: string): MeetingAction | undefined {
   return match ? { type: match[1] as MeetingAction["type"], id: Number(match[2]) } : undefined;
 }
 
+/** The search box submits to this link; the window reads the query back with `searchFromLink`. */
+const SEARCH_LINK = "search:";
+
+export function searchFromLink(url: string): string | undefined {
+  if (!url.startsWith(SEARCH_LINK)) return undefined;
+  return new URLSearchParams(url.slice(SEARCH_LINK.length).replace(/^\?/, "")).get("q") ?? "";
+}
+
 const clock = (seconds: number): string => {
   const s = Math.floor(seconds);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -91,6 +99,8 @@ function detail(m: Meeting): string {
 
 const STYLE = `
   body { font: 13px -apple-system, system-ui, sans-serif; margin: 0; display: flex; height: 100vh; color: #1d1d1f; }
+  nav form { padding: 8px; position: sticky; top: 0; background: #f5f5f7; border-bottom: 1px solid #d2d2d7; }
+  nav input { width: 100%; box-sizing: border-box; }
   nav { width: 260px; overflow-y: auto; border-right: 1px solid #d2d2d7; background: #f5f5f7; }
   main { flex: 1; overflow-y: auto; padding: 16px 24px; }
   ul.meetings { list-style: none; margin: 0; padding: 0; }
@@ -113,11 +123,12 @@ const STYLE = `
 `;
 
 /** The whole Meetings window as one HTML page. */
-export function renderMeetingsPage(meetings: MeetingListItem[], selected: Meeting | undefined): string {
+export function renderMeetingsPage(meetings: MeetingListItem[], selected: Meeting | undefined, query = ""): string {
+  const search = `<form action="${SEARCH_LINK}" method="get"><input type="search" name="q" placeholder="Search" value="${esc(query)}"></form>`;
   const list = meetings.length
     ? `<ul class="meetings">${meetings.map((m) => listItem(m, selected?.id)).join("")}</ul>`
-    : `<p class="empty">No Meetings yet.</p>`;
+    : `<p class="empty">${query.trim() ? "No Meetings match." : "No Meetings yet."}</p>`;
   const main = selected ? detail(selected) : `<p class="empty">Select a Meeting.</p>`;
   return `<!doctype html><html><head><meta charset="utf-8"><style>${STYLE}</style></head>
-<body><nav>${list}</nav><main>${main}</main></body></html>`;
+<body><nav>${search}${list}</nav><main>${main}</main></body></html>`;
 }
