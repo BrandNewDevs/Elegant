@@ -99,6 +99,17 @@ describe("Meeting-specific evidence retrieval", () => {
     expect(huge.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
+  it("skips a second lexical query rewrite after chat has already resolved its follow-up", async () => {
+    const { store, id } = meeting(long());
+    const local = model(selection);
+    const result = await createMeetingEvidence({ store: fixedHits(store, []), model: local })({
+      meetingId: id, question: "When will You finish the permission guide?", skipRewrite: true,
+      history: [{ question: "Who owns the guide?", answer: "You." }], fits: byCount(3),
+    });
+    expect(result.mode).toBe("scan");
+    expect(local.requests.every(request => !instruction(request).startsWith("Rewrite"))).toBe(true);
+  });
+
   it("scans every original passage for broad questions before returning an exhaustive result", async () => {
     const { store, id, passages } = meeting(long());
     const local = model(selection);

@@ -151,7 +151,10 @@ def aggregate(results: dict[str, Any], fixtures: list[dict[str, Any]],
                            or answers[question["id"]].get("skipped")
                            or "answer" not in answers[question["id"]]
                            for question in questions)
-        if run.get("error") or not valid_summary(run.get("summary")):
+        summary_skipped = run.get("summarySkipped") is True and "summary" not in run and not run.get("error")
+        if summary_skipped:
+            row.update(reason="Summary intentionally not requested; chat evaluated separately")
+        elif run.get("error") or not valid_summary(run.get("summary")):
             row.update(summaryStatus="fail", reason="Summary generation failed or output is malformed")
         else:
             labels = {segment["speaker"] for segment in fixture["transcript"]["segments"]}
@@ -178,7 +181,10 @@ def aggregate(results: dict[str, Any], fixtures: list[dict[str, Any]],
             "criticalPointsExpected": len(critical),
             **{key: review[key] for key in REVIEW_COUNTS},
         })
-        if row["summaryStatus"] != "fail":
+        if summary_skipped:
+            row["coverage"] = None
+            row["criticalPointsCovered"] = None
+        if row["summaryStatus"] != "fail" and not summary_skipped:
             row.update(summaryStatus="pass" if summary_pass else "fail",
                        reason="Human reviewed against predefined points and original passages")
         if row["chatStatus"] != "fail" and questions and not missing_chat:
