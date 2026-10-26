@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { MeetingsViewState } from "../shared/meetings-view-state";
+import type { MeetingsApi } from "../shared/meetings-api";
 import type { SetupAction } from "../shared/setup-actions";
 import type { SetupViewState } from "../shared/setup-view-state";
 import type { PromptChoice } from "../shared/prompt-choice";
@@ -8,17 +8,7 @@ import type { PromptChoice } from "../shared/prompt-choice";
 declare global {
   interface Window {
     electron: {
-      meetings: {
-        ready(): void;
-        onState(callback: (state: MeetingsViewState) => void): () => void;
-        settings(open: boolean): void;
-        select(id: number): void;
-        search(query: string): void;
-        rename(payload: { meetingId: number; label: string; name: string }): void;
-        export(id: number): void;
-        regenerate(id: number): Promise<void>;
-        delete(id: number): Promise<void>;
-      };
+      meetings: MeetingsApi;
       setup: {
         ready(): void;
         onState(callback: (state: SetupViewState) => void): () => void;
