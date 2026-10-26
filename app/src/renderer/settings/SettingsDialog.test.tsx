@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
+import type { SetupViewState } from "../../shared/setup-view-state";
 import { nothingDone, pushSetupState, withState } from "@/lib/test-electron";
 import { SettingsDialog } from "./SettingsDialog";
 
@@ -77,4 +78,19 @@ it("changes the name from Settings, and only offers Save once it differs", () =>
   expect(save.disabled).toBe(false);
   fireEvent.click(save);
   expect(send.setUserName).toHaveBeenCalledWith("Ken");
+});
+
+it("does not put focus on the close button when it opens, even though the content arrives later", () => {
+  let push: (view: SetupViewState) => void = () => {};
+  pushSetupState(nothingDone);
+  window.electron.setup.onState = (callback) => {
+    push = callback;
+    return () => {};
+  };
+  render(<SettingsDialog open onOpenChange={() => {}} />);
+  expect(screen.getByRole("dialog")).toBe(document.activeElement);
+  expect(document.activeElement).not.toBe(screen.getByRole("button", { name: "Close" }));
+
+  act(() => push(nothingDone));
+  expect(screen.getByRole("dialog")).toBe(document.activeElement);
 });
