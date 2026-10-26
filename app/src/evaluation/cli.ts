@@ -15,7 +15,7 @@ import { evaluateFixture, validateFixture } from "./runner.js";
 import { evaluationMetadata } from "./metadata.js";
 
 const [mode, source, output] = process.argv.slice(2);
-if (!source || !output || !["baseline", "current", "chat", "private-baseline", "private-current", "private-chat"].includes(mode ?? "")) throw new Error("Usage: eval:ai <baseline|current|chat|private-baseline|private-current|private-chat> <fixtures-dir|private-manifest.json> <results.json>");
+if (!source || !output || !["baseline", "current", "chat", "summary", "private-baseline", "private-current", "private-chat", "private-summary"].includes(mode ?? "")) throw new Error("Usage: eval:ai <baseline|current|chat|summary|private-baseline|private-current|private-chat|private-summary> <fixtures-dir|private-manifest.json> <results.json>");
 const privateRun = mode!.startsWith("private-");
 const root = await realpath(fileURLToPath(new URL("../../../", import.meta.url)));
 const outside = (path: string) => isOutside(root, path);
@@ -53,7 +53,7 @@ const summarise = implementation === "baseline" ? createBaselineSummariser({ mod
 const store = openStore(":memory:");
 const meetingIds = new WeakMap<Transcript, number>();
 const chat = createMeetingChat({ store, model, modelName });
-const pipeline = { ...(mode!.endsWith("chat") ? {} : { summarise }), ...(implementation === "current" ? { answer: async (transcript: Transcript, question: string,
+const pipeline = { ...(mode!.endsWith("chat") ? {} : { summarise }), ...(implementation === "current" && !mode!.endsWith("summary") ? { answer: async (transcript: Transcript, question: string,
   history: { question: string; answer: { text: string } }[]) => {
   let meetingId = meetingIds.get(transcript);
   if (!meetingId) {

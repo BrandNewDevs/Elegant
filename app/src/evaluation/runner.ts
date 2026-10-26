@@ -27,7 +27,7 @@ export async function evaluateFixture(fixture: EvaluationFixture, pipeline: Eval
   const chat: { questionId: string; answer?: EvaluationAnswer; error?: string; skipped?: string; elapsedMs?: number; calls?: number }[] = [];
   const completed = new Map<string, { question: string; answer: EvaluationAnswer }[]>();
   for (const question of fixture.questions) {
-    if (!pipeline.answer) { chat.push({ questionId: question.id, skipped: "Meeting chat is not implemented in this revision" }); continue; }
+    if (!pipeline.answer) { chat.push({ questionId: question.id, skipped: "Chat was not selected for this evaluation" }); continue; }
     const history = question.followUpTo ? completed.get(question.followUpTo) ?? [] : [];
     const queryStarted = performance.now(), beforeQuery = callCount();
     try {
