@@ -181,6 +181,9 @@ def aggregate(results: dict[str, Any], fixtures: list[dict[str, Any]],
             "criticalPointsExpected": len(critical),
             **{key: review[key] for key in REVIEW_COUNTS},
         })
+        if summary_skipped:
+            row["coverage"] = None
+            row["criticalPointsCovered"] = None
         if row["summaryStatus"] != "fail" and not summary_skipped:
             row.update(summaryStatus="pass" if summary_pass else "fail",
                        reason="Human reviewed against predefined points and original passages")

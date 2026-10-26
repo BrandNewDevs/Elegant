@@ -15,5 +15,6 @@ class ChatOnlyReportTests(unittest.TestCase):
         result = aggregate({"runs": [run]}, [fixture], {"one": review})
         self.assertEqual(result["summaryQuality"], "pending")
         self.assertEqual(result["chatQuality"], "pass")
+        self.assertIsNone(result["fixtures"][0]["coverage"])
         run["error"] = "An actual Summary failure"
         self.assertEqual(aggregate({"runs": [run]}, [fixture])["summaryQuality"], "fail")

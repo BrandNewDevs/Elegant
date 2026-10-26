@@ -1,0 +1,140 @@
+{
+  "metadata": {
+    "sourceCommit": "47a40d019ecd95542127b8bec503f6915a43c777",
+    "sourceDirty": true,
+    "recordedAt": "2026-10-26T21:41:19.334Z",
+    "implementation": "chat-only",
+    "model": {
+      "name": "gemma3:4b-it-q4_K_M",
+      "model": "gemma3:4b-it-q4_K_M",
+      "modified_at": "2026-10-05T05:47:50.046802317+05:30",
+      "size": 3338801804,
+      "digest": "a2af6cc3eb7fa8be8504abaf9b04e88f17a119ec3f04a3addf55f92841195f5a",
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "gemma3",
+        "families": [
+          "gemma3"
+        ],
+        "parameter_size": "4.3B",
+        "quantization_level": "Q4_K_M"
+      },
+      "capabilities": [
+        "completion"
+      ]
+    },
+    "ollama": {
+      "version": "0.34.0"
+    },
+    "hardware": {
+      "platform": "linux",
+      "release": "7.0.0-38-generic",
+      "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+      "memoryBytes": 15950888960,
+      "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU, 4096 MiB"
+    },
+    "settings": {
+      "numCtx": 8192,
+      "temperature": 0,
+      "maxInputBytes": 5500,
+      "maxOutputTokens": 2048
+    },
+    "promptVersion": "meeting-chat-v1",
+    "memoryScope": "Node peak RSS only. Ollama, Swift, peak total memory and swap need external observation.",
+    "runCondition": "uncontrolled",
+    "scope": "Production chat on a completed synthetic Transcript without a Summary"
+  },
+  "fixtureId": "straightforward",
+  "calls": 4,
+  "chat": [
+    {
+      "questionId": "owner",
+      "answer": {
+        "text": "You will write the permission guide by Thursday. (0:0)",
+        "refs": [
+          0
+        ],
+        "sufficient": true
+      },
+      "generation": {
+        "promptVersion": "meeting-chat-v1",
+        "model": "gemma3:4b-it-q4_K_M",
+        "elapsedMs": 1667.793154,
+        "calls": 1,
+        "promptTokens": 430,
+        "outputTokens": 33,
+        "retrievalCalls": 0,
+        "retrievalMode": "full",
+        "exhaustive": true
+      },
+      "elapsedMs": 1668.041021
+    },
+    {
+      "questionId": "deadline",
+      "answer": {
+        "text": "The release date is still undecided. (2:0)",
+        "refs": [
+          2
+        ],
+        "sufficient": true
+      },
+      "generation": {
+        "promptVersion": "meeting-chat-v1",
+        "model": "gemma3:4b-it-q4_K_M",
+        "elapsedMs": 1504.236548,
+        "calls": 1,
+        "promptTokens": 468,
+        "outputTokens": 29,
+        "retrievalCalls": 0,
+        "retrievalMode": "full",
+        "exhaustive": true
+      },
+      "elapsedMs": 1504.313008
+    },
+    {
+      "questionId": "release",
+      "answer": {
+        "text": "The release date is still undecided.",
+        "refs": [
+          3
+        ],
+        "sufficient": true
+      },
+      "generation": {
+        "promptVersion": "meeting-chat-v1",
+        "model": "gemma3:4b-it-q4_K_M",
+        "elapsedMs": 1300.5895100000002,
+        "calls": 1,
+        "promptTokens": 429,
+        "outputTokens": 23,
+        "retrievalCalls": 0,
+        "retrievalMode": "full",
+        "exhaustive": true
+      },
+      "elapsedMs": 1300.6110319999998
+    },
+    {
+      "questionId": "calendar",
+      "answer": {
+        "text": "We agree to keep the first release English only. We are not adding calendar integration.",
+        "refs": [
+          2
+        ],
+        "sufficient": true
+      },
+      "generation": {
+        "promptVersion": "meeting-chat-v1",
+        "model": "gemma3:4b-it-q4_K_M",
+        "elapsedMs": 1681.2790020000002,
+        "calls": 1,
+        "promptTokens": 428,
+        "outputTokens": 36,
+        "retrievalCalls": 0,
+        "retrievalMode": "full",
+        "exhaustive": true
+      },
+      "elapsedMs": 1681.3015830000004
+    }
+  ]
+}
