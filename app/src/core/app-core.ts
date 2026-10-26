@@ -132,6 +132,8 @@ export class AppCore {
             this.store.saveAudio(id, { micPath: event.micPath, systemPath: event.systemPath });
             this.store.setMeetingState(id, "failed", `the app quit before this Recording was processed; the audio is in ${where}`);
           } else {
+            // Queued work may be cancelled before the runner starts; retain paths immediately for retry.
+            this.store.saveAudio(id, { micPath: event.micPath, systemPath: event.systemPath });
             this.pipelineJob(id, "transcription-and-summary", context => this.runner.run(id, { micPath: event.micPath, systemPath: event.systemPath }, context));
           }
           break;
