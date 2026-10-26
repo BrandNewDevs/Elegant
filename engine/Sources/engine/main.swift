@@ -115,6 +115,39 @@ func transcribe(_ command: [String: Any]) {
     }
 }
 
+func requestPermission(_ command: [String: Any]) {
+    guard let permission = command["permission"] as? String, ["microphone", "system_audio"].contains(permission) else {
+        send(["type": "error", "message": "malformed request_permission command"])
+        return
+    }
+    // Both calls can wait on the user's answer, so they run off the command-reading thread.
+    Task {
+        let granted = permission == "microphone" ? await requestMicrophoneAccess() : requestSystemAudioAccess()
+        send(["type": "permission_result", "permission": permission, "granted": granted])
+    }
+}
+
+func downloadModels(_ command: [String: Any]) {
+    guard let model = command["model"] as? String, let modelsDirectory = command["modelsDirectory"] as? String else {
+        send(["type": "error", "message": "malformed download_models command"])
+        return
+    }
+    Task {
+        // WhisperKit reports far more often than the app needs; only whole percents go up.
+        let lastPercent = ProgressThrottle()
+        do {
+            try await transcriber.prepare(model: model, modelsDirectory: URL(fileURLWithPath: modelsDirectory)) { fraction in
+                if lastPercent.advance(to: Int(fraction * 100)) {
+                    send(["type": "model_download_progress", "model": model, "fraction": fraction])
+                }
+            }
+            send(["type": "models_ready"])
+        } catch {
+            send(["type": "model_download_failed", "message": "\(error)"])
+        }
+    }
+}
+
 func handle(command line: String) {
     guard let data = line.data(using: .utf8),
           let command = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -131,6 +164,10 @@ func handle(command line: String) {
         stopRecording()
     case "transcribe":
         transcribe(command)
+    case "request_permission":
+        requestPermission(command)
+    case "download_models":
+        downloadModels(command)
     case "start_buffer":
         startBuffer()
     case "discard_buffer":

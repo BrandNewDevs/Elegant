@@ -1,6 +1,9 @@
 // The wire protocol between the Swift engine and the app: one JSON object per line over stdio.
 import type { TranscriptSegment } from "../pipeline/pipeline.js";
 
+/** A macOS permission the engine needs. */
+export type Permission = "microphone" | "system_audio";
+
 /** Events the engine sends up to the app. */
 export type EngineEvent =
   | { type: "ready"; version: string }
@@ -16,6 +19,14 @@ export type EngineEvent =
   | { type: "transcript_ready"; id: string; segments: TranscriptSegment[] }
   /** The `transcribe` command with this id failed; the audio is untouched. */
   | { type: "transcription_failed"; id: string; message: string }
+  /** The answer to `request_permission`: whether macOS now lets the engine capture that audio. */
+  | { type: "permission_result"; permission: Permission; granted: boolean }
+  /** How far a `download_models` command has got, as a fraction from 0 to 1. */
+  | { type: "model_download_progress"; model: string; fraction: number }
+  /** Every model of a `download_models` command is downloaded and loads. */
+  | { type: "models_ready" }
+  /** The `download_models` command failed; models already downloaded are kept. */
+  | { type: "model_download_failed"; message: string }
   /** The Recording cannot finish; nothing usable was written. */
   | { type: "recording_failed"; message: string }
   | { type: "error"; message: string };
@@ -38,6 +49,17 @@ export type EngineCommand =
    * downloads it into `modelsDirectory` the first time it is needed. Answered by `transcript_ready` or `transcription_failed`.
    */
   | { type: "transcribe"; id: string; micPath: string; systemPath: string; model: string; modelsDirectory: string }
+  /**
+   * Ask macOS for a permission, which shows its prompt the first time. Answered by `permission_result`; a permission
+   * that was already answered is reported without a prompt.
+   */
+  | { type: "request_permission"; permission: Permission }
+  /**
+   * Download the speech model (and any other model Transcripts need) into `modelsDirectory` and check that it loads, so
+   * the first Recording does not wait for it. Answered by `model_download_progress` events, then `models_ready` or
+   * `model_download_failed`.
+   */
+  | { type: "download_models"; model: string; modelsDirectory: string }
   | { type: "shutdown" };
 
 export interface EngineExit {
@@ -54,12 +76,16 @@ export interface Engine {
   stop(): Promise<void>;
 }
 
-const EVENT_FIELDS: Record<EngineEvent["type"], Record<string, "string" | "number" | "array">> = {
+const EVENT_FIELDS: Record<EngineEvent["type"], Record<string, "string" | "number" | "boolean" | "array">> = {
   ready: { version: "string" },
   mic_in_use_started: { app: "string", pid: "number" },
   mic_in_use_stopped: { app: "string", pid: "number" },
   recording_started: { app: "string", startedAt: "string" },
   tracks_ready: { micPath: "string", systemPath: "string", micStartHostTime: "number", systemStartHostTime: "number" },
+  permission_result: { permission: "string", granted: "boolean" },
+  model_download_progress: { model: "string", fraction: "number" },
+  models_ready: {},
+  model_download_failed: { message: "string" },
   transcript_ready: { id: "string", segments: "array" },
   transcription_failed: { id: "string", message: "string" },
   recording_failed: { message: "string" },
