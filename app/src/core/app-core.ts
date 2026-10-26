@@ -415,8 +415,9 @@ export class AppCore {
         return id;
       },
       setMeetingState: (id, state, error) => {
+        const previous = store.getMeeting(id);
         store.setMeetingState(id, state, error);
-        notify();
+        if (previous?.state !== state || previous.error !== (error ?? null)) notify();
       },
       renameParticipant: (id, label, name) => {
         store.renameParticipant(id, label, name);

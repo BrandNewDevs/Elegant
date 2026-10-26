@@ -1,3 +1,4 @@
+import type { AIJobQueue } from "../pipeline/job-queue.js";
 import type { Engine, Permission } from "../engine/protocol.js";
 import type { OllamaStatus } from "../pipeline/ollama.js";
 import type { Store } from "../store/store.js";
@@ -32,6 +33,7 @@ export interface SetupOptions {
   speechModel: string;
   modelsDirectory: string;
   checkOllama: () => Promise<OllamaStatus>;
+  jobs?: AIJobQueue;
 }
 
 const PERMISSION_DENIED: Record<Permission, string> = {
@@ -50,6 +52,7 @@ const PERMISSION_STEP = { microphone: "microphone", system_audio: "systemAudio" 
  */
 export class Setup {
   private _state: SetupState;
+  private modelJob?: { resolve: () => void; reject: (error: Error) => void };
   private listeners: (() => void)[] = [];
   private checkedListeners: (() => void)[] = [];
   private pendingChecks = new Set<Permission>();
@@ -83,12 +86,16 @@ export class Setup {
           if (this._state.models.status === "working") this.update({ models: { status: "working", fraction: event.fraction } });
           break;
         case "models_ready":
+          this.modelJob?.resolve();
+          this.modelJob = undefined;
           if (this._state.models.status === "working") {
             this.store.setSetting(MODELS_READY_SETTING, "true");
             this.update({ models: { status: "done", fraction: 1 } });
           }
           break;
         case "model_download_failed":
+          this.modelJob?.reject(new Error("Speech model preparation failed. Check your connection and retry."));
+          this.modelJob = undefined;
           if (this._state.models.status === "working") {
             this.update({ models: { status: "problem", fraction: this._state.models.fraction, message: `The download failed: ${event.message}. Check your connection and try again.` } });
           }
@@ -96,6 +103,8 @@ export class Setup {
       }
     });
     engine.onExit(() => {
+      this.modelJob?.reject(new Error("The engine stopped while preparing speech models"));
+      this.modelJob = undefined;
       const stopped = { status: "problem", message: "The engine stopped. Restart the app and try again." } as const;
       const patch: Partial<SetupState> = {};
       for (const step of ["microphone", "systemAudio"] as const) if (this._state[step].status === "working") patch[step] = stopped;
@@ -160,7 +169,14 @@ export class Setup {
   downloadModels(): void {
     if (this._state.models.status === "working") return;
     this.update({ models: { status: "working", fraction: 0 } });
-    this.engine.send({ type: "download_models", model: this.options.speechModel, modelsDirectory: this.options.modelsDirectory });
+    const prepare = () => new Promise<void>((resolve, reject) => {
+      this.modelJob = { resolve, reject };
+      this.engine.send({ type: "download_models", model: this.options.speechModel, modelsDirectory: this.options.modelsDirectory });
+    });
+    const work = this.options.jobs
+      ? this.options.jobs.enqueue({ id: "setup-models", owner: "setup", kind: "speech-model-preparation" }, prepare)
+      : prepare();
+    void work.catch(() => this.update({ models: { status: "problem", fraction: 0, message: "Speech model preparation stopped. Restart the app and retry." } }));
   }
 
   /** Checks that Ollama is running with the Summary model pulled. Safe to repeat once the user has fixed it. */

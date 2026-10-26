@@ -1,5 +1,5 @@
 import type { LanguageModel } from "./language-model.js";
-import type { Summary, Transcript, TranscriptSegment } from "./pipeline.js";
+import type { PipelineContext, Summary, Transcript, TranscriptSegment } from "./pipeline.js";
 import { InvalidSummaryError, parseSummary, parseTldr, SUMMARY_SCHEMA, TLDR_SCHEMA } from "./validate-summary.js";
 
 export interface SummariserOptions {
@@ -11,7 +11,7 @@ export interface SummariserOptions {
 }
 
 // Sized for a 4B-class model with an 8k-token context: roughly 3k tokens of transcript, leaving room for the answer.
-const DEFAULT_MAX_CHUNK_CHARS = 12_000;
+const DEFAULT_MAX_CHUNK_CHARS = 2_500;
 
 const RULES = `Rules:
 - Use the speaker labels exactly as written in the transcript. Never invent, guess or substitute names.
@@ -71,14 +71,15 @@ export function createSummariser({
   model,
   attempts = 3,
   maxChunkChars = DEFAULT_MAX_CHUNK_CHARS,
-}: SummariserOptions): (transcript: Transcript) => Promise<Summary> {
+}: SummariserOptions): (transcript: Transcript, context?: PipelineContext) => Promise<Summary> {
   /** Asks the model, re-asking with the reason when its output fails `parse`. */
-  async function ask<T>(prompt: string, schema: object, parse: (json: string) => T): Promise<T> {
+  async function ask<T>(prompt: string, schema: object, parse: (json: string) => T, signal?: AbortSignal): Promise<T> {
     let problem: string | undefined;
     for (let attempt = 1; attempt <= attempts; attempt++) {
+      signal?.throwIfAborted();
       const note = problem ? `\n\nYour previous answer was rejected because ${problem}. Fix that.` : "";
       try {
-        return parse(await model.generate({ prompt: prompt + note, schema }));
+        return parse(await model.generate({ prompt: prompt + note, schema, signal }));
       } catch (err) {
         if (!(err instanceof InvalidSummaryError)) throw err;
         problem = err.message;
@@ -87,17 +88,17 @@ export function createSummariser({
     throw new InvalidSummaryError(`the model's output was rejected after ${attempts} attempts: ${problem}`);
   }
 
-  async function summariseChunk(segments: TranscriptSegment[]): Promise<Summary> {
+  async function summariseChunk(segments: TranscriptSegment[], signal?: AbortSignal): Promise<Summary> {
     const labels = new Set(segments.map((s) => s.speaker));
     const prompt = `${SUMMARISE_PROMPT}\n\nTranscript:\n${segments.map(line).join("\n")}`;
-    return ask(prompt, SUMMARY_SCHEMA, (json) => parseSummary(json, labels));
+    return ask(prompt, SUMMARY_SCHEMA, (json) => parseSummary(json, labels), signal);
   }
 
-  return async (transcript) => {
+  return async (transcript, context = {}) => {
     if (transcript.segments.length === 0) throw new Error("the Transcript is empty, so there is nothing to summarise");
 
     const parts: Summary[] = [];
-    for (const segments of chunk(transcript.segments, maxChunkChars)) parts.push(await summariseChunk(segments));
+    for (const segments of chunk(transcript.segments, maxChunkChars)) parts.push(await summariseChunk(segments, context.signal));
     if (parts.length === 1) return parts[0]!;
 
     const said = new Map<string, string[]>();
@@ -105,7 +106,7 @@ export function createSummariser({
       for (const p of part.participants) said.set(p.speaker, [...(said.get(p.speaker) ?? []), ...p.said]);
     }
     const combinePrompt = `${COMBINE_PROMPT}\n\nSummaries:\n${parts.map((p, i) => `Part ${i + 1}: ${p.tldr}`).join("\n")}`;
-    const tldr = await ask(combinePrompt, TLDR_SCHEMA, parseTldr);
+    const tldr = await ask(combinePrompt, TLDR_SCHEMA, parseTldr, context.signal);
     return { tldr, participants: [...said].map(([speaker, points]) => ({ speaker, said: points })) };
   };
 }

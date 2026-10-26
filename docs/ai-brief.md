@@ -79,6 +79,14 @@ Output: a Summary as JSON.
 - Start with 8,192 context tokens, at most 2,048 response tokens and a conservative 5,500 UTF-8 byte serialized-input budget. Count instructions, evidence, history and retry messages together; check the margin against actual prompt-token counts. Use temperature zero and at most three total attempts for invalid output. Connection errors are actionable failures, not blind retries.
 - Centralize model settings and readiness checks. Support system/user messages, JSON Schema, timeouts, cancellation and operational metadata without logging Transcript content or prompts by default. Serialize AI jobs, release idle speech models before Gemma and cancel work before closing storage.
 
+## Shared infrastructure now implemented
+
+`pipeline/evidence.ts` computes ordered Transcript revisions and resolves segment ordinals, rejecting stale references. `OllamaClient.complete` supports system/user messages, schema output, bounded requests, cancellation through body reading, timeouts and token/timing metadata. `generate` remains the compatibility adapter. The frozen evaluation baseline has its own original transport and validator.
+
+`AppCore.jobs` serializes pipeline work; Settings model preparation shares that queue. Cancelling an active job keeps its resource slot occupied until the underlying work settles. Shutdown cancels jobs, stops the engine, waits for work to settle, then closes storage. Successful transcription waits for `models_released` before returning; preparation unloads models too. Mac memory measurements remain pending. Queue display and user controls arrive with the UI integration.
+
+The legacy production Summary chunk size is temporarily reduced to fit conservative requests. Evidence-backed bounded consolidation replaces that implementation in the next delivery; the frozen evaluation baseline remains unchanged.
+
 ## Meeting chat contract
 
 Chat becomes available once a Meeting's Transcript is complete, even if Summary generation failed. Each answer contains text, supporting references and an evidence-sufficiency result. Facts come from the original Transcript, never from earlier generated answers. Missing owners, dates and agreements must not be guessed.
