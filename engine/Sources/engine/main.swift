@@ -110,6 +110,8 @@ func transcribe(_ command: [String: Any]) {
                 "segments": segments.map { ["start": $0.start, "end": $0.end, "speaker": $0.speaker, "text": $0.text] },
             ])
         } catch {
+            // Unload partially loaded models after a failed attempt, too. Busy operations reject this safely.
+            try? await transcriber.releaseModels()
             send(["type": "transcription_failed", "id": id, "message": "\(error)"])
         }
     }
