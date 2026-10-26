@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Meeting } from "../store/store.js";
 import { meetingIdFromLink, renderMeetingsPage, searchFromLink, renameFromLink } from "./meetings-page.js";
 
 describe("the Meetings page search", () => {
@@ -23,7 +24,6 @@ describe("the Meetings page search", () => {
   });
 });
 
-import type { Meeting } from "../store/store.js";
 
 const meeting: Meeting = {
   id: 4,

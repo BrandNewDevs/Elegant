@@ -1,7 +1,6 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PipelineStages } from "../pipeline/pipeline.js";
 import { createSummariser } from "../pipeline/summariser.js";
@@ -1307,7 +1306,7 @@ describe("exporting a Meeting to Markdown", () => {
   });
 
   it("shows a renamed Participant by name in the Summary and the Transcript, and leaves the others as labelled", async () => {
-    const { id, core, path, dir } = seeded();
+    const { id, core, dir } = seeded();
     core.renameParticipant(id, "Speaker 1", "Priya");
 
     const { markdown } = core.exportMeeting(id);
