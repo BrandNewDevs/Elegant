@@ -4,7 +4,7 @@ import type { Store } from "../store/store.js";
 import type { PipelineStages, Tracks, Transcript } from "./pipeline.js";
 
 /** What the runner needs from the store, so it does not depend on the whole thing. */
-export type PipelineSink = Pick<Store, "saveTranscript" | "saveSummary" | "setMeetingState">;
+export type PipelineSink = Pick<Store, "saveTranscript" | "saveSummary" | "setMeetingState" | "saveAudio" | "clearAudio">;
 
 /** The engine puts each Recording's tracks in a directory of its own with this prefix; only such a directory is removed. */
 const RECORDING_DIR_PREFIX = "meeting-recorder-";
@@ -17,12 +17,18 @@ export class PipelineRunner {
     private readonly options: { keepAudio?: boolean } = {},
   ) {}
 
+  /** Transcribes and summarises a Recording. Also the retry for a Meeting whose transcription failed: its audio is still there. */
   async run(meetingId: number, tracks: Tracks): Promise<void> {
     this.sink.setMeetingState(meetingId, "processing");
+    // Remembered until the audio is deleted, so a failure can be retried without re-recording.
+    this.sink.saveAudio(meetingId, tracks);
     try {
       const transcript = await this.stages.transcribe(tracks);
       this.sink.saveTranscript(meetingId, transcript);
-      if (!this.options.keepAudio) await discardAudio(tracks);
+      if (!this.options.keepAudio) {
+        await discardAudio(tracks);
+        this.sink.clearAudio(meetingId);
+      }
       // A call with no speech is a finished Meeting with nothing to summarise, not a failure.
       if (transcript.segments.length === 0) this.sink.setMeetingState(meetingId, "done");
       else await this.summarise(meetingId, transcript);

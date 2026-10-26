@@ -2,6 +2,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PipelineStages } from "../pipeline/pipeline.js";
 import { createSummariser } from "../pipeline/summariser.js";
 import { FakeEngine } from "../testing/fake-engine.js";
 import { FakeModel } from "../testing/fake-model.js";
@@ -831,5 +832,81 @@ describe("summarising with a language model", () => {
     await core.idle();
     await expect(core.retrySummary(core.listMeetings()[0]!.id)).rejects.toThrow(/failed/);
     await expect(core.retrySummary(999)).rejects.toThrow(/no such Meeting/);
+  });
+});
+
+describe("retrying a failed transcription", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "retry-test-"));
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  function recordedAndFailed() {
+    const micPath = join(dir, "mic.wav"), systemPath = join(dir, "system.wav");
+    writeFileSync(micPath, "");
+    writeFileSync(systemPath, "");
+    let failing = true;
+    const healthy = fakePipeline();
+    const pipeline: PipelineStages = {
+      transcribe: async (t) => {
+        if (failing) throw new Error("the speech model is not downloaded");
+        return healthy.transcribe(t);
+      },
+      summarise: healthy.summarise,
+    };
+    const engine = new FakeEngine();
+    const core = new AppCore({ engine, store: openStore(":memory:"), pipeline });
+    core.start();
+    engine.emit({ type: "ready", version: "0.1.0" });
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
+    engine.emit({ type: "tracks_ready", micPath, systemPath, micStartHostTime: 1000.197, systemStartHostTime: 1000 });
+    return { core, micPath, systemPath, recover: () => (failing = false) };
+  }
+
+  it("keeps the audio when transcription fails", async () => {
+    const { core, micPath, systemPath } = recordedAndFailed();
+    await core.idle();
+    const meeting = core.getMeeting(core.listMeetings()[0]!.id)!;
+    expect(meeting).toMatchObject({ state: "failed", error: "the speech model is not downloaded", audio: { micPath, systemPath } });
+    expect(existsSync(micPath) && existsSync(systemPath)).toBe(true);
+  });
+
+  it("transcribes again from the kept audio, then deletes it", async () => {
+    const { core, micPath, systemPath, recover } = recordedAndFailed();
+    await core.idle();
+    const id = core.listMeetings()[0]!.id;
+
+    recover();
+    await core.retryTranscription(id);
+
+    const meeting = core.getMeeting(id)!;
+    expect(meeting).toMatchObject({ state: "done", error: null, audio: null, summary: fixtureSummary });
+    expect(meeting.transcript.segments).toEqual(fixtureTranscript.segments);
+    expect(existsSync(micPath) || existsSync(systemPath)).toBe(false);
+  });
+
+  it("stays failed, with the audio kept, when the retry fails too", async () => {
+    const { core, micPath } = recordedAndFailed();
+    await core.idle();
+    const id = core.listMeetings()[0]!.id;
+
+    await core.retryTranscription(id);
+    expect(core.getMeeting(id)).toMatchObject({ state: "failed", audio: { micPath } });
+  });
+
+  it("refuses when the Meeting does not exist, did not fail, or its audio is gone", async () => {
+    const { core, micPath, recover } = recordedAndFailed();
+    await core.idle();
+    const id = core.listMeetings()[0]!.id;
+    await expect(core.retryTranscription(999)).rejects.toThrow(/no such Meeting/);
+
+    rmSync(micPath);
+    await expect(core.retryTranscription(id)).rejects.toThrow(/no longer there/);
+
+    writeFileSync(micPath, "");
+    recover();
+    await core.retryTranscription(id);
+    await expect(core.retryTranscription(id)).rejects.toThrow(/failed/);
   });
 });

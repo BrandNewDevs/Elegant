@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { Summary, Transcript } from "../pipeline/pipeline.js";
+import type { Summary, Tracks, Transcript } from "../pipeline/pipeline.js";
 
 export type MeetingState = "recording" | "processing" | "done" | "failed";
 
@@ -22,6 +22,8 @@ export interface Meeting extends MeetingListItem {
   participants: Participant[];
   transcript: Transcript;
   summary: Summary | null;
+  /** The Recording's tracks while its audio is kept, so a failed transcription can be retried; null once deleted. */
+  audio: Tracks | null;
 }
 
 export interface Store {
@@ -29,13 +31,15 @@ export interface Store {
   setMeetingState(id: number, state: MeetingState, error?: string): void;
   saveTranscript(id: number, transcript: Transcript): void;
   saveSummary(id: number, summary: Summary): void;
+  saveAudio(id: number, tracks: Tracks): void;
+  clearAudio(id: number): void;
   getMeeting(id: number): Meeting | undefined;
   /** Newest first. */
   listMeetings(): MeetingListItem[];
   close(): void;
 }
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const SCHEMA = `
   CREATE TABLE meetings (
@@ -44,7 +48,9 @@ const SCHEMA = `
     started_at TEXT NOT NULL,
     ended_at   TEXT,
     state      TEXT NOT NULL CHECK (state IN ('recording','processing','done','failed')),
-    error      TEXT
+    error      TEXT,
+    mic_path   TEXT,
+    system_path TEXT
   );
   CREATE TABLE participants (
     id         INTEGER PRIMARY KEY,
@@ -80,6 +86,10 @@ export function openStore(path: string): Store {
   const version = (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
   if (version === 0) {
     db.exec(SCHEMA);
+    db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  } else if (version === 1) {
+    db.exec("ALTER TABLE meetings ADD COLUMN mic_path TEXT");
+    db.exec("ALTER TABLE meetings ADD COLUMN system_path TEXT");
     db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   }
 
@@ -132,6 +142,14 @@ export function openStore(path: string): Store {
       ).run(id, summary.tldr, JSON.stringify(summary.participants));
     },
 
+    saveAudio(id, tracks) {
+      db.prepare("UPDATE meetings SET mic_path = ?, system_path = ? WHERE id = ?").run(tracks.micPath, tracks.systemPath, id);
+    },
+
+    clearAudio(id) {
+      db.prepare("UPDATE meetings SET mic_path = NULL, system_path = NULL WHERE id = ?").run(id);
+    },
+
     getMeeting(id) {
       const row = db.prepare("SELECT * FROM meetings WHERE id = ?").get(id) as MeetingRow | undefined;
       if (!row) return undefined;
@@ -154,6 +172,7 @@ export function openStore(path: string): Store {
         participants,
         transcript: { segments },
         summary: s ? { tldr: s.tldr, participants: JSON.parse(s.participants_json) } : null,
+        audio: row.mic_path && row.system_path ? { micPath: row.mic_path, systemPath: row.system_path } : null,
       };
     },
 
@@ -178,4 +197,6 @@ interface MeetingRow {
   ended_at: string | null;
   state: MeetingState;
   error: string | null;
+  mic_path: string | null;
+  system_path: string | null;
 }
