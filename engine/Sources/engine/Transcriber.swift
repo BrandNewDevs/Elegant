@@ -89,11 +89,18 @@ actor Transcriber {
         return loaded
     }
 
-    private func loadedKit(model: String, modelsDirectory: URL) async throws -> WhisperKit {
+    /// Downloads `model` if it is not here yet and loads it, so the first Recording does not wait for either.
+    /// `progress` gets the download's fraction, from 0 to 1.
+    func prepare(model: String, modelsDirectory: URL, progress: @escaping @Sendable (Double) -> Void) async throws {
+        _ = try await loadedKit(model: model, modelsDirectory: modelsDirectory, progress: progress)
+    }
+
+    private func loadedKit(model: String, modelsDirectory: URL, progress: (@Sendable (Double) -> Void)? = nil) async throws -> WhisperKit {
         if let kit, loadedModel == model { return kit }
         log("preparing speech model \(model); the first time this downloads it and can take minutes")
-        let folder = try await WhisperKit.download(variant: model, downloadBase: modelsDirectory) { progress in
-            log("downloading \(model): \(Int(progress.fractionCompleted * 100))%")
+        let folder = try await WhisperKit.download(variant: model, downloadBase: modelsDirectory) { downloaded in
+            log("downloading \(model): \(Int(downloaded.fractionCompleted * 100))%")
+            progress?(downloaded.fractionCompleted)
         }
         let config = WhisperKitConfig(
             downloadBase: modelsDirectory,

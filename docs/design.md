@@ -18,6 +18,7 @@ A personal macOS menu-bar app that notices when you are in an online call, offer
 - SQLite is the source of truth, with full-text search over Transcripts and Summaries.
 - v1 features: Meeting list and detail view, Transcript with Participant labels, Summary, rename a Participant, delete a Meeting and all its data, regenerate a Summary, export a Meeting to Markdown, search.
 - Launches at login. Models download on first run. First run also walks through the macOS permission prompts (microphone, system-audio capture) and checks that Ollama is running with a model pulled.
+- First-run setup (`app/src/setup/first-run-setup.ts`, window in `app/src/main/setup-window.ts`) shows until both permissions are granted and the models are downloaded; it is also under "Set up…" in the menu bar. Each step explains itself and starts only when its button is pressed, so no macOS prompt appears unannounced. The engine answers `request_permission` with `permission_result` and `download_models` with `model_download_progress` then `models_ready`. System audio has no macOS call that reports its status, so the engine starts a tap briefly and counts a running tap as granted. The Ollama check never blocks setup, because recording works without it and a failed Summary is retryable. Only the speech model is downloaded so far; the diarization models join `download_models` when diarization lands.
 - Bundle identifier: `dev.bnd.meetingrecorder`. It is permanent because macOS ties permissions and the login item to it; the display name lives in one config.
 
 ## Shape
