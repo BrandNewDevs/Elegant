@@ -14,6 +14,8 @@ export interface EvidenceRequest {
   /** Checks the caller's complete answer request budget, not just the evidence text. */
   fits?: (sources: SourceFragment[]) => boolean;
   forceScan?: boolean;
+  /** Internal: chat has already resolved a follow-up with its single bounded question rewrite. */
+  skipRewrite?: boolean;
   /** Trusted main-process authorization: stored Transcript is complete while only Summary work is pending. */
   allowSummaryProcessing?: boolean;
   onStage?: (stage: EvidenceStage) => void;
@@ -201,7 +203,7 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
         .filter(passage => passage.meetingId === input.meetingId && passage.revision === revision && byId.has(passage.id))
         .map(passage => byId.get(passage.id)!);
       let hits = safeHits(input.question);
-      if (!hits.length || followUp(input.question, history)) {
+      if (!input.skipRewrite && (!hits.length || followUp(input.question, history))) {
         stage("rewriting");
         const query = await ask("rewrite", [], json => {
           const value = parsed(json);

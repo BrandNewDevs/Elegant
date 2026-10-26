@@ -18,13 +18,15 @@ function setup(source = transcript) {
   store.saveTranscript(id, source); store.setMeetingState(id, "done");
   return { store, id, expectedRevision: transcriptRevision(source) };
 }
-interface Data { question: string; priorUserQuestion?: string; history: { question: string; answer: string }[]; sources?: SourceFragment[]; exhaustive?: boolean }
+interface Data { question: string; originalQuestion?: string; priorUserQuestion?: string; history: { question: string; answer: string }[]; sources?: SourceFragment[]; exhaustive?: boolean }
 const contents = (request: TextRequest) => JSON.parse(request.messages.at(-1)!.content) as { instruction: string; data: Data };
 const isAnswer = (request: TextRequest) => "text" in (request.schema as { properties: object }).properties;
 function fake(reply: (request: TextRequest, call: number) => unknown): TextModel & { requests: TextRequest[] } {
   const requests: TextRequest[] = [];
   return { requests, async complete(request) {
-    requests.push(request); const result = reply(request, requests.length);
+    requests.push(request);
+    const resolving = "question" in (request.schema as { properties: object }).properties;
+    const result = resolving ? { question: "When will You finish the permission guide?" } : reply(request, requests.length);
     return { text: typeof result === "string" ? result : JSON.stringify(result), metadata: { model: "local:test", elapsedMs: 1, promptTokens: 10, outputTokens: 4 } };
   } };
 }
@@ -81,6 +83,21 @@ describe("grounded Meeting chat", () => {
     });
     const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "When will they finish it?", history });
     expect(result.answer).toEqual({ text: "You will finish the permission guide by Thursday.", refs: [0], sufficient: true });
+  });
+
+  it("uses one standalone follow-up rewrite even when the entire Transcript fits", async () => {
+    const { store, id, expectedRevision } = setup();
+    const history = [{ question, answer: "You will write the permission guide. Speaker 1 will review it on Friday." }];
+    const model = fake(request => {
+      expect(contents(request).data.question).toBe("When will You finish the permission guide?");
+      expect(contents(request).data.originalQuestion).toBe("When will they finish it?");
+      return { ...positive, text: "You will finish the permission guide by Thursday." };
+    });
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "When will they finish it?", history });
+    expect(result.answer.refs).toEqual([0]);
+    expect(model.requests.filter(request => "question" in (request.schema as { properties: object }).properties)).toHaveLength(1);
+    expect(result.generation.calls).toBe(2);
+    expect(result.generation.retrievalCalls).toBe(0);
   });
 
   it("never supplies a generated Summary as factual evidence and allows a failed Summary's Transcript", async () => {
