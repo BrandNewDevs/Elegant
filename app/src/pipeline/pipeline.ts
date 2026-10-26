@@ -24,7 +24,11 @@ export interface Tracks {
   systemPath: string;
 }
 
-export interface PipelineContext { signal?: AbortSignal }
+export interface PipelineContext {
+  signal?: AbortSignal;
+  /** The Transcript is saved before the summarising stage is announced. */
+  onStage?: (stage: "transcribing" | "summarising") => void;
+}
 
 export interface PipelineStages {
   transcribe(tracks: Tracks, context?: PipelineContext): Promise<Transcript>;

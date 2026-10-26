@@ -85,3 +85,14 @@ AI_MODEL=gemma3:4b-it-q4_K_M AI_SPLIT=tuning pnpm run eval:retrieval ../evaluati
 This standalone command accepts synthetic fixtures only. It records selected original references, expected-reference recall, query mode, exhaustive/incomplete state, calls and latency. It never supplies expected answers to the model. Short complete Transcripts need no retrieval model call. A reference being present is not evidence that a generated answer is correct; use `eval:ai` and source review for that. Private end-to-end examples use `private-current` and stay outside Git.
 
 `retrieval/linux-short-fixtures.json` records 16 short-fixture questions. All used the complete-Transcript path with no inference calls. These observations do not validate long retrieval, generated answers, real Meetings or M4 latency.
+
+## Test chat without regenerating a Summary
+
+```
+AI_MODEL=gemma3:4b-it-q4_K_M pnpm --dir app run eval:ai chat ../evaluation/fixtures /tmp/chat.json
+pnpm --dir app run eval:ai private-chat /absolute/private/manifest.json /absolute/private/chat.json
+```
+
+The `chat` modes intentionally skip Summary generation and use the production Meeting-chat module on stored Transcripts. Reports leave Summary quality pending, even when chat has been reviewed. Results separate Summary latency/calls from individual chat latency/calls. Follow-ups use actual prior answers, never expected answers.
+
+`chat/linux-short-answers.json` records four real Gemma answers to synthetic questions: writer, contextual deadline, undecided release date, and excluded calendar integration. The writer and deadline cite the expected passage; the negative outcomes remain explicit. Some extra citation choices and inline citation formatting still need quality review. `linux-before-followup-fix.json` is a failed earlier observation, not a passed evaluation: it demonstrates why a standalone question and focused evidence audit were needed. Neither file establishes real Meeting quality or M4 performance; final independent quality gates remain pending.

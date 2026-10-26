@@ -7,7 +7,8 @@ import { formatElapsed } from "../core/elapsed.js";
 import { ignoredAppsFile } from "../core/ignored-apps.js";
 import { ProcessEngine } from "../engine/process-engine.js";
 import { createEngineTranscriber } from "../pipeline/engine-transcriber.js";
-import { checkOllama, OllamaClient } from "../pipeline/ollama.js";
+import { createMeetingChat } from "../pipeline/meeting-chat.js";
+import { checkOllama, OllamaClient, DEFAULT_SUMMARY_MODEL } from "../pipeline/ollama.js";
 import { createGroundedSummariser } from "../pipeline/grounded-summariser.js";
 import { Setup } from "../setup/setup.js";
 import { openStore } from "../store/store.js";
@@ -107,13 +108,15 @@ app.whenReady().then(() => {
   const store = openStore(join(dataDir, "meetings.db"));
   const engine = new ProcessEngine({ command: process.env.MEETING_RECORDER_ENGINE ?? engineCommand });
   ignoredAppsPath = join(dataDir, "ignored-apps.json");
+  const textModel = new OllamaClient();
   core = new AppCore({
+    chat: createMeetingChat({ store, model: textModel, modelName: DEFAULT_SUMMARY_MODEL }),
     engine,
     store,
     extraIgnoredApps: ignoredAppsFile(ignoredAppsPath),
     pipeline: {
       transcribe: createEngineTranscriber(engine, { model: SPEECH_MODEL, modelsDirectory: join(dataDir, "models") }),
-      summarise: createGroundedSummariser({ model: new OllamaClient() }),
+      summarise: createGroundedSummariser({ model: textModel }),
     },
   });
 

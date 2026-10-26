@@ -1,3 +1,4 @@
+import type { MeetingsApi } from "../shared/meetings-api.js";
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import type { MeetingsViewState } from "../shared/meetings-view-state.js";
 import type { PromptChoice } from "../shared/prompt-choice.js";
@@ -10,20 +11,27 @@ function subscribe<T>(channel: string, callback: (payload: T) => void): () => vo
   return () => ipcRenderer.removeListener(channel, handler);
 }
 
+const meetings = {
+  ready: () => ipcRenderer.send("meetings:ready"),
+  onState: (callback: (state: MeetingsViewState) => void) => subscribe("meetings:state", callback),
+  settings: (open: boolean) => ipcRenderer.send("meetings:settings", open),
+  setShowInDock: (show: boolean) => ipcRenderer.send("meetings:show-in-dock", show),
+  select: (id: number) => ipcRenderer.send("meetings:select", id),
+  search: (query: string) => ipcRenderer.send("meetings:search", query),
+  rename: (payload: { meetingId: number; label: string; name: string }) =>
+    ipcRenderer.send("meetings:rename", payload),
+  export: (id: number) => ipcRenderer.send("meetings:export", id),
+  regenerate: (id: number) => ipcRenderer.invoke("meetings:regenerate", id),
+  delete: (id: number) => ipcRenderer.invoke("meetings:delete", id),
+  sendQuestion: payload => ipcRenderer.invoke("meetings:send-question", payload),
+  cancelQuestion: payload => ipcRenderer.invoke("meetings:cancel-question", payload),
+  clearChat: (meetingId: number) => ipcRenderer.invoke("meetings:clear-chat", meetingId),
+  openReference: payload => ipcRenderer.invoke("meetings:open-reference", payload),
+  cancelJob: payload => ipcRenderer.invoke("meetings:cancel-job", payload),
+} satisfies MeetingsApi;
+
 contextBridge.exposeInMainWorld("electron", {
-  meetings: {
-    ready: () => ipcRenderer.send("meetings:ready"),
-    onState: (callback: (state: MeetingsViewState) => void) => subscribe("meetings:state", callback),
-    settings: (open: boolean) => ipcRenderer.send("meetings:settings", open),
-    setShowInDock: (show: boolean) => ipcRenderer.send("meetings:show-in-dock", show),
-    select: (id: number) => ipcRenderer.send("meetings:select", id),
-    search: (query: string) => ipcRenderer.send("meetings:search", query),
-    rename: (payload: { meetingId: number; label: string; name: string }) =>
-      ipcRenderer.send("meetings:rename", payload),
-    export: (id: number) => ipcRenderer.send("meetings:export", id),
-    regenerate: (id: number) => ipcRenderer.invoke("meetings:regenerate", id),
-    delete: (id: number) => ipcRenderer.invoke("meetings:delete", id),
-  },
+  meetings,
   setup: {
     ready: () => ipcRenderer.send("setup:ready"),
     onState: (callback: (state: SetupViewState) => void) => subscribe("setup:state", callback),

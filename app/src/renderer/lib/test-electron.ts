@@ -1,3 +1,4 @@
+import type { MeetingsApi } from "../../shared/meetings-api";
 import { vi } from "vitest";
 import type { SetupViewState } from "../../shared/setup-view-state";
 
@@ -28,7 +29,7 @@ export function pushSetupState(view: SetupViewState) {
       act,
       setUserName,
     },
-    meetings: { setShowInDock } as unknown as Window["electron"]["meetings"],
+    meetings: createMeetingsApi({ setShowInDock }),
     prompt: {} as Window["electron"]["prompt"],
   };
   return Object.assign(act, { setUserName, setShowInDock });
@@ -36,4 +37,21 @@ export function pushSetupState(view: SetupViewState) {
 
 export function withState(patch: Partial<SetupViewState["state"]>, permissionsGranted = false): SetupViewState {
   return { ...nothingDone, permissionsGranted, state: { ...nothingDone.state, ...patch } };
+}
+
+
+/** Typed spies for renderer tests; individual operations can be overridden without rebuilding the bridge. */
+export function createMeetingsApi(overrides: Partial<MeetingsApi> = {}) {
+  const api = {
+    ready: vi.fn(),
+    onState: vi.fn((_callback: Parameters<MeetingsApi["onState"]>[0]) => () => {}),
+    settings: vi.fn(), setShowInDock: vi.fn(), select: vi.fn(), search: vi.fn(), rename: vi.fn(), export: vi.fn(),
+    regenerate: vi.fn(async () => {}), delete: vi.fn(async () => {}),
+    sendQuestion: vi.fn(async (_payload: Parameters<MeetingsApi["sendQuestion"]>[0]) => {}),
+    cancelQuestion: vi.fn(async (_payload: Parameters<MeetingsApi["cancelQuestion"]>[0]) => {}),
+    clearChat: vi.fn(async (_meetingId: number) => {}),
+    openReference: vi.fn(async (_payload: Parameters<MeetingsApi["openReference"]>[0]) => [] as number[]),
+    cancelJob: vi.fn(async (_payload: Parameters<MeetingsApi["cancelJob"]>[0]) => {}),
+  } satisfies MeetingsApi;
+  return Object.assign(api, overrides);
 }
