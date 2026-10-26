@@ -1,7 +1,7 @@
 import { InvalidSummaryError } from "./validate-summary.js";
 
 export interface SourcePiece { id: string; ref: number; part: number; speaker: string; start: number; end: number; text: string }
-export type FactKind = "proposal" | "decision" | "commitment" | "disagreement" | "unresolved";
+export type FactKind = "proposal" | "decision" | "commitment" | "disagreement" | "unresolved" | "update";
 export interface SupportedPoint { speaker: string; text: string; refs: number[] }
 export interface SupportedFact extends SupportedPoint { kind: FactKind; sources: SourcePiece[] }
 export interface GroundedOutput { tldr: string; tldrRefs: number[]; points: SupportedPoint[] }
@@ -16,7 +16,7 @@ export const GROUNDED_SCHEMA = {
 };
 export const FACTS_SCHEMA = {
   type: "object", properties: { facts: { type: "array", items: {
-    type: "object", properties: { ...pointProperties, sourceIds: { type: "array", items: { type: "string" }, minItems: 1 }, kind: { type: "string", enum: ["proposal", "decision", "commitment", "disagreement", "unresolved"] } },
+    type: "object", properties: { ...pointProperties, sourceIds: { type: "array", items: { type: "string" }, minItems: 1 }, kind: { type: "string", enum: ["proposal", "decision", "commitment", "disagreement", "unresolved", "update"] } },
     required: ["speaker", "text", "refs", "kind", "sourceIds"],
   } } }, required: ["facts"],
 };
@@ -53,7 +53,7 @@ export function parseFacts(json: string, sources: SourcePiece[], primary?: Sourc
   const value = object(json);
   if (!Array.isArray(value.facts)) return problem("facts must be a list");
   return value.facts.map(value => {
-    if (!record(value) || typeof value.kind !== "string" || !["proposal", "decision", "commitment", "disagreement", "unresolved"].includes(value.kind)) return problem("Use a supported fact kind");
+    if (!record(value) || typeof value.kind !== "string" || !["proposal", "decision", "commitment", "disagreement", "unresolved", "update"].includes(value.kind)) return problem("Use a supported fact kind");
     if (!Array.isArray(value.sourceIds) || !value.sourceIds.length || !value.sourceIds.every(id => typeof id === "string" && sources.some(source => source.id === id))
         || new Set(value.sourceIds).size !== value.sourceIds.length) return problem("Cite distinct sourceIds supplied with the original passages");
     const selected = sources.filter(source => (value.sourceIds as string[]).includes(source.id));
