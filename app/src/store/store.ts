@@ -1,3 +1,4 @@
+import { buildPassages, type EvidencePassage } from "../pipeline/passages.js";
 import { transcriptRevision } from "../pipeline/evidence.js";
 import { DatabaseSync } from "node:sqlite";
 import type { Summary, Tracks, Transcript } from "../pipeline/pipeline.js";
@@ -48,6 +49,10 @@ export interface Store {
    * search works while it is being typed), newest first. A query with no words matches nothing.
    */
   searchMeetings(query: string): MeetingListItem[];
+  /** Derived source passages in Transcript order, restricted to this Meeting and revision. */
+  listPassages(meetingId: number, revision: string): EvidencePassage[];
+  /** Ranked OR-word lookup; never returns evidence from a different Meeting or revision. */
+  searchPassages(meetingId: number, revision: string, query: string, limit?: number): EvidencePassage[];
   close(): void;
 }
 
@@ -189,6 +194,31 @@ export function openStore(path: string): Store {
     }
   };
 
+  const rebuildPassages = (meetingId: number, transcript: Transcript): void => {
+    db.prepare("DELETE FROM passage_index WHERE meeting_id = ?").run(meetingId);
+    db.prepare("DELETE FROM passages WHERE meeting_id = ?").run(meetingId);
+    const revision = transcriptRevision(transcript);
+    const insert = db.prepare("INSERT INTO passages (meeting_id, revision, idx, refs_json, text) VALUES (?, ?, ?, ?, ?)");
+    const index = db.prepare("INSERT INTO passage_index (passage_id, meeting_id, revision, text) VALUES (?, ?, ?, ?)");
+    for (const passage of buildPassages(transcript)) {
+      const id = insert.run(meetingId, revision, passage.index, JSON.stringify(passage.sources), passage.text).lastInsertRowid;
+      index.run(id, meetingId, revision, passage.text);
+    }
+  };
+  // Schema 3 originally reserved these tables. Build missing derived data without another migration.
+  for (const { meeting_id } of db.prepare("SELECT DISTINCT meeting_id FROM segments").all() as { meeting_id: number }[]) {
+    const segments = db.prepare("SELECT start, end, speaker, text FROM segments WHERE meeting_id = ? ORDER BY idx")
+      .all(meeting_id) as unknown as Transcript["segments"];
+    const revision = transcriptRevision({ segments });
+    const count = (db.prepare("SELECT count(*) AS n FROM passages WHERE meeting_id = ? AND revision = ?").get(meeting_id, revision) as { n: number }).n;
+    const indexed = (db.prepare("SELECT count(*) AS n FROM passage_index WHERE meeting_id = ? AND revision = ?").get(meeting_id, revision) as { n: number }).n;
+    if (!count || count !== indexed) inTransaction(() => rebuildPassages(meeting_id, { segments }));
+  }
+  const passageRows = (rows: unknown[]): EvidencePassage[] => (rows as PassageRow[]).map(row => ({
+    id: row.id, meetingId: row.meeting_id, revision: row.revision, index: row.idx,
+    sources: JSON.parse(row.refs_json) as EvidencePassage["sources"], text: row.text,
+  }));
+
   return {
     createMeeting({ app, startedAt }) {
       const r = db
@@ -224,6 +254,7 @@ export function openStore(path: string): Store {
           insertSegment.run(id, i, s.start, s.end, s.speaker, s.text);
         });
         db.prepare("DELETE FROM participants WHERE meeting_id = ? AND label NOT IN (SELECT speaker FROM segments WHERE meeting_id = ?)").run(id, id);
+        rebuildPassages(id, transcript);
         reindex(id);
       });
     },
@@ -333,6 +364,23 @@ export function openStore(path: string): Store {
       return rows.map((r) => ({ id: r.id, app: r.app, startedAt: r.started_at, state: r.state }));
     },
 
+    listPassages(meetingId, revision) {
+      return passageRows(db.prepare("SELECT p.* FROM passages p JOIN meetings m ON m.id = p.meeting_id WHERE p.meeting_id = ? AND p.revision = ? ORDER BY p.idx, p.id")
+        .all(meetingId, revision));
+    },
+
+    searchPassages(meetingId, revision, query, limit = 8) {
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("Passage result limit must be between 1 and 100");
+      const words = [...new Set(query.match(/[\p{L}\p{N}]+/gu) ?? [])].slice(0, 64);
+      if (!words.length) return [];
+      const expression = words.map(word => `"${word}"`).join(" OR ");
+      return passageRows(db.prepare(`SELECT p.* FROM passage_index
+        JOIN passages p ON p.id = passage_index.passage_id AND p.meeting_id = passage_index.meeting_id AND p.revision = passage_index.revision
+        JOIN meetings m ON m.id = p.meeting_id
+        WHERE passage_index MATCH ? AND p.meeting_id = ? AND p.revision = ?
+        ORDER BY bm25(passage_index), p.idx, p.id LIMIT ?`).all(expression, meetingId, revision, limit));
+    },
+
     close() {
       db.close();
     },
@@ -348,4 +396,14 @@ interface MeetingRow {
   error: string | null;
   mic_path: string | null;
   system_path: string | null;
+}
+
+
+interface PassageRow {
+  id: number;
+  meeting_id: number;
+  revision: string;
+  idx: number;
+  refs_json: string;
+  text: string;
 }
