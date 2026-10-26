@@ -17,3 +17,15 @@ describe("parsing a transcript_ready event", () => {
     expect(() => parseEngineEvent(line([null]))).toThrow(/malformed segment/);
   });
 });
+
+describe("parsing first-run setup events", () => {
+  it("accepts a permission answer, progress and the end of a download", () => {
+    expect(parseEngineEvent(JSON.stringify({ type: "permission_result", permission: "microphone", granted: false }))).toMatchObject({ granted: false });
+    expect(parseEngineEvent(JSON.stringify({ type: "model_download_progress", model: "m", fraction: 0.5 }))).toMatchObject({ fraction: 0.5 });
+    expect(parseEngineEvent(JSON.stringify({ type: "models_ready" }))).toEqual({ type: "models_ready" });
+  });
+
+  it("rejects a permission answer whose granted is not a boolean", () => {
+    expect(() => parseEngineEvent(JSON.stringify({ type: "permission_result", permission: "microphone", granted: "yes" }))).toThrow(/granted/);
+  });
+});

@@ -58,3 +58,32 @@ export class OllamaClient implements LanguageModel {
     return content;
   }
 }
+
+export type OllamaStatus =
+  | { status: "ready" }
+  | { status: "not-running"; message: string }
+  | { status: "no-model"; message: string };
+
+/** Whether Ollama answers and has `model` pulled. The messages say what to do, since the user reads them in first-run setup. */
+export async function checkOllama({
+  baseUrl = DEFAULT_OLLAMA_URL,
+  model = DEFAULT_SUMMARY_MODEL,
+  timeoutMs = 5000,
+}: { baseUrl?: string; model?: string; timeoutMs?: number } = {}): Promise<OllamaStatus> {
+  const notRunning: OllamaStatus = {
+    status: "not-running",
+    message: `Ollama is not running at ${baseUrl}. Install it from ollama.com and start it, then check again.`,
+  };
+  let names: string[];
+  try {
+    const response = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!response.ok) return notRunning;
+    names = ((await response.json()) as { models?: { name: string }[] }).models?.map((m) => m.name) ?? [];
+  } catch {
+    return notRunning;
+  }
+  // A name without a tag means the latest one.
+  const wanted = model.includes(":") ? model : `${model}:latest`;
+  if (names.includes(wanted)) return { status: "ready" };
+  return { status: "no-model", message: `Ollama is running but does not have ${model}. Run: ollama pull ${model}` };
+}

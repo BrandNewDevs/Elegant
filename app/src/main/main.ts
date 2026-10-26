@@ -7,12 +7,14 @@ import { formatElapsed } from "../core/elapsed.js";
 import { knownAppsFile } from "../core/known-apps.js";
 import { ProcessEngine } from "../engine/process-engine.js";
 import { createEngineTranscriber } from "../pipeline/engine-transcriber.js";
-import { OllamaClient } from "../pipeline/ollama.js";
+import { checkOllama, OllamaClient } from "../pipeline/ollama.js";
 import { createSummariser } from "../pipeline/summariser.js";
+import { FirstRunSetup } from "../setup/first-run-setup.js";
 import { openStore } from "../store/store.js";
 import { DISPLAY_NAME, SPEECH_MODEL } from "../config.js";
 import { showPrompt } from "./prompt-window.js";
 import { MeetingsWindow } from "./meetings-window.js";
+import { SetupWindow } from "./setup-window.js";
 import { STATUS_LABEL } from "./status-label.js";
 
 const RECORDING_SYMBOL = "⏺";
@@ -24,6 +26,7 @@ let tray: Tray | undefined;
 let core: AppCore | undefined;
 let prompt: { close(): void } | undefined;
 let meetingsWindow: MeetingsWindow | undefined;
+let setupWindow: SetupWindow | undefined;
 
 let knownAppsPath = "";
 
@@ -47,6 +50,7 @@ function render(): void {
       { label: text, enabled: false },
       { type: "separator" },
       { label: "Meetings…", click: () => meetingsWindow?.show() },
+      { label: "Set up…", click: () => setupWindow?.show() },
       {
         label: "Keep audio after transcription",
         type: "checkbox",
@@ -100,6 +104,12 @@ app.whenReady().then(() => {
   });
 
   meetingsWindow = new MeetingsWindow(core);
+  const setup = new FirstRunSetup(engine, store, {
+    speechModel: SPEECH_MODEL,
+    modelsDirectory: join(dataDir, "models"),
+    checkOllama: () => checkOllama(),
+  });
+  setupWindow = new SetupWindow(setup);
 
   tray = new Tray(nativeImage.createEmpty());
   core.onDetectedMeetingChange((meeting) => {
@@ -141,6 +151,8 @@ app.whenReady().then(() => {
   core.start();
   // Opened by hand, the app shows its window, since the menu-bar item alone is easy to miss. Opened at login it stays quiet.
   if (!app.getLoginItemSettings().wasOpenedAtLogin) meetingsWindow.show();
+  // Until setup is done it stays in front, even at login: the permissions and models are needed before any Recording.
+  if (!setup.complete) setupWindow.show();
 
   let quitting = false;
   app.on("before-quit", (event) => {
