@@ -96,6 +96,7 @@ it("shows the Settings page in place of the Meetings when the window is on it, a
       return () => {};
     },
     act: vi.fn(),
+    setUserName: vi.fn(),
   };
   render(<MeetingsApp />);
   expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();

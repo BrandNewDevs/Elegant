@@ -58,3 +58,16 @@ it("goes back to the Meetings", () => {
   fireEvent.click(screen.getByRole("button", { name: "Meetings" }));
   expect(backs).toBe(1);
 });
+
+it("changes the name from Settings, and only offers Save once it differs", () => {
+  const send = pushSetupState({ ...nothingDone, userName: "Kenny" });
+  render(<SettingsPage onBack={() => {}} />);
+  const save = screen.getByRole("button", { name: "Save" }) as HTMLButtonElement;
+  expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Kenny");
+  expect(save.disabled).toBe(true);
+
+  fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Ken" } });
+  expect(save.disabled).toBe(false);
+  fireEvent.click(save);
+  expect(send.setUserName).toHaveBeenCalledWith("Ken");
+});

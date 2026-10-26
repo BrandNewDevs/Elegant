@@ -29,5 +29,5 @@ The condensed account of a Meeting produced from its Transcript: a TL;DR and wha
 _Avoid_: Notes, minutes, recap
 
 **Participant**:
-A person who speaks in a Meeting, including you. Others start out unnamed ("Speaker 1", "Speaker 2") until you give them a name.
+A person who speaks in a Meeting, including you. You appear as "You" until you give your name (in onboarding or Settings); others start out unnamed ("Speaker 1", "Speaker 2") until you give them a name.
 _Avoid_: Attendee

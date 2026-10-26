@@ -37,6 +37,10 @@ export class SetupBridge {
       this.clients.set(event.sender, true);
       this.push(event.sender);
     });
+    ipcMain.on("setup:set-user-name", (event, name: unknown) => {
+      if (!this.clients.has(event.sender) || typeof name !== "string") return;
+      this.setup.setUserName(name.slice(0, 100));
+    });
     ipcMain.on("setup:act", (event, action: SetupAction) => {
       if (!this.clients.has(event.sender)) return;
       this.act(action, event.sender);
@@ -70,7 +74,12 @@ export class SetupBridge {
 
   private push(contents: WebContents): void {
     if (contents.isDestroyed()) return;
-    const payload: SetupViewState = { name: DISPLAY_NAME, permissionsGranted: this.setup.permissionsGranted, state: this.setup.state };
+    const payload: SetupViewState = {
+      name: DISPLAY_NAME,
+      userName: this.setup.userName,
+      permissionsGranted: this.setup.permissionsGranted,
+      state: this.setup.state,
+    };
     contents.send("setup:state", payload);
   }
 }

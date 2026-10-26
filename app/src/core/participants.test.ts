@@ -29,14 +29,15 @@ const pipeline: PipelineStages = {
 
 async function recordedMeeting() {
   const engine = new FakeEngine();
-  const core = new AppCore({ engine, store: openStore(":memory:"), pipeline });
+  const store = openStore(":memory:");
+  const core = new AppCore({ engine, store, pipeline });
   core.start();
   engine.emit({ type: "ready", version: "0.1.0" });
   engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z" });
   engine.emit({ type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav", micStartHostTime: 1000.197, systemStartHostTime: 1000 });
   await core.idle();
   const [meeting] = core.listMeetings();
-  return { core, id: meeting!.id };
+  return { core, store, id: meeting!.id };
 }
 
 describe("renaming a Participant", () => {
@@ -113,7 +114,8 @@ describe("renaming a Participant", () => {
 
   it("applies to one Meeting only", async () => {
     const engine = new FakeEngine();
-    const core = new AppCore({ engine, store: openStore(":memory:"), pipeline });
+    const store = openStore(":memory:");
+  const core = new AppCore({ engine, store, pipeline });
     core.start();
     engine.emit({ type: "ready", version: "0.1.0" });
     for (const startedAt of ["2026-10-24T10:00:00.000Z", "2026-10-24T11:00:00.000Z"]) {
@@ -167,5 +169,31 @@ describe("renaming a Participant", () => {
     const { core, id } = await recordedMeeting();
     expect(() => core.renameParticipant(id, "Speaker 9", "Priya")).toThrow(/no Participant "Speaker 9"/);
     expect(() => core.renameParticipant(999, "Speaker 1", "Priya")).toThrow();
+  });
+});
+
+describe("the person's own name", () => {
+  it("stands in for You in the Transcript, the Summary and the export, for every Meeting", async () => {
+    const { core, store, id } = await recordedMeeting();
+    expect(core.getMeetingForDisplay(id)!.transcript.segments[0]!.speaker).toBe("You");
+
+    store.setSetting("userName", "Kenny");
+    const shown = core.getMeetingForDisplay(id)!;
+    expect(shown.transcript.segments[0]!.speaker).toBe("Kenny");
+    expect(shown.summary!.participants[0]!.speaker).toBe("Kenny");
+    expect(shown.participants.find((p) => p.label === "You")!.name).toBe("Kenny");
+    expect(core.exportMeeting(id).markdown).toContain("**Kenny** (0:00): Where are we on the launch?");
+  });
+
+  it("gives way to a name chosen for You in that Meeting, and does not change what is stored", async () => {
+    const { core, store, id } = await recordedMeeting();
+    store.setSetting("userName", "Kenny");
+    core.renameParticipant(id, "You", "Ken");
+    expect(core.getMeetingForDisplay(id)!.transcript.segments[0]!.speaker).toBe("Ken");
+    expect(core.exportMeeting(id).markdown).not.toContain("Kenny");
+
+    store.setSetting("userName", "");
+    core.renameParticipant(id, "You", "");
+    expect(core.getMeetingForDisplay(id)!.transcript.segments[0]!.speaker).toBe("You");
   });
 });

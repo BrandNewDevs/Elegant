@@ -1,8 +1,10 @@
-import { AlertCircle, ArrowLeft, CheckCircle2, Cpu, Download, ExternalLink, Loader2, RefreshCw, Settings, ShieldCheck, Sparkles, XCircle, type LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Cpu, UserRound, Download, ExternalLink, Loader2, RefreshCw, Settings, ShieldCheck, Sparkles, XCircle, type LucideIcon } from "lucide-react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
@@ -77,6 +79,35 @@ function PermissionRow({ copy, step, name }: { copy: PermissionCopy; step: Permi
         </>
       )}
     </div>
+  );
+}
+
+function NameCard({ userName }: { userName: string }) {
+  const [name, setName] = useState(userName);
+  const changed = name.trim() !== userName;
+  const save = (e: FormEvent) => {
+    e.preventDefault();
+    window.electron.setup.setUserName(name);
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardHeading icon={UserRound}>Your name</CardHeading>
+        <CardDescription>Shown in place of &ldquo;You&rdquo; in transcripts, summaries and exports, in every Meeting.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={save} className="flex items-end gap-2">
+          <div className="flex-1 space-y-2">
+            <Label htmlFor="user-name">Name</Label>
+            <Input id="user-name" autoComplete="name" maxLength={100} value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+          </div>
+          <Button type="submit" disabled={!changed}>
+            Save
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -161,6 +192,7 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
           Settings
         </h1>
       </div>
+      <NameCard key={view.userName} userName={view.userName} />
       <Card>
         <CardHeader className="pb-1">
           <CardHeading icon={ShieldCheck}>Permissions</CardHeading>

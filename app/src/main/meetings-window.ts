@@ -26,6 +26,7 @@ export class MeetingsWindow {
     private readonly bridge: SetupBridge,
   ) {
     core.onMeetingsChanged(() => this.pushState());
+    setup.onUserNameChange(() => this.pushState());
     this.registerIpc();
   }
 

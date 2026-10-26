@@ -261,3 +261,26 @@ describe("checkOllama against an HTTP server", () => {
     expect(await checkOllama({ baseUrl })).toMatchObject({ status: "not-running", message: expect.stringContaining("not running") });
   });
 });
+
+describe("the person's name", () => {
+  it("is remembered across launches, trimmed, and cleared when blank", () => {
+    const first = setup();
+    expect(first.s.userName).toBe("");
+    first.s.setUserName("  Kenny ");
+    expect(first.s.userName).toBe("Kenny");
+    expect(setup(undefined, first.store).s.userName).toBe("Kenny");
+
+    first.s.setUserName("   ");
+    expect(first.s.userName).toBe("");
+  });
+
+  it("tells the listeners that show it, and the pages that the state changed", () => {
+    const { s } = setup();
+    let names = 0;
+    let changes = 0;
+    s.onUserNameChange(() => names++);
+    s.onChange(() => changes++);
+    s.setUserName("Kenny");
+    expect([names, changes]).toEqual([1, 1]);
+  });
+});

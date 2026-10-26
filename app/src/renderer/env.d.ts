@@ -23,6 +23,7 @@ declare global {
         ready(): void;
         onState(callback: (state: SetupViewState) => void): () => void;
         act(action: SetupAction): void;
+        setUserName(name: string): void;
       };
       prompt: {
         ready(): void;

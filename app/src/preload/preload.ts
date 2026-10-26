@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld("electron", {
     ready: () => ipcRenderer.send("setup:ready"),
     onState: (callback: (state: SetupViewState) => void) => subscribe("setup:state", callback),
     act: (action: SetupAction) => ipcRenderer.send("setup:act", action),
+    setUserName: (name: string) => ipcRenderer.send("setup:set-user-name", name),
   },
   prompt: {
     ready: () => ipcRenderer.send("prompt:ready"),

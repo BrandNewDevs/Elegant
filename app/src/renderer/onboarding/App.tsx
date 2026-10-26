@@ -1,14 +1,16 @@
-import { ArrowRight, AudioLines, AlertCircle, CheckCircle2, ExternalLink, Loader2, PartyPopper } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { ArrowRight, AudioLines, AlertCircle, CheckCircle2, ExternalLink, Loader2, PartyPopper, UserRound } from "lucide-react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import type { SetupViewState } from "../../shared/setup-view-state";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { PERMISSIONS, PROMPT_NOTE, type PermissionCopy } from "@/lib/permissions";
 import { useSetup } from "@/lib/use-setup";
 
-type Stage = "welcome" | "microphone" | "systemAudio" | "ready";
+type Stage = "welcome" | "name" | "microphone" | "systemAudio" | "ready";
 
-const STAGES: Stage[] = ["welcome", "microphone", "systemAudio", "ready"];
+const STAGES: Stage[] = ["welcome", "name", "microphone", "systemAudio", "ready"];
 
 /** Starts at the first thing still missing, so a permission that is already allowed is never asked for again. */
 function firstStage({ state }: SetupViewState): Stage {
@@ -30,6 +32,37 @@ function StageFrame({ icon, title, children, actions }: { icon: ReactNode; title
       <div className="mt-3 max-w-sm space-y-3 text-muted-foreground">{children}</div>
       <div className="mt-8 flex flex-col items-center gap-3">{actions}</div>
     </section>
+  );
+}
+
+/** Asks what to call the person; the name stands in for "You" in their Meetings. Optional, and changeable in Settings. */
+function NameStage({ initial, onContinue }: { initial: string; onContinue: () => void }) {
+  const [name, setName] = useState(initial);
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    window.electron.setup.setUserName(name);
+    onContinue();
+  };
+
+  return (
+    <form onSubmit={submit} className="flex flex-1 flex-col">
+      <StageFrame
+        icon={<UserRound aria-hidden />}
+        title="What should we call you?"
+        actions={
+          <Button type="submit" size="lg">
+            {name.trim() ? "Continue" : "Skip for now"}
+            <ArrowRight aria-hidden />
+          </Button>
+        }
+      >
+        <p>Your name appears in place of &ldquo;You&rdquo; in transcripts and summaries. You can change it later in Settings.</p>
+        <div className="space-y-2 pt-2 text-left">
+          <Label htmlFor="user-name">Your name</Label>
+          <Input id="user-name" autoFocus autoComplete="name" maxLength={100} value={name} onChange={(e) => setName(e.target.value)} placeholder="Kenny" />
+        </div>
+      </StageFrame>
+    </form>
   );
 }
 
@@ -131,6 +164,7 @@ export function OnboardingApp() {
           <p>It needs two permissions from macOS. This takes a minute, and you only do it once.</p>
         </StageFrame>
       )}
+      {stage === "name" && <NameStage initial={view.userName} onContinue={() => next("name")} />}
       {stage === "microphone" && <PermissionStage copy={PERMISSIONS.microphone} name={view.name} view={view} onContinue={() => next("microphone")} />}
       {stage === "systemAudio" && <PermissionStage copy={PERMISSIONS.systemAudio} name={view.name} view={view} onContinue={() => next("systemAudio")} />}
       {stage === "ready" && (
