@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Cpu, UserRound, Download, ExternalLink, Loader2, RefreshCw, Settings, ShieldCheck, Sparkles, XCircle, type LucideIcon } from "lucide-react";
+import { AlertCircle, CheckCircle2, Cpu, Dock, UserRound, Download, ExternalLink, Loader2, RefreshCw, Settings, ShieldCheck, Sparkles, XCircle, type LucideIcon } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { PERMISSIONS, type PermissionCopy, type PermissionStep } from "@/lib/permissions";
 import { useSetup } from "@/lib/use-setup";
 import type { Step } from "../../setup/setup";
@@ -112,6 +113,26 @@ function NameCard({ userName }: { userName: string }) {
   );
 }
 
+function DockCard({ showInDock, name }: { showInDock: boolean; name: string }) {
+  return (
+    <Card>
+      <CardHeader className="flex-row items-start justify-between gap-4 space-y-0 pb-6">
+        <div className="space-y-1.5">
+          <CardHeading icon={Dock}>
+            <Label htmlFor="show-in-dock" className="text-base">
+              Show in Dock
+            </Label>
+          </CardHeading>
+          <CardDescription>
+            {name} always has its menu bar icon. With this on, it also shows in the Dock: click the icon to open {name}, and minimised windows go there.
+          </CardDescription>
+        </div>
+        <Switch id="show-in-dock" checked={showInDock} onCheckedChange={(checked) => window.electron.meetings.setShowInDock(checked)} />
+      </CardHeader>
+    </Card>
+  );
+}
+
 function ModelsCard({ models, name }: { models: Step & { fraction: number }; name: string }) {
   const percent = Math.round(models.fraction * 100);
   return (
@@ -175,7 +196,7 @@ function SummariesCard({ ollama }: { ollama: Step }) {
   );
 }
 
-function SettingsContent() {
+function SettingsContent({ showInDock }: { showInDock: boolean }) {
   const view = useSetup();
   if (!view) return null;
   const { name, state } = view;
@@ -183,6 +204,7 @@ function SettingsContent() {
   return (
     <div className="space-y-5">
       <NameCard key={view.userName} userName={view.userName} />
+      <DockCard showInDock={showInDock} name={name} />
       <Card>
         <CardHeader className="pb-1">
           <CardHeading icon={ShieldCheck}>Permissions</CardHeading>
@@ -200,8 +222,16 @@ function SettingsContent() {
   );
 }
 
-/** Settings, as a dialog over the main window: your name, the permissions, the model download and the Ollama check. */
-export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+/** Settings, as a dialog over the main window: your name, Show in Dock, the permissions, the model download and the Ollama check. */
+export function SettingsDialog({
+  open,
+  onOpenChange,
+  showInDock = false,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  showInDock?: boolean;
+}) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -219,10 +249,10 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             <Settings className="size-5 text-muted-foreground" aria-hidden />
             Settings
           </DialogTitle>
-          <DialogDescription>Your name, the permissions, and what summaries need.</DialogDescription>
+          <DialogDescription>Your name, the Dock, the permissions, and what summaries need.</DialogDescription>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto p-6">
-          <SettingsContent />
+          <SettingsContent showInDock={showInDock} />
         </div>
       </DialogContent>
     </Dialog>

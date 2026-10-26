@@ -27,6 +27,7 @@ beforeEach(() => {
       ready: vi.fn(),
       onState: vi.fn(() => () => {}),
       settings: vi.fn(),
+      setShowInDock: vi.fn(),
       select: vi.fn(),
       search: vi.fn(),
       rename: vi.fn(),
@@ -41,7 +42,7 @@ beforeEach(() => {
 
 it("shows the query in the box, escaped, and says when nothing matches", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
-    callback({ settingsOpen: false, meetings: [], selected: undefined, query: `"><script>` });
+    callback({ settingsOpen: false, showInDock: false, meetings: [], selected: undefined, query: `"><script>` });
     return () => {};
   });
   render(<MeetingsApp />);
@@ -54,6 +55,7 @@ it("lists Meetings and selects one", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
     callback({
       settingsOpen: false,
+      showInDock: false,
       meetings: [{ id: 7, app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z", state: "done" }],
       selected: undefined,
       query: "x",
@@ -66,7 +68,7 @@ it("lists Meetings and selects one", () => {
 
 it("offers a rename field for each Participant, showing their label and current name", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
-    callback({ settingsOpen: false, meetings: [], selected: meeting, query: "" });
+    callback({ settingsOpen: false, showInDock: false, meetings: [], selected: meeting, query: "" });
     return () => {};
   });
   render(<MeetingsApp />);
@@ -76,7 +78,7 @@ it("offers a rename field for each Participant, showing their label and current 
 
 it("opens Settings from the sidebar", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
-    callback({ settingsOpen: false, meetings: [], selected: undefined, query: "" });
+    callback({ settingsOpen: false, showInDock: false, meetings: [], selected: undefined, query: "" });
     return () => {};
   });
   render(<MeetingsApp />);
@@ -87,7 +89,7 @@ it("opens Settings from the sidebar", () => {
 
 it("shows Settings as a dialog over the Meetings when it is open, and asks to close it", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
-    callback({ settingsOpen: true, meetings: [], selected: undefined, query: "" });
+    callback({ settingsOpen: true, showInDock: true, meetings: [], selected: undefined, query: "" });
     return () => {};
   });
   window.electron.setup = {
@@ -102,6 +104,7 @@ it("shows Settings as a dialog over the Meetings when it is open, and asks to cl
   render(<MeetingsApp />);
   expect(screen.getByRole("dialog", { name: "Settings" })).toBeTruthy();
   expect(screen.getByPlaceholderText("Search meetings")).toBeTruthy();
+  expect(screen.getByRole("switch", { name: "Show in Dock" }).getAttribute("aria-checked")).toBe("true");
 
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   expect(window.electron.meetings.settings).toHaveBeenCalledWith(false);

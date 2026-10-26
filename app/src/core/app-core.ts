@@ -13,6 +13,9 @@ import type { Meeting, MeetingListItem, Store } from "../store/store.js";
 /** The store setting behind `AppCore.keepAudio`. */
 const KEEP_AUDIO_SETTING = "keepAudio";
 
+/** The store setting behind `AppCore.showInDock`. */
+const SHOW_IN_DOCK_SETTING = "showInDock";
+
 /** The store setting behind `AppCore.neverApps`: a JSON array of app names. */
 const NEVER_APPS_SETTING = "neverApps";
 
@@ -63,6 +66,7 @@ export class AppCore {
   private recordingListeners: ((recording: ActiveRecording | undefined) => void)[] = [];
   private recordingFailedListeners: ((message: string) => void)[] = [];
   private stopNudgeListeners: ((app: string) => void)[] = [];
+  private showInDockListeners: ((show: boolean) => void)[] = [];
   private recordingSettledWaiters: (() => void)[] = [];
   private stopTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -269,6 +273,22 @@ export class AppCore {
   /** Applies from the next transcription on. */
   setKeepAudio(keep: boolean): void {
     this.deps.store.setSetting(KEEP_AUDIO_SETTING, String(keep));
+  }
+
+  /** Whether the app shows in the Dock as well as the menu bar. Off by default: it is a menu-bar app. */
+  get showInDock(): boolean {
+    return this.deps.store.getSetting(SHOW_IN_DOCK_SETTING) === "true";
+  }
+
+  /** Remembers the choice and tells the listeners, which show or hide the Dock icon at once. */
+  setShowInDock(show: boolean): void {
+    if (show === this.showInDock) return;
+    this.deps.store.setSetting(SHOW_IN_DOCK_SETTING, String(show));
+    for (const l of this.showInDockListeners) l(show);
+  }
+
+  onShowInDockChange(listener: (show: boolean) => void): void {
+    this.showInDockListeners.push(listener);
   }
 
   /** Removes a Meeting and all its data, including any kept audio. */

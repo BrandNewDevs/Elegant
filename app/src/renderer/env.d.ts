@@ -12,6 +12,7 @@ declare global {
         ready(): void;
         onState(callback: (state: MeetingsViewState) => void): () => void;
         settings(open: boolean): void;
+        setShowInDock(show: boolean): void;
         select(id: number): void;
         search(query: string): void;
         rename(payload: { meetingId: number; label: string; name: string }): void;

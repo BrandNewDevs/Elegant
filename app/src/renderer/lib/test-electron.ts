@@ -17,6 +17,7 @@ export const nothingDone: SetupViewState = {
 export function pushSetupState(view: SetupViewState) {
   const act = vi.fn();
   const setUserName = vi.fn();
+  const setShowInDock = vi.fn();
   window.electron = {
     setup: {
       ready: vi.fn(),
@@ -27,10 +28,10 @@ export function pushSetupState(view: SetupViewState) {
       act,
       setUserName,
     },
-    meetings: {} as Window["electron"]["meetings"],
+    meetings: { setShowInDock } as unknown as Window["electron"]["meetings"],
     prompt: {} as Window["electron"]["prompt"],
   };
-  return Object.assign(act, { setUserName });
+  return Object.assign(act, { setUserName, setShowInDock });
 }
 
 export function withState(patch: Partial<SetupViewState["state"]>, permissionsGranted = false): SetupViewState {

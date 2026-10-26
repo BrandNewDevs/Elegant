@@ -26,6 +26,7 @@ export class MeetingsWindow {
     private readonly bridge: SetupBridge,
   ) {
     core.onMeetingsChanged(() => this.pushState());
+    core.onShowInDockChange(() => this.pushState());
     setup.onUserNameChange(() => this.pushState());
     this.registerIpc();
   }
@@ -42,6 +43,10 @@ export class MeetingsWindow {
     ipcMain.on("meetings:settings", (event, open: boolean) => {
       if (!this.fromThis(event.sender)) return;
       this.setSettingsOpen(open === true);
+    });
+    ipcMain.on("meetings:show-in-dock", (event, show: unknown) => {
+      if (!this.fromThis(event.sender) || typeof show !== "boolean") return;
+      this.core.setShowInDock(show);
     });
     ipcMain.on("meetings:select", (event, id: number) => {
       if (!this.fromThis(event.sender)) return;
@@ -162,7 +167,13 @@ export class MeetingsWindow {
     if (!this.window || this.window.isDestroyed() || !this.pageLoaded) return;
     const selected = this.selectedId === undefined ? undefined : this.core.getMeetingForDisplay(this.selectedId);
     const meetings = this.query.trim() ? this.core.searchMeetings(this.query) : this.core.listMeetings();
-    const payload: MeetingsViewState = { settingsOpen: this.settingsOpen, meetings, selected, query: this.query };
+    const payload: MeetingsViewState = {
+      settingsOpen: this.settingsOpen,
+      showInDock: this.core.showInDock,
+      meetings,
+      selected,
+      query: this.query,
+    };
     this.window.webContents.send("meetings:state", payload);
   }
 }

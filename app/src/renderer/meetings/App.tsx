@@ -183,6 +183,7 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
 
 export function MeetingsApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showInDock, setShowInDock] = useState(false);
   const [query, setQuery] = useState("");
   const [meetings, setMeetings] = useState<MeetingListItem[]>([]);
   const [selected, setSelected] = useState<Meeting | undefined>();
@@ -190,6 +191,7 @@ export function MeetingsApp() {
   useEffect(() => {
     const unsubscribe = window.electron.meetings.onState((state) => {
       setSettingsOpen(state.settingsOpen);
+      setShowInDock(state.showInDock);
       setQuery(state.query);
       setMeetings(state.meetings);
       setSelected(state.selected);
@@ -247,7 +249,7 @@ export function MeetingsApp() {
           )}
         </main>
       </ScrollArea>
-      <SettingsDialog open={settingsOpen} onOpenChange={(open) => window.electron.meetings.settings(open)} />
+      <SettingsDialog open={settingsOpen} showInDock={showInDock} onOpenChange={(open) => window.electron.meetings.settings(open)} />
     </div>
   );
 }
