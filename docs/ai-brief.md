@@ -10,7 +10,7 @@ For whoever builds the AI side. Read [`design.md`](./design.md) and [`GLOSSARY.m
 
 Production AI logic lives in the Electron app's TypeScript pipeline. Swift owns transcription and diarization. Ollama serves Gemma. Python only collects evaluation results and calculates metrics; it is not a production runtime. Evaluation must invoke the same TypeScript modules as the app, not a separate Python implementation.
 
-The delivery order is evidence-backed Summaries, then Meeting chat. English Meetings up to 60 minutes are the initial target. These are implementation contracts for the upcoming delivery; the baseline app currently produces Summaries without evidence and has no chat.
+The delivery order is evidence-backed Summaries, then Meeting chat. English Meetings up to 60 minutes are the initial target. Evidence-backed Summary generation and its supporting request infrastructure are implemented. Meeting chat and citation navigation in the UI remain upcoming work. Quality and target-device gates below remain unverified until their evaluations are completed.
 
 ## What you can and can't conclude from Linux
 
@@ -85,9 +85,19 @@ Output: a Summary as JSON.
 
 `AppCore.jobs` serializes pipeline work; Settings model preparation shares that queue. Cancelling an active job keeps its resource slot occupied until the underlying work settles. Shutdown cancels jobs, stops the engine, waits for work to settle, then closes storage. Successful transcription waits for `models_released` before returning; preparation unloads models too. Mac memory measurements remain pending. Queue display and user controls arrive with the UI integration.
 
-The legacy production Summary chunk size is temporarily reduced to fit conservative requests. Evidence-backed bounded consolidation replaces that implementation in the next delivery; the frozen evaluation baseline remains unchanged.
+## Evidence-backed Summary implementation
 
-## Meeting chat contract
+The public `createGroundedSummariser` interface in `pipeline/grounded-summariser.ts` implements the Summary contract. The app and evaluation runner use it; the frozen original summariser remains available only for comparison. It returns the compatible Summary fields with optional `evidence` and `generation` sidecars.
+
+`evidence` contains the Transcript `revision`, TL;DR segment ordinals in `tldr`, and per-Participant `said` reference lists aligned with the existing Summary points. `generation` records prompt version, model, elapsed time, request count and available token counts. Speaker labels remain stable internally; Participant renames affect presentation only.
+
+Short inputs are summarized in one request. Larger inputs use bounded extraction and consolidation while preserving original segment references and relevant source text. Structural validation rejects unknown labels and references, duplicate Participants and empty points; factual accuracy still requires review. Empty Transcripts complete without a Summary. Failed regeneration leaves the last successful Summary and sidecars intact.
+
+The additive schema version 3 migration creates `summary_artifacts`, `chat_requests`, `passages` and `passage_index`. Summary artifacts are wired now and saved atomically with Summary text. The chat and passage tables establish storage for later deliveries; they do not mean chat or retrieval is already available. Existing version 2 data and legacy Summaries without artifacts remain readable; regeneration adds evidence.
+
+Clickable evidence references will be added in the later UI delivery. Until then, stored references and evaluation output can be inspected through application interfaces. Passing structural tests is not a claim that the human-reviewed Summary quality or M4 performance gates have passed.
+
+## Planned Meeting chat contract
 
 Chat becomes available once a Meeting's Transcript is complete, even if Summary generation failed. Each answer contains text, supporting references and an evidence-sufficiency result. Facts come from the original Transcript, never from earlier generated answers. Missing owners, dates and agreements must not be guessed.
 

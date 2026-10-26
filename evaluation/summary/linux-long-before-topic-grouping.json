@@ -1,0 +1,88 @@
+{
+  "metadata": {
+    "sourceCommit": "80d8f191e0490ff771d35a62e3e1402da134708c",
+    "sourceDirty": false,
+    "recordedAt": "2026-10-26T20:43:49.047Z",
+    "implementation": "current",
+    "model": {
+      "name": "gemma3:4b-it-q4_K_M",
+      "model": "gemma3:4b-it-q4_K_M",
+      "modified_at": "2026-10-05T05:47:50.046802317+05:30",
+      "size": 3338801804,
+      "digest": "a2af6cc3eb7fa8be8504abaf9b04e88f17a119ec3f04a3addf55f92841195f5a",
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "gemma3",
+        "families": [
+          "gemma3"
+        ],
+        "parameter_size": "4.3B",
+        "quantization_level": "Q4_K_M"
+      },
+      "capabilities": [
+        "completion"
+      ]
+    },
+    "ollama": {
+      "version": "0.34.0"
+    },
+    "hardware": {
+      "platform": "linux",
+      "release": "7.0.0-38-generic",
+      "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+      "memoryBytes": 15950888960,
+      "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU, 4096 MiB"
+    },
+    "settings": {
+      "numCtx": 8192,
+      "temperature": 0,
+      "maxInputBytes": 5500,
+      "maxOutputTokens": 2048
+    },
+    "promptVersion": "grounded-summary-v1",
+    "memoryScope": "Node peak RSS only. Ollama, Swift, peak total memory and swap need external observation.",
+    "runCondition": "uncontrolled"
+  },
+  "runs": [
+    {
+      "id": "long-discussion",
+      "split": "reserved",
+      "synthetic": true,
+      "error": "Summary incomplete: the generation deadline was reached",
+      "chat": [
+        {
+          "questionId": "final-plan",
+          "skipped": "Meeting chat is not implemented in this revision"
+        },
+        {
+          "questionId": "guide-owner",
+          "skipped": "Meeting chat is not implemented in this revision"
+        },
+        {
+          "questionId": "guide-deadline",
+          "skipped": "Meeting chat is not implemented in this revision"
+        },
+        {
+          "questionId": "retest",
+          "skipped": "Meeting chat is not implemented in this revision"
+        },
+        {
+          "questionId": "packaging",
+          "skipped": "Meeting chat is not implemented in this revision"
+        },
+        {
+          "questionId": "peak",
+          "skipped": "Meeting chat is not implemented in this revision"
+        },
+        {
+          "questionId": "date",
+          "skipped": "Meeting chat is not implemented in this revision"
+        }
+      ],
+      "elapsedMs": 900001.848286,
+      "calls": 44,
+      "peakRssKiB": 433944
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import type { SummaryEvidence, SummaryGeneration } from "./evidence.js";
 // The two pipeline stages and their JSON contract. See docs/ai-brief.md.
 
 export interface TranscriptSegment {
@@ -13,6 +14,8 @@ export interface Transcript {
 
 export interface Summary {
   tldr: string;
+  evidence?: SummaryEvidence;
+  generation?: SummaryGeneration;
   participants: { speaker: string; said: string[] }[];
 }
 

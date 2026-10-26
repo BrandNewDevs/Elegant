@@ -8,7 +8,7 @@ import { ignoredAppsFile } from "../core/ignored-apps.js";
 import { ProcessEngine } from "../engine/process-engine.js";
 import { createEngineTranscriber } from "../pipeline/engine-transcriber.js";
 import { checkOllama, OllamaClient } from "../pipeline/ollama.js";
-import { createSummariser } from "../pipeline/summariser.js";
+import { createGroundedSummariser } from "../pipeline/grounded-summariser.js";
 import { Setup } from "../setup/setup.js";
 import { openStore } from "../store/store.js";
 import { DISPLAY_NAME, SPEECH_MODEL } from "../config.js";
@@ -99,7 +99,7 @@ app.whenReady().then(() => {
     extraIgnoredApps: ignoredAppsFile(ignoredAppsPath),
     pipeline: {
       transcribe: createEngineTranscriber(engine, { model: SPEECH_MODEL, modelsDirectory: join(dataDir, "models") }),
-      summarise: createSummariser({ model: new OllamaClient() }),
+      summarise: createGroundedSummariser({ model: new OllamaClient() }),
     },
   });
 

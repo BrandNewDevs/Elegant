@@ -1,5 +1,6 @@
 import { cpus, platform, release, totalmem } from "node:os";
 import { execFileSync } from "node:child_process";
+import { SUMMARY_PROMPT_VERSION } from "../pipeline/grounded-summariser.js";
 import { DEFAULT_OLLAMA_URL } from "../pipeline/ollama.js";
 
 export async function evaluationMetadata(model: string, implementation: string) {
@@ -13,9 +14,15 @@ export async function evaluationMetadata(model: string, implementation: string) 
   if (!installed) throw new Error(`Model ${model} is not installed. Set AI_MODEL to an installed tag.`);
   let gpu = "unavailable";
   try { gpu = execFileSync("nvidia-smi", ["--query-gpu=name,memory.total", "--format=csv,noheader"], { encoding: "utf8" }).trim(); } catch { /* Not an NVIDIA device. */ }
-  return { recordedAt: new Date().toISOString(), implementation, model: installed, ollama: await json("/api/version"),
+  let sourceCommit = "unknown";
+  let sourceDirty: boolean | undefined;
+  try {
+    sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    sourceDirty = !!execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).trim();
+  } catch { /* Evaluation outside a Git checkout still records its prompt version. */ }
+  return { sourceCommit, sourceDirty, recordedAt: new Date().toISOString(), implementation, model: installed, ollama: await json("/api/version"),
     hardware: { platform: platform(), release: release(), cpu: cpus()[0]?.model, memoryBytes: totalmem(), gpu },
-    settings: { numCtx: 8192, temperature: 0 }, promptVersion: implementation === "baseline" ? "baseline-v1" : "summary-v1",
+    settings: { numCtx: 8192, temperature: 0, ...(implementation === "baseline" ? { maxChunkChars: 12000 } : { maxInputBytes: 5500, maxOutputTokens: 2048 }) }, promptVersion: implementation === "baseline" ? "baseline-v1" : SUMMARY_PROMPT_VERSION,
     memoryScope: "Node peak RSS only. Ollama, Swift, peak total memory and swap need external observation.",
     runCondition: process.env.AI_RUN_CONDITION ?? "uncontrolled" };
 }

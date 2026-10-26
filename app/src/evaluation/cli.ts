@@ -4,9 +4,9 @@ import { isOutside, privateOutputPath } from "./private-path.js";
 import { fileURLToPath } from "node:url";
 import { BaselineOllamaClient } from "./baseline-model.js";
 import { createBaselineSummariser } from "./baseline.js";
-import { createSummariser } from "../pipeline/summariser.js";
+import { createGroundedSummariser } from "../pipeline/grounded-summariser.js";
 import { OllamaClient, DEFAULT_SUMMARY_MODEL } from "../pipeline/ollama.js";
-import type { LanguageModel } from "../pipeline/language-model.js";
+import type { LanguageModel, TextModel } from "../pipeline/language-model.js";
 import { evaluateFixture, validateFixture } from "./runner.js";
 import { evaluationMetadata } from "./metadata.js";
 
@@ -38,10 +38,14 @@ if (!selected.length) throw new Error("No fixtures found for this split");
 const implementation = mode!.endsWith("baseline") ? "baseline" : "current";
 const modelName = process.env.AI_MODEL ?? DEFAULT_SUMMARY_MODEL;
 const metadata = await evaluationMetadata(modelName, implementation);
-const client = implementation === "baseline" ? new BaselineOllamaClient({ model: modelName }) : new OllamaClient({ model: modelName });
+const client = new OllamaClient({ model: modelName });
+const baseline = new BaselineOllamaClient({ model: modelName });
 let calls = 0;
-const model: LanguageModel = { generate: request => { calls++; return client.generate(request); } };
-const summarise = (implementation === "baseline" ? createBaselineSummariser : createSummariser)({ model });
+const model: LanguageModel & TextModel = {
+  generate: request => { calls++; return baseline.generate(request); },
+  complete: request => { calls++; console.log(`Local model request ${calls}`); return client.complete(request); },
+};
+const summarise = implementation === "baseline" ? createBaselineSummariser({ model }) : createGroundedSummariser({ model });
 const runs = [];
 for (const fixture of selected) {
   runs.push(await evaluateFixture(fixture, { summarise }, () => calls));

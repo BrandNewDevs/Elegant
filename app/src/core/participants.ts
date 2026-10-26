@@ -13,6 +13,7 @@ export function applyNames(meeting: Meeting): Meeting {
     segments: meeting.transcript.segments.map((s) => ({ ...s, speaker: name(s.speaker) })),
   };
   const summary: Summary | null = meeting.summary && {
+    ...meeting.summary,
     tldr: say(meeting.summary.tldr),
     participants: meeting.summary.participants.map((p) => ({ speaker: name(p.speaker), said: p.said.map(say) })),
   };
