@@ -1,4 +1,4 @@
-/** Actions the setup window can request from the main process. */
+/** Actions the onboarding and settings windows can request from the main process. */
 export const SETUP_ACTIONS = [
   "microphone",
   "system-audio",
@@ -6,6 +6,7 @@ export const SETUP_ACTIONS = [
   "ollama",
   "settings-microphone",
   "settings-system-audio",
+  "open-settings",
   "done",
 ] as const;
 

@@ -14,7 +14,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         meetings: resolve(import.meta.dirname, "src/renderer/meetings.html"),
-        setup: resolve(import.meta.dirname, "src/renderer/setup.html"),
+        onboarding: resolve(import.meta.dirname, "src/renderer/onboarding.html"),
+        settings: resolve(import.meta.dirname, "src/renderer/settings.html"),
         prompt: resolve(import.meta.dirname, "src/renderer/prompt.html"),
       },
     },

@@ -1,7 +1,7 @@
-import type { SetupState } from "../setup/first-run-setup.js";
+import type { SetupState } from "../setup/setup.js";
 
 export type SetupViewState = {
   name: string;
-  complete: boolean;
+  permissionsGranted: boolean;
   state: SetupState;
 };

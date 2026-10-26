@@ -55,6 +55,12 @@ export type EngineCommand =
    */
   | { type: "request_permission"; permission: Permission }
   /**
+   * Report a permission without asking for it, answered by `permission_result`. The microphone is read from its macOS
+   * status and never prompts. System audio has no status, so the engine starts a tap, which prompts if the user never
+   * answered: send it only for a permission that was granted before.
+   */
+  | { type: "check_permission"; permission: Permission }
+  /**
    * Download the speech model (and any other model Transcripts need) into `modelsDirectory` and check that it loads, so
    * the first Recording does not wait for it. Answered by `model_download_progress` events, then `models_ready` or
    * `model_download_failed`.

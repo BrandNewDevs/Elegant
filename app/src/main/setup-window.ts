@@ -1,21 +1,36 @@
 import { BrowserWindow, ipcMain, shell, type WebContents } from "electron";
-import type { FirstRunSetup } from "../setup/first-run-setup.js";
+import type { Setup } from "../setup/setup.js";
 import { DISPLAY_NAME } from "../config.js";
 import type { SetupAction } from "../shared/setup-actions.js";
 import type { SetupViewState } from "../shared/setup-view-state.js";
-import { preloadPath, rendererPagePath } from "./window-ui.js";
+import { preloadPath, rendererPagePath, type RendererPage } from "./window-ui.js";
 
 const SETTINGS_PANE = {
   "settings-microphone": "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
   "settings-system-audio": "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
 } as const;
 
-/** The first-run setup window. React UI talks to the main process over IPC. */
+export interface SetupWindowOptions {
+  /** Which page this window shows: the first-run onboarding or the settings. Both read and act on the same Setup. */
+  page: Extract<RendererPage, "onboarding" | "settings">;
+  title: string;
+  width: number;
+  height: number;
+  /** Runs each time the window is shown, for example to refresh what the page reports. */
+  onShow?: () => void;
+  /** Opens the settings window; the onboarding's last step offers it. */
+  openSettings?: () => void;
+}
+
+/** A window over the Setup: the React page asks for actions over IPC and is sent the state whenever it changes. */
 export class SetupWindow {
   private window: BrowserWindow | undefined;
   private pageLoaded = false;
 
-  constructor(private readonly setup: FirstRunSetup) {
+  constructor(
+    private readonly setup: Setup,
+    private readonly options: SetupWindowOptions,
+  ) {
     setup.onChange(() => this.pushState());
     ipcMain.on("setup:ready", (event) => {
       if (!this.fromThis(event.sender)) return;
@@ -34,9 +49,9 @@ export class SetupWindow {
   show(): void {
     if (!this.window) {
       const window = new BrowserWindow({
-        width: 560,
-        height: 720,
-        title: `${DISPLAY_NAME}: Set up`,
+        width: this.options.width,
+        height: this.options.height,
+        title: `${DISPLAY_NAME}: ${this.options.title}`,
         webPreferences: { preload: preloadPath(), contextIsolation: true, sandbox: true },
       });
       window.on("closed", () => {
@@ -45,15 +60,15 @@ export class SetupWindow {
       });
       window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
       this.window = window;
-      void this.window.loadFile(rendererPagePath("setup"));
+      void this.window.loadFile(rendererPagePath(this.options.page));
       this.window.webContents.once("did-finish-load", () => {
         this.pageLoaded = true;
         this.pushState();
       });
-      void this.setup.checkOllama();
     } else if (this.pageLoaded) {
       this.pushState();
     }
+    this.options.onShow?.();
     this.window.show();
     this.window.focus();
   }
@@ -71,6 +86,8 @@ export class SetupWindow {
       case "settings-microphone":
       case "settings-system-audio":
         return void shell.openExternal(SETTINGS_PANE[action]);
+      case "open-settings":
+        return this.options.openSettings?.();
       case "done":
         return this.window?.close();
     }
@@ -78,7 +95,7 @@ export class SetupWindow {
 
   private pushState(): void {
     if (!this.window || this.window.isDestroyed() || !this.pageLoaded) return;
-    const payload: SetupViewState = { name: DISPLAY_NAME, complete: this.setup.complete, state: this.setup.state };
+    const payload: SetupViewState = { name: DISPLAY_NAME, permissionsGranted: this.setup.permissionsGranted, state: this.setup.state };
     this.window.webContents.send("setup:state", payload);
   }
 }
