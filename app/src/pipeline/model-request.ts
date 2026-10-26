@@ -8,6 +8,7 @@ export const AI_SETTINGS = Object.freeze({
   maxInputBytes: 5500,
   timeoutMs: 5 * 60_000,
   temperature: 0,
+  think: false,
 });
 
 /** Conservative input accounting, including schema, message roles, history and retry instructions. */

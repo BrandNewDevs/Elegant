@@ -39,7 +39,7 @@ describe("local Ollama model interface", () => {
       void jsonBody(req).then(body => { received = body; res.end(JSON.stringify(reply)); });
     });
     const response = await new OllamaClient({ baseUrl, model: "local:test" }).complete(request);
-    expect(received).toEqual({ model: "local:test", messages: request.messages, stream: false, format: request.schema,
+    expect(received).toEqual({ model: "local:test", messages: request.messages, stream: false, format: request.schema, think: false,
       options: { num_ctx: 8192, num_predict: 2048, temperature: 0 } });
     expect(response.text).toBe(reply.message.content);
     expect(response.metadata).toMatchObject({ model: "local:test", promptTokens: 64, outputTokens: 12, loadDurationNs: 12345 });
