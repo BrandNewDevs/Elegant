@@ -39,7 +39,7 @@ type Mode = keyof typeof TASK;
 interface Selection { sourceIds: string[]; sufficient: boolean }
 const unique = (sources: SourceFragment[]) => [...new Map(sources.map(source => [source.id, source])).values()]
   .sort((a, b) => a.ref - b.ref || a.part - b.part);
-const broad = (question: string) => /\b(all|overall|throughout|everything|entire|summari[sz]e|overview|whole meeting|decisions|action items|commitments|unresolved matters)\b/i.test(question);
+const broad = (question: string) => /\b(all|overall|throughout|everything|entire|summari[sz]e|overview|whole meeting|decisions|action items|commitments|unresolved matters|final|latest|eventually|end(?:ed)? up)\b/i.test(question);
 const followUp = (question: string, history: EvidenceRequest["history"]) => !!history?.length &&
   (/\b(it|that|they|their|this|those|them|he|she|his|her|same)\b|^\s*(and\b|what about\b)/i.test(question) || question.trim().split(/\s+/).length <= 5);
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
@@ -161,7 +161,7 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
         const next = await select(chosen, "reduce");
         if (next.sources.length >= chosen.length) throw new IncompleteEvidence("Relevant original evidence cannot fit the answer budget without losing support; ask a narrower question");
         chosen = next.sources;
-        sufficient &&= next.sufficient;
+        sufficient = next.sufficient;
         globallyAssessed = next.batchCount === 1;
       }
       throw new IncompleteEvidence("Evidence consolidation did not finish within its reduction limit");
@@ -207,6 +207,10 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
         hits = [...new Map([...hits, ...safeHits(query)].map(passage => [passage.id, passage])).values()];
       }
       if (!input.forceScan && !broad(input.question) && hits.length) {
+        // A later correction can say "actually Monday" without repeating the original topic's search terms.
+        const firstHit = Math.min(...hits.map(hit => hit.index));
+        const corrections = safeHits("correction actually instead revised replaced superseded changed cancelled final").filter(hit => hit.index >= firstHit);
+        hits = [...new Map([...hits, ...corrections].map(passage => [passage.id, passage])).values()];
         const indices = new Set<number>([passages.at(-1)!.index]);
         for (const hit of hits) for (const index of [hit.index - 1, hit.index, hit.index + 1]) indices.add(index);
         const candidates = unique(passages.filter(passage => indices.has(passage.index)).flatMap(scoped));
