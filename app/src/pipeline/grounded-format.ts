@@ -16,10 +16,25 @@ export const GROUNDED_SCHEMA = {
 };
 export const FACTS_SCHEMA = {
   type: "object", properties: { facts: { type: "array", items: {
-    type: "object", properties: { ...pointProperties, sourceIds: { type: "array", items: { type: "string" }, minItems: 1, uniqueItems: true }, kind: { type: "string", enum: ["proposal", "decision", "commitment", "disagreement", "unresolved", "update"] } },
-    required: ["speaker", "text", "refs", "kind", "sourceIds"],
+    type: "object", properties: { speaker: pointProperties.speaker, text: pointProperties.text, sourceIds: { type: "array", items: { type: "string" }, minItems: 1, uniqueItems: true }, kind: { type: "string", enum: ["proposal", "decision", "commitment", "disagreement", "unresolved", "update"] } },
+    required: ["speaker", "text", "kind", "sourceIds"],
   } } }, required: ["facts"],
 };
+
+/** Restrict structured output to evidence that was actually supplied in this request. */
+export function groundedSchema(sources: SourcePiece[]) {
+  const refs = { ...refsSchema, items: { type: "integer", enum: [...new Set(sources.map(source => source.ref))] } };
+  return { ...GROUNDED_SCHEMA, properties: { ...GROUNDED_SCHEMA.properties, tldrRefs: refs,
+    points: { ...GROUNDED_SCHEMA.properties.points, items: { ...GROUNDED_SCHEMA.properties.points.items,
+      properties: { ...pointProperties, refs, speaker: { type: "string", enum: [...new Set(sources.map(source => source.speaker))] } } } } } };
+}
+export function factsSchema(sources: SourcePiece[], speakers = sources) {
+  const facts = FACTS_SCHEMA.properties.facts;
+  return { ...FACTS_SCHEMA, properties: { facts: { ...facts, items: { ...facts.items, properties: { ...facts.items.properties,
+    speaker: { type: "string", enum: [...new Set(speakers.map(source => source.speaker))] },
+    sourceIds: { ...facts.items.properties.sourceIds, items: { type: "string", enum: sources.map(source => source.id) } },
+  } } } } };
+}
 
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const problem = (message: string): never => { throw new InvalidSummaryError(message); };
@@ -56,8 +71,8 @@ export function parseFacts(json: string, sources: SourcePiece[], primary?: Sourc
     if (!record(value) || typeof value.kind !== "string" || !["proposal", "decision", "commitment", "disagreement", "unresolved", "update"].includes(value.kind)) return problem("Use a supported fact kind");
     if (!Array.isArray(value.sourceIds) || !value.sourceIds.length || !value.sourceIds.every(id => typeof id === "string" && sources.some(source => source.id === id))) return problem("Cite sourceIds supplied with the original passages");
     const selected = sources.filter(source => (value.sourceIds as string[]).includes(source.id));
-    const p = point(value, selected);
-    if (selected.some(source => !p.refs.includes(source.ref))) return problem("Every cited sourceId must belong to a cited segment ref");
+    // The model cites one identifier system. Derive public ordinals from validated original pieces.
+    const p = point({ ...value, refs: [...new Set(selected.map(source => source.ref))] }, selected);
     if (primary && !selected.some(source => source.speaker === p.speaker && primary.some(piece => piece.id === source.id))) return problem("Extract only points made by speakers in the primary source pieces");
     return { ...p, kind: value.kind as FactKind, sources: selected };
   });

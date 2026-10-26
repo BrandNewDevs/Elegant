@@ -23,7 +23,7 @@ function fake(reply: (request: TextRequest, call: number) => unknown): TextModel
   } };
 }
 interface Piece { id: string; ref: number; part: number; speaker: string; text: string }
-interface Fact { speaker: string; text: string; refs: number[]; sourceIds: string[]; kind: string }
+interface Fact { speaker: string; text: string; refs?: number[]; sourceIds: string[]; kind: string }
 interface Payload { sources?: Piece[]; primary?: Piece[]; context?: Piece[]; candidates?: Fact[]; draft?: unknown }
 const payload = (request: TextRequest): Payload => JSON.parse(request.messages[1]!.content) as Payload;
 
@@ -31,7 +31,7 @@ const payload = (request: TextRequest): Payload => JSON.parse(request.messages[1
 function hierarchicalReply(request: TextRequest): unknown {
   const input = payload(request);
   if (input.primary) return { facts: input.primary.map(source => ({ speaker: source.speaker, text: `Important point from ${source.id}.`,
-    refs: [source.ref], sourceIds: [source.id], kind: "update" })) };
+    sourceIds: [source.id], kind: "update" })) };
   if ("facts" in (request.schema as { properties: object }).properties) return { facts: [input.candidates!.at(-1)] };
   const source = input.sources!.at(-1)!;
   return { tldr: "The final supported point is retained.", tldrRefs: [source.ref],
@@ -150,17 +150,17 @@ describe("evidence-backed Summary generation", () => {
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
-  it("normalizes duplicate extraction refs and sourceIds before consolidation", async () => {
+  it("deduplicates sourceIds and derives ordinal references before consolidation", async () => {
     const model = fake(request => {
       const output = hierarchicalReply(request) as { facts?: Fact[] };
-      if (output.facts) return { facts: output.facts.map(fact => ({ ...fact, refs: [...fact.refs, ...fact.refs], sourceIds: [...fact.sourceIds, ...fact.sourceIds] })) };
+      if (output.facts) return { facts: output.facts.map(fact => ({ ...fact, refs: [999], sourceIds: [...fact.sourceIds, ...fact.sourceIds] })) };
       return output;
     });
     const result = await createGroundedSummariser({ model })(longTranscript());
     expect(result.evidence!.tldr).toEqual([35]);
     for (const request of model.requests) {
       for (const fact of payload(request).candidates ?? []) {
-        expect(fact.refs).toEqual([...new Set(fact.refs)]);
+        expect(fact).not.toHaveProperty("refs");
         expect(fact.sourceIds).toEqual([...new Set(fact.sourceIds)]);
       }
     }
@@ -172,6 +172,26 @@ describe("evidence-backed Summary generation", () => {
     await createGroundedSummariser({ model })({ segments: [{ start: 0, end: 1, speaker: "You", text }] });
     const pieces = model.requests.flatMap(request => payload(request).primary ?? []);
     expect(pieces.map(piece => piece.text).join("")).toBe(text);
+  });
+
+  it("constrains model identifiers to the source IDs, ordinals and speakers supplied in each request", async () => {
+    const model = fake(hierarchicalReply);
+    await createGroundedSummariser({ model })(longTranscript());
+    for (const request of model.requests) {
+      const input = payload(request);
+      const sources = input.sources ?? [...(input.primary ?? []), ...(input.context ?? [])];
+      const schema = request.schema as { properties: Record<string, { items?: { enum?: unknown[]; properties?: Record<string, { items?: { enum?: unknown[] }; enum?: unknown[] }> } }> };
+      if (schema.properties.facts) {
+        const properties = schema.properties.facts.items!.properties!;
+        expect(properties).not.toHaveProperty("refs");
+        expect(new Set(properties.sourceIds!.items!.enum)).toEqual(new Set(sources.map(source => source.id)));
+        expect(new Set(properties.speaker!.enum)).toEqual(new Set((input.primary ?? sources).map(source => source.speaker)));
+      } else {
+        expect(new Set(schema.properties.tldrRefs!.items!.enum)).toEqual(new Set(sources.map(source => source.ref)));
+        expect(new Set(schema.properties.points!.items!.properties!.refs!.items!.enum)).toEqual(new Set(sources.map(source => source.ref)));
+      }
+      expect(requestBytes(request)).toBeLessThanOrEqual(5500);
+    }
   });
 
   it("uses prior context only as supporting context and validates extraction source IDs", async () => {
