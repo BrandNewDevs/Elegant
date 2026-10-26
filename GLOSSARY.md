@@ -9,7 +9,7 @@ An online call you are in, from the moment the app detects it. A Meeting exists 
 _Avoid_: Call, session
 
 **Detection**:
-The app noticing that you are probably in a Meeting, based on a known app using the microphone.
+The app noticing that you are probably in a Meeting, based on an app using the microphone (any `.app` bundle except built-in and user-configured ignores).
 _Avoid_: Trigger, discovery
 
 **Prompt**:
