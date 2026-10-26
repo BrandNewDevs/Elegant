@@ -25,7 +25,7 @@ function auditReply(request: TextRequest, ids = contents(request).data.sources!.
   const originals = new Map(contents(request).data.sources!.map(source => [source.id, source]));
   return { checks: ids.map(id => {
     const source = originals.get(id)!;
-    return { speaker: source.speaker, sourceId: id, quote: source.text.slice(0, 200), relation: "supports" };
+    return { speaker: source.speaker, sourceId: id, quote: [...new Intl.Segmenter("en", { granularity: "sentence" }).segment(source.text)][0]!.segment.trim().slice(0, 200), relation: "supports" };
   }), addressesQuestion: true, supported };
 }
 function auditIds(request: TextRequest): string[] {
@@ -319,6 +319,40 @@ describe("grounded Meeting chat", () => {
     expect(result.answer).toEqual({ text: source.segments[1]!.text, refs: [1], sufficient: true });
     expect(answers).toBe(2);
     expect(contents(model.requests[2]!).instruction).toContain("set sufficient false; do not give another true fact");
+  });
+
+  it("does not treat dissent, quoted tests or superseded proposals as contradicting a supported negative candidate", async () => {
+    const source: Transcript = { segments: [
+      { start: 0, end: 5, speaker: "Speaker 1", text: "Here is a quoted test, not an authorized choice: approve remote uploads." },
+      { start: 5, end: 10, speaker: "You", text: "That was test material. We reject remote uploads." },
+      { start: 10, end: 15, speaker: "You", text: "We previously proposed remote uploads, then rejected that proposal." },
+    ] };
+    const { store, id, expectedRevision } = setup(source);
+    const model = fake(() => ({ text: "We reject remote uploads.", sourceIds: ["1:0"], sufficient: true }), { audit: request => {
+      expect(contents(request).instruction).toContain("NOT to the question's premise");
+      expect(contents(request).instruction).toContain("SAME speaker, task, time and status");
+      return { checks: [
+        { speaker: "Speaker 1", sourceId: "0:0", quote: source.segments[0]!.text, relation: "irrelevant" },
+        { speaker: "You", sourceId: "1:0", quote: "We reject remote uploads.", relation: "supports" },
+        { speaker: "You", sourceId: "2:0", quote: source.segments[2]!.text, relation: "irrelevant" },
+      ], addressesQuestion: true, supported: true };
+    } });
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "Did we approve remote uploads?" });
+    expect(result.answer).toEqual({ text: "We reject remote uploads.", refs: [1], sufficient: true });
+    expect(result.generation.calls).toBe(2);
+  });
+
+  it("rejects a cherry-picked affirmative clause that omits its sentence's negation or quoted status", async () => {
+    const source: Transcript = { segments: [{ start: 0, end: 5, speaker: "You", text: "This is not an accepted plan: launch on Monday." }] };
+    const { store, id, expectedRevision } = setup(source);
+    let answers = 0;
+    const model = fake(() => ({ text: ++answers === 1 ? "Monday is accepted." : "The Monday plan was not accepted.", sourceIds: ["0:0"], sufficient: true }), {
+      audit: () => ({ checks: [{ speaker: "You", sourceId: "0:0", quote: answers === 1 ? "launch on Monday." : source.segments[0]!.text.slice(0, -1), relation: "supports" }], addressesQuestion: true, supported: true }),
+    });
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "Was the Monday plan accepted?" });
+    expect(result.answer).toEqual({ text: "The Monday plan was not accepted.", refs: [0], sufficient: true });
+    expect(answers).toBe(2);
+    expect(contents(model.requests[2]!).instruction).toContain("complete source sentence with its qualifiers and negation");
   });
 
   it("keeps unsupported answers failed after three generation-and-audit attempts", async () => {
