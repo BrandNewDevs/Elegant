@@ -1,3 +1,4 @@
+import { JobStatus } from "./JobStatus";
 import type { MeetingsViewState } from "../../shared/meetings-view-state";
 import { MeetingDetail } from "./MeetingDetail";
 import { AlertCircle, CheckCircle2, Inbox, Loader2, MessagesSquare, Radio, Search, Settings, type LucideIcon } from "lucide-react";
@@ -60,6 +61,7 @@ export function MeetingsApp() {
   const [query, setQuery] = useState("");
   const [meetings, setMeetings] = useState<MeetingListItem[]>([]);
   const [selected, setSelected] = useState<Meeting | undefined>();
+  const [jobs, setJobs] = useState<MeetingsViewState["jobs"]>();
   const [chat, setChat] = useState<MeetingsViewState["chat"]>();
   const selection = useRef<{ id?: number; revision?: string }>({});
 
@@ -67,6 +69,7 @@ export function MeetingsApp() {
     const unsubscribe = window.electron.meetings.onState((state) => {
       selection.current = { id: state.selected?.id, revision: state.chat?.revision };
       setChat(state.chat);
+      setJobs(state.jobs);
       setSettingsOpen(state.settingsOpen);
       setQuery(state.query);
       setMeetings(state.meetings);
@@ -106,6 +109,7 @@ export function MeetingsApp() {
             meetings.map((m) => <MeetingListRow key={m.id} meeting={m} selected={selected?.id === m.id} />)
           )}
         </ScrollArea>
+        {jobs?.length ? <div className="p-2"><JobStatus jobs={jobs} /></div> : null}
         <div className="border-t p-2">
           <Button type="button" variant="ghost" size="sm" className="w-full justify-start" onClick={() => window.electron.meetings.settings(true)}>
             <Settings aria-hidden />
@@ -116,7 +120,7 @@ export function MeetingsApp() {
       <ScrollArea className="min-h-0 flex-1">
         <main className="p-6">
           {selected ? (
-            <MeetingDetail key={`${selected.id}:${chat?.revision ?? "legacy"}`} meeting={selected} chat={chat} isCurrent={() => selection.current.id === selected.id && selection.current.revision === chat?.revision} />
+            <MeetingDetail key={`${selected.id}:${chat?.revision ?? "legacy"}`} meeting={selected} chat={chat} jobs={jobs} isCurrent={() => selection.current.id === selected.id && selection.current.revision === chat?.revision} />
           ) : (
             <div className="flex flex-col items-center gap-2 pt-24 text-muted-foreground">
               <MessagesSquare className="size-8" aria-hidden />

@@ -1,3 +1,5 @@
+import { ChatPanel } from "./ChatPanel";
+import { JobStatus } from "./JobStatus";
 import { AlertCircle, FileDown, FileText, Loader2, MessageSquare, Radio, RefreshCw, Sparkles, Trash2, Users, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Meeting } from "../../store/store";
@@ -21,8 +23,8 @@ function Heading({ children, icon: Icon }: { children: ReactNode; icon: LucideIc
   return <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><Icon className="size-3.5" aria-hidden />{children}</h2>;
 }
 
-export function MeetingDetail({ meeting, chat, isCurrent }: {
-  meeting: Meeting; chat: MeetingsViewState["chat"]; isCurrent: () => boolean;
+export function MeetingDetail({ meeting, chat, jobs, isCurrent }: {
+  meeting: Meeting; chat: MeetingsViewState["chat"]; jobs: MeetingsViewState["jobs"]; isCurrent: () => boolean;
 }) {
   const [view, setView] = useState<View>("summary");
   const [error, setError] = useState("");
@@ -61,6 +63,7 @@ export function MeetingDetail({ meeting, chat, isCurrent }: {
         <Button type="button" variant="destructive" size="sm" onClick={() => void action(() => window.electron.meetings.delete(meeting.id))}><Trash2 aria-hidden />Delete Meeting</Button>
       </div>}
     </header>
+    <JobStatus jobs={jobs ?? []} meetingId={meeting.id} onCancel={jobId => void action(() => window.electron.meetings.cancelJob({ meetingId: meeting.id, jobId }))} />
     <Separator />
     {error && <Alert variant="destructive" role="alert"><AlertCircle className="size-4" aria-hidden /><AlertDescription>{error}</AlertDescription></Alert>}
     {meeting.state === "recording" && <Alert variant="warning"><Radio className="size-4" aria-hidden /><AlertDescription>This Meeting is being recorded.</AlertDescription></Alert>}
@@ -105,7 +108,7 @@ export function MeetingDetail({ meeting, chat, isCurrent }: {
         className={cn("rounded-r-md border-l-2 p-3 text-sm leading-relaxed outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", highlighted.includes(index) ? "border-primary bg-primary/10" : "border-border")}>
         <span className="mr-2 font-mono text-xs text-muted-foreground">{formatClock(segment.start)}</span><strong>{segment.speaker}</strong> {segment.text}
       </p>) : <p className="py-8 text-sm text-muted-foreground">No Transcript is available yet.</p>}</div>}
-      {view === "chat" && <p className="py-8 text-sm text-muted-foreground">Meeting chat is being prepared.</p>}
+      <div hidden={view !== "chat"}><ChatPanel meetingId={meeting.id} chat={chat} transcript={meeting.transcript} onOpen={openEvidence} isCurrent={current} /></div>
     </section>
   </div>;
 }
