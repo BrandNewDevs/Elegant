@@ -2,6 +2,10 @@ import { readFile, readdir, writeFile, realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import { isOutside, privateOutputPath } from "./private-path.js";
 import { fileURLToPath } from "node:url";
+import { createMeetingChat, CHAT_PROMPT_VERSION } from "../pipeline/meeting-chat.js";
+import { transcriptRevision } from "../pipeline/evidence.js";
+import type { Transcript } from "../pipeline/pipeline.js";
+import { openStore } from "../store/store.js";
 import { BaselineOllamaClient } from "./baseline-model.js";
 import { createBaselineSummariser } from "./baseline.js";
 import { createGroundedSummariser } from "../pipeline/grounded-summariser.js";
@@ -37,7 +41,7 @@ const selected = split ? fixtures.filter(fixture => fixture.split === split) : f
 if (!selected.length) throw new Error("No fixtures found for this split");
 const implementation = mode!.endsWith("baseline") ? "baseline" : "current";
 const modelName = process.env.AI_MODEL ?? DEFAULT_SUMMARY_MODEL;
-const metadata = await evaluationMetadata(modelName, implementation);
+const metadata = { ...await evaluationMetadata(modelName, implementation), ...(implementation === "current" ? { chatPromptVersion: CHAT_PROMPT_VERSION } : {}) };
 const client = new OllamaClient({ model: modelName });
 const baseline = new BaselineOllamaClient({ model: modelName });
 let calls = 0;
@@ -46,10 +50,28 @@ const model: LanguageModel & TextModel = {
   complete: request => { calls++; console.log(`Local model request ${calls}`); return client.complete(request); },
 };
 const summarise = implementation === "baseline" ? createBaselineSummariser({ model }) : createGroundedSummariser({ model });
+const store = openStore(":memory:");
+const meetingIds = new WeakMap<Transcript, number>();
+const chat = createMeetingChat({ store, model, modelName });
+const pipeline = { summarise, ...(implementation === "current" ? { answer: async (transcript: Transcript, question: string,
+  history: { question: string; answer: { text: string } }[]) => {
+  let meetingId = meetingIds.get(transcript);
+  if (!meetingId) {
+    meetingId = store.createMeeting({ app: "Evaluation", startedAt: new Date().toISOString() });
+    store.saveTranscript(meetingId, transcript);
+    store.setMeetingState(meetingId, "done");
+    meetingIds.set(transcript, meetingId);
+  }
+  const result = await chat({ meetingId, question, history: history.map(pair => ({ question: pair.question, answer: pair.answer.text })),
+    expectedRevision: transcriptRevision(transcript) });
+  return { ...result.answer, revision: result.revision, generation: result.generation };
+} } : {}) };
 const runs = [];
+try {
 for (const fixture of selected) {
-  runs.push(await evaluateFixture(fixture, { summarise }, () => calls));
+  runs.push(await evaluateFixture(fixture, pipeline, () => calls));
   // Keep results even if a later fixture fails or the process is interrupted. Content stays at the selected local path.
   await writeFile(destination, JSON.stringify({ metadata, runs }, null, 2) + "\n");
   console.log(`${fixture.id}: ${runs.at(-1)?.error ? "failed" : "generated; human review pending"}`);
 }
+} finally { store.close(); }

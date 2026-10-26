@@ -8,7 +8,7 @@ export interface EvaluationFixture {
   points: { id: string; text: string; speaker: string; refs: number[]; critical: boolean }[];
   questions: { id: string; question: string; answer: string | null; refs: number[]; followUpTo?: string; critical: boolean }[];
 }
-export interface EvaluationAnswer { text: string; refs: number[]; sufficient: boolean }
+export interface EvaluationAnswer { text: string; refs: number[]; sufficient: boolean; revision?: string; generation?: import("../shared/meeting-chat.js").ChatGeneration }
 export interface EvaluationPipeline {
   summarise(transcript: Transcript): Promise<Summary>;
   answer?(transcript: Transcript, question: string, history: { question: string; answer: EvaluationAnswer }[]): Promise<EvaluationAnswer>;
@@ -22,19 +22,22 @@ export async function evaluateFixture(fixture: EvaluationFixture, pipeline: Eval
   let error: string | undefined;
   try { summary = await pipeline.summarise(fixture.transcript); }
   catch (problem) { error = problem instanceof Error ? problem.message : String(problem); }
-  const chat: { questionId: string; answer?: EvaluationAnswer; error?: string; skipped?: string }[] = [];
+  const summaryElapsedMs = performance.now() - started;
+  const summaryCalls = callCount() - initialCalls;
+  const chat: { questionId: string; answer?: EvaluationAnswer; error?: string; skipped?: string; elapsedMs?: number; calls?: number }[] = [];
   const completed = new Map<string, { question: string; answer: EvaluationAnswer }[]>();
   for (const question of fixture.questions) {
     if (!pipeline.answer) { chat.push({ questionId: question.id, skipped: "Meeting chat is not implemented in this revision" }); continue; }
     const history = question.followUpTo ? completed.get(question.followUpTo) ?? [] : [];
+    const queryStarted = performance.now(), beforeQuery = callCount();
     try {
       const answer = await pipeline.answer(fixture.transcript, question.question, history);
-      chat.push({ questionId: question.id, answer });
+      chat.push({ questionId: question.id, answer, elapsedMs: performance.now() - queryStarted, calls: callCount() - beforeQuery });
       completed.set(question.id, [...history, { question: question.question, answer }]);
-    } catch (problem) { chat.push({ questionId: question.id, error: problem instanceof Error ? problem.message : String(problem) }); }
+    } catch (problem) { chat.push({ questionId: question.id, error: problem instanceof Error ? problem.message : String(problem), elapsedMs: performance.now() - queryStarted, calls: callCount() - beforeQuery }); }
   }
   return { id: fixture.id, split: fixture.split, synthetic: fixture.synthetic, summary, error, chat,
-    elapsedMs: performance.now() - started, calls: callCount() - initialCalls,
+    elapsedMs: performance.now() - started, calls: callCount() - initialCalls, summaryElapsedMs, summaryCalls,
     peakRssKiB: process.resourceUsage().maxRSS };
 }
 
