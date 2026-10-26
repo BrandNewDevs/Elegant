@@ -1,5 +1,6 @@
 import { BrowserWindow, screen } from "electron";
 import { DISPLAY_NAME } from "../config.js";
+import { promptPosition } from "./prompt-position.js";
 
 const RECORD_URL = "prompt://record";
 const NOT_NOW_URL = "prompt://not-now";
@@ -25,15 +26,13 @@ export function promptHtml(app: string): string {
   <a class="record" href="${RECORD_URL}">Record</a><a href="${NOT_NOW_URL}">Not now</a>`;
 }
 
-/** Shows the Prompt overlay at the top right of the screen. Closing it without answering counts as Not now. */
+/** Shows the Prompt overlay at the bottom centre of the screen. Closing it without answering counts as Not now. */
 export function showPrompt(app: string, handlers: { record(): void; notNow(): void }): { close(): void } {
   const { workArea } = screen.getPrimaryDisplay();
-  const width = 340;
+  const size = { width: 340, height: 96 };
   const win = new BrowserWindow({
-    width,
-    height: 96,
-    x: workArea.x + workArea.width - width - 16,
-    y: workArea.y + 16,
+    ...size,
+    ...promptPosition(workArea, size),
     frame: false,
     resizable: false,
     movable: false,
