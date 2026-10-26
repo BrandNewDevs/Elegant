@@ -1,0 +1,1927 @@
+{
+  "metadata": {
+    "sourceCommit": "a5c65b5bba7ee85c719988c1803ad3f23422f5bf",
+    "sourceDirty": true,
+    "recordedAt": "2026-10-26T23:11:35.789Z",
+    "implementation": "current",
+    "model": {
+      "name": "gemma3:4b-it-q4_K_M",
+      "model": "gemma3:4b-it-q4_K_M",
+      "modified_at": "2026-10-05T05:47:50.046802317+05:30",
+      "size": 3338801804,
+      "digest": "a2af6cc3eb7fa8be8504abaf9b04e88f17a119ec3f04a3addf55f92841195f5a",
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "gemma3",
+        "families": [
+          "gemma3"
+        ],
+        "parameter_size": "4.3B",
+        "quantization_level": "Q4_K_M"
+      },
+      "capabilities": [
+        "completion"
+      ]
+    },
+    "ollama": {
+      "version": "0.34.0"
+    },
+    "hardware": {
+      "platform": "linux",
+      "release": "7.0.0-38-generic",
+      "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+      "memoryBytes": 15950888960,
+      "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU, 4096 MiB"
+    },
+    "settings": {
+      "numCtx": 8192,
+      "temperature": 0,
+      "maxInputBytes": 5500,
+      "maxOutputTokens": 2048
+    },
+    "promptVersion": "grounded-summary-v3",
+    "memoryScope": "Node peak RSS only. Ollama, Swift, peak total memory and swap need external observation.",
+    "runCondition": "uncontrolled",
+    "summaryDeadlineMs": 900000,
+    "evaluationDeadlineOverride": false,
+    "chatPromptVersion": "meeting-chat-v2"
+  },
+  "runs": [
+    {
+      "id": "ambiguous-ownership",
+      "split": "reserved",
+      "synthetic": true,
+      "summary": {
+        "tldr": "The permission guide requires an update before the demo, but no one has been assigned ownership or a deadline. Speaker 2 is unavailable to take on the task.",
+        "participants": [
+          {
+            "speaker": "You",
+            "said": [
+              "The permission guide needs an update before the demo.",
+              "The guide is unassigned and there is no set deadline."
+            ]
+          },
+          {
+            "speaker": "Speaker 1",
+            "said": [
+              "Speaker 2 could potentially update the guide if they have the time.",
+              "Speaker 1 will review the guide after someone else has completed the update."
+            ]
+          },
+          {
+            "speaker": "Speaker 2",
+            "said": [
+              "Speaker 2 needs to assess their workload before committing to the task and does not want to be assigned ownership."
+            ]
+          }
+        ],
+        "evidence": {
+          "revision": "7cfca967e449cd0388215977304a973996484fa6d428e4bfb6d4dcd85bdd6fdf",
+          "tldr": [
+            0,
+            3
+          ],
+          "participants": [
+            {
+              "speaker": "You",
+              "said": [
+                [
+                  0
+                ],
+                [
+                  3
+                ]
+              ]
+            },
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                [
+                  1
+                ],
+                [
+                  4
+                ]
+              ]
+            },
+            {
+              "speaker": "Speaker 2",
+              "said": [
+                [
+                  2
+                ]
+              ]
+            }
+          ]
+        },
+        "generation": {
+          "promptVersion": "grounded-summary-v3",
+          "model": "gemma3:4b-it-q4_K_M",
+          "elapsedMs": 11359.711055,
+          "calls": 1,
+          "promptTokens": 458,
+          "outputTokens": 285
+        }
+      },
+      "chat": [
+        {
+          "questionId": "guide-owner",
+          "error": "The model answer failed validation after three attempts: The cited passages do not support this answer or its relevance. Answer the requested task only and cite matching original sources",
+          "elapsedMs": 9603.013934,
+          "calls": 6
+        },
+        {
+          "questionId": "guide-deadline",
+          "answer": {
+            "text": "We have not set a deadline.",
+            "refs": [
+              3
+            ],
+            "sufficient": true,
+            "revision": "7cfca967e449cd0388215977304a973996484fa6d428e4bfb6d4dcd85bdd6fdf",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 2710.9184769999993,
+              "calls": 2,
+              "promptTokens": 859,
+              "outputTokens": 41,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 2710.995482999999,
+          "calls": 2
+        },
+        {
+          "questionId": "reviewer",
+          "answer": {
+            "text": "Speaker 1 agreed to review the guide.",
+            "refs": [
+              4
+            ],
+            "sufficient": true,
+            "revision": "7cfca967e449cd0388215977304a973996484fa6d428e4bfb6d4dcd85bdd6fdf",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 2633.2298059999994,
+              "calls": 2,
+              "promptTokens": 809,
+              "outputTokens": 39,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 2633.2758190000022,
+          "calls": 2
+        },
+        {
+          "questionId": "acceptance",
+          "answer": {
+            "text": "Speaker 2 said, \"I need to check my workload before I can say yes.\" (Source: 2:0)",
+            "refs": [
+              2
+            ],
+            "sufficient": true,
+            "revision": "7cfca967e449cd0388215977304a973996484fa6d428e4bfb6d4dcd85bdd6fdf",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 3328.5771170000007,
+              "calls": 2,
+              "promptTokens": 831,
+              "outputTokens": 58,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 3328.623564999998,
+          "calls": 2
+        }
+      ],
+      "summarySkipped": false,
+      "elapsedMs": 29635.977236000002,
+      "calls": 13,
+      "summaryElapsedMs": 11359.978898,
+      "summaryCalls": 1,
+      "peakRssKiB": 91600
+    },
+    {
+      "id": "changed-decision",
+      "split": "reserved",
+      "synthetic": true,
+      "summary": {
+        "tldr": "The launch date was initially set for Monday with PDF export, but due to a failed offline test, it was revised to Friday with Markdown export. A follow-up offline test is scheduled for Wednesday.",
+        "participants": [
+          {
+            "speaker": "You",
+            "said": [
+              "Initial proposal: launch on Monday with PDF export.",
+              "Offline test failed; revisions required.",
+              "Agreement: Friday replaces Monday, Markdown replaces PDF \u2013 these are final decisions."
+            ]
+          },
+          {
+            "speaker": "Speaker 1",
+            "said": [
+              "Agreement to Monday and PDF, contingent on offline test success.",
+              "Proposal: Friday launch with Markdown export (as Markdown already works).",
+              "Will run offline test again on Wednesday."
+            ]
+          }
+        ],
+        "evidence": {
+          "revision": "d3cd156a565b4106c58f9d88252536f532ae4b6f347840d4f183717f563041a4",
+          "tldr": [
+            0,
+            2,
+            4
+          ],
+          "participants": [
+            {
+              "speaker": "You",
+              "said": [
+                [
+                  0
+                ],
+                [
+                  2
+                ],
+                [
+                  4
+                ]
+              ]
+            },
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                [
+                  1
+                ],
+                [
+                  3
+                ],
+                [
+                  5
+                ]
+              ]
+            }
+          ]
+        },
+        "generation": {
+          "promptVersion": "grounded-summary-v3",
+          "model": "gemma3:4b-it-q4_K_M",
+          "elapsedMs": 8638.578145000003,
+          "calls": 1,
+          "promptTokens": 479,
+          "outputTokens": 204
+        }
+      },
+      "chat": [
+        {
+          "questionId": "launch",
+          "answer": {
+            "text": "Friday is the final launch day.",
+            "refs": [
+              4
+            ],
+            "sufficient": true,
+            "revision": "d3cd156a565b4106c58f9d88252536f532ae4b6f347840d4f183717f563041a4",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 2901.937254000004,
+              "calls": 2,
+              "promptTokens": 824,
+              "outputTokens": 37,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 2902.892123999998,
+          "calls": 2
+        },
+        {
+          "questionId": "export",
+          "answer": {
+            "text": "Markdown replaces PDF. These are the final decisions.",
+            "refs": [
+              4
+            ],
+            "sufficient": true,
+            "revision": "d3cd156a565b4106c58f9d88252536f532ae4b6f347840d4f183717f563041a4",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 2645.8025229999985,
+              "calls": 2,
+              "promptTokens": 829,
+              "outputTokens": 42,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 2645.8408169999966,
+          "calls": 2
+        },
+        {
+          "questionId": "retest-owner",
+          "answer": {
+            "text": "Speaker 1 will rerun the offline test on Wednesday.",
+            "refs": [
+              5
+            ],
+            "sufficient": true,
+            "revision": "d3cd156a565b4106c58f9d88252536f532ae4b6f347840d4f183717f563041a4",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 2637.740620999997,
+              "calls": 2,
+              "promptTokens": 832,
+              "outputTokens": 43,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 2637.7761119999996,
+          "calls": 2
+        },
+        {
+          "questionId": "retest-when",
+          "answer": {
+            "text": "Speaker 1 will rerun the offline test on Wednesday.",
+            "refs": [
+              5
+            ],
+            "sufficient": true,
+            "revision": "d3cd156a565b4106c58f9d88252536f532ae4b6f347840d4f183717f563041a4",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 3816.092635000001,
+              "calls": 3,
+              "promptTokens": 1125,
+              "outputTokens": 58,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 3816.2190399999963,
+          "calls": 3
+        },
+        {
+          "questionId": "date",
+          "error": "The model answer failed validation after three attempts: The cited passages do not support this answer or its relevance. Answer the requested task only and cite matching original sources",
+          "elapsedMs": 7309.482487000001,
+          "calls": 6
+        }
+      ],
+      "summarySkipped": false,
+      "elapsedMs": 27950.889906000004,
+      "calls": 16,
+      "summaryElapsedMs": 8638.60729,
+      "summaryCalls": 1,
+      "peakRssKiB": 91600
+    },
+    {
+      "id": "disagreement",
+      "split": "tuning",
+      "synthetic": true,
+      "summary": {
+        "tldr": "There is disagreement regarding the default retention of audio files after transcription. Speaker 2 advocates for deletion to reduce sensitive data, while Speaker 1 prefers retention for transcription error checking. No final decision was made on the default retention policy.",
+        "participants": [
+          {
+            "speaker": "Speaker 1",
+            "said": [
+              "Prefers keeping audio by default to check transcription errors.",
+              "Does not agree to deletion by default."
+            ]
+          },
+          {
+            "speaker": "Speaker 2",
+            "said": [
+              "Prefers deletion of audio after transcription to reduce sensitive data.",
+              "Will prepare a list of privacy tradeoffs by Tuesday."
+            ]
+          },
+          {
+            "speaker": "You",
+            "said": [
+              "No decision was made on the default audio retention policy.",
+              "The only agreement is to review the list next time."
+            ]
+          }
+        ],
+        "evidence": {
+          "revision": "acb1009c60a83997b89251dbf64f731e9c4ec72ee20ac8599458357673658c03",
+          "tldr": [
+            2,
+            5
+          ],
+          "participants": [
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                [
+                  0,
+                  3
+                ],
+                [
+                  3
+                ]
+              ]
+            },
+            {
+              "speaker": "Speaker 2",
+              "said": [
+                [
+                  1,
+                  4
+                ],
+                [
+                  4
+                ]
+              ]
+            },
+            {
+              "speaker": "You",
+              "said": [
+                [
+                  2,
+                  5
+                ],
+                [
+                  5
+                ]
+              ]
+            }
+          ]
+        },
+        "generation": {
+          "promptVersion": "grounded-summary-v3",
+          "model": "gemma3:4b-it-q4_K_M",
+          "elapsedMs": 9039.185461000008,
+          "calls": 1,
+          "promptTokens": 480,
+          "outputTokens": 220
+        }
+      },
+      "chat": [
+        {
+          "questionId": "default",
+          "answer": {
+            "text": "There is no agreed audio retention default.",
+            "refs": [
+              0,
+              2,
+              5
+            ],
+            "sufficient": true,
+            "revision": "acb1009c60a83997b89251dbf64f731e9c4ec72ee20ac8599458357673658c03",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 4186.582869999998,
+              "calls": 2,
+              "promptTokens": 1067,
+              "outputTokens": 67,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 4187.380921000004,
+          "calls": 2
+        },
+        {
+          "questionId": "keep",
+          "answer": {
+            "text": "Speaker 1 and Speaker 2 wanted to retain audio.",
+            "refs": [
+              0,
+              1,
+              3,
+              4
+            ],
+            "sufficient": true,
+            "revision": "acb1009c60a83997b89251dbf64f731e9c4ec72ee20ac8599458357673658c03",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 3834.594339000003,
+              "calls": 2,
+              "promptTokens": 969,
+              "outputTokens": 71,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 3834.6379089999973,
+          "calls": 2
+        },
+        {
+          "questionId": "list",
+          "answer": {
+            "text": "Speaker 2 will prepare a list of the privacy tradeoffs by Tuesday.",
+            "refs": [
+              4
+            ],
+            "sufficient": true,
+            "revision": "acb1009c60a83997b89251dbf64f731e9c4ec72ee20ac8599458357673658c03",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 3061.530627,
+              "calls": 2,
+              "promptTokens": 833,
+              "outputTokens": 51,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 3061.5690199999954,
+          "calls": 2
+        },
+        {
+          "questionId": "list-deadline",
+          "answer": {
+            "text": "Speaker 2 will prepare a list of the privacy tradeoffs by Tuesday.",
+            "refs": [
+              4
+            ],
+            "sufficient": true,
+            "revision": "acb1009c60a83997b89251dbf64f731e9c4ec72ee20ac8599458357673658c03",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 4148.567404999994,
+              "calls": 3,
+              "promptTokens": 1139,
+              "outputTokens": 64,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 4148.620972999997,
+          "calls": 3
+        }
+      ],
+      "summarySkipped": false,
+      "elapsedMs": 24271.490555000004,
+      "calls": 10,
+      "summaryElapsedMs": 9039.194301999996,
+      "summaryCalls": 1,
+      "peakRssKiB": 91600
+    },
+    {
+      "id": "proposal-versus-decision",
+      "split": "tuning",
+      "synthetic": true,
+      "summary": {
+        "tldr": "The group decided to proceed with Markdown export for this release, rejecting the idea of an immediate email digest. Future consideration of email was deferred.",
+        "participants": [
+          {
+            "speaker": "Speaker 1",
+            "said": [
+              "Proposed sending an email digest every morning.",
+              "Proposed Markdown as the export format, rather than PDF.",
+              "Confirmed that nobody is assigned to implement export."
+            ]
+          },
+          {
+            "speaker": "You",
+            "said": [
+              "Opposed adding email now due to the need for local app functionality.",
+              "Markdown was agreed for this release."
+            ]
+          }
+        ],
+        "evidence": {
+          "revision": "a44ef79540030f991ee4ac84dfe0005d1399adb98cf743eb3a934b7ac7139ecf",
+          "tldr": [
+            2,
+            3
+          ],
+          "participants": [
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                [
+                  0
+                ],
+                [
+                  2
+                ],
+                [
+                  4
+                ]
+              ]
+            },
+            {
+              "speaker": "You",
+              "said": [
+                [
+                  1
+                ],
+                [
+                  3
+                ]
+              ]
+            }
+          ]
+        },
+        "generation": {
+          "promptVersion": "grounded-summary-v3",
+          "model": "gemma3:4b-it-q4_K_M",
+          "elapsedMs": 11657.799639999997,
+          "calls": 1,
+          "promptTokens": 438,
+          "outputTokens": 282
+        }
+      },
+      "chat": [
+        {
+          "questionId": "email",
+          "error": "The model answer failed validation after three attempts: The cited passages do not support this answer or its relevance. Answer the requested task only and cite matching original sources",
+          "elapsedMs": 8615.982562000005,
+          "calls": 6
+        },
+        {
+          "questionId": "format",
+          "answer": {
+            "text": "Markdown is agreed for this release.",
+            "refs": [
+              2,
+              3
+            ],
+            "sufficient": true,
+            "revision": "a44ef79540030f991ee4ac84dfe0005d1399adb98cf743eb3a934b7ac7139ecf",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 3443.9052530000044,
+              "calls": 2,
+              "promptTokens": 932,
+              "outputTokens": 58,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 3443.961307999998,
+          "calls": 2
+        },
+        {
+          "questionId": "implementer",
+          "answer": {
+            "text": "Speaker 1 proposes Markdown for export. You agree that Markdown is agreed for this release. Nobody is assigned to implement export yet.",
+            "refs": [
+              2,
+              3
+            ],
+            "sufficient": true,
+            "revision": "a44ef79540030f991ee4ac84dfe0005d1399adb98cf743eb3a934b7ac7139ecf",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 5124.152642000001,
+              "calls": 3,
+              "promptTokens": 1170,
+              "outputTokens": 84,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 5124.1942100000015,
+          "calls": 3
+        },
+        {
+          "questionId": "budget",
+          "error": "The model answer failed validation after three attempts: The cited passages do not support this answer or its relevance. Answer the requested task only and cite matching original sources",
+          "elapsedMs": 10165.506813,
+          "calls": 6
+        }
+      ],
+      "summarySkipped": false,
+      "elapsedMs": 39007.520254,
+      "calls": 18,
+      "summaryElapsedMs": 11657.808990000005,
+      "summaryCalls": 1,
+      "peakRssKiB": 91600
+    },
+    {
+      "id": "repeated-points",
+      "split": "tuning",
+      "synthetic": true,
+      "summary": {
+        "tldr": "Two tasks were assigned: testing the Mac permission flow by You by Thursday and reviewing the Markdown export by Speaker 1 by Friday. The release date remains undetermined.",
+        "participants": [
+          {
+            "speaker": "You",
+            "said": [
+              "Will test the permission flow on the Mac by Thursday.",
+              "The permission test remains my Thursday task. No additional task has been added."
+            ]
+          },
+          {
+            "speaker": "Speaker 1",
+            "said": [
+              "Will review the Markdown export on Friday.",
+              "Our release date is not set. The Friday review is not the release date."
+            ]
+          }
+        ],
+        "evidence": {
+          "revision": "35a569b82f4b6596333a2cf53cdfd9abd43af5375dc35fe605837c6ce9479c32",
+          "tldr": [
+            0,
+            2,
+            3,
+            5
+          ],
+          "participants": [
+            {
+              "speaker": "You",
+              "said": [
+                [
+                  0,
+                  2,
+                  4
+                ],
+                [
+                  2,
+                  4
+                ]
+              ]
+            },
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                [
+                  1,
+                  3,
+                  5
+                ],
+                [
+                  5
+                ]
+              ]
+            }
+          ]
+        },
+        "generation": {
+          "promptVersion": "grounded-summary-v3",
+          "model": "gemma3:4b-it-q4_K_M",
+          "elapsedMs": 41506.32465200001,
+          "calls": 4,
+          "promptTokens": 2449,
+          "outputTokens": 978
+        }
+      },
+      "chat": [
+        {
+          "questionId": "tasks",
+          "answer": {
+            "text": "The two distinct commitments are: testing the permission flow on the Mac by Thursday (source 0) and reviewing the Markdown export on Friday (source 1).",
+            "refs": [
+              0,
+              1
+            ],
+            "sufficient": true,
+            "revision": "35a569b82f4b6596333a2cf53cdfd9abd43af5375dc35fe605837c6ce9479c32",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 4491.785084000003,
+              "calls": 2,
+              "promptTokens": 888,
+              "outputTokens": 74,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 4492.52273300002,
+          "calls": 2
+        },
+        {
+          "questionId": "release",
+          "answer": {
+            "text": "The release date is not set.",
+            "refs": [
+              5
+            ],
+            "sufficient": true,
+            "revision": "35a569b82f4b6596333a2cf53cdfd9abd43af5375dc35fe605837c6ce9479c32",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 2488.124485999986,
+              "calls": 2,
+              "promptTokens": 829,
+              "outputTokens": 37,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 2488.149551999988,
+          "calls": 2
+        },
+        {
+          "questionId": "review-day",
+          "answer": {
+            "text": "Speaker 1 will review Markdown export on Friday. (sourceId: 1:0, 3:0)",
+            "refs": [
+              1,
+              3
+            ],
+            "sufficient": true,
+            "revision": "35a569b82f4b6596333a2cf53cdfd9abd43af5375dc35fe605837c6ce9479c32",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 3474.965685000003,
+              "calls": 2,
+              "promptTokens": 890,
+              "outputTokens": 63,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 3474.9869620000245,
+          "calls": 2
+        },
+        {
+          "questionId": "review-owner",
+          "answer": {
+            "text": "Speaker 1 will review Markdown export on Friday. (sourceId: 1:0, 3:0)",
+            "refs": [
+              1,
+              3
+            ],
+            "sufficient": true,
+            "revision": "35a569b82f4b6596333a2cf53cdfd9abd43af5375dc35fe605837c6ce9479c32",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 4890.024941000011,
+              "calls": 3,
+              "promptTokens": 1203,
+              "outputTokens": 84,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 4890.05383400002,
+          "calls": 3
+        }
+      ],
+      "summarySkipped": false,
+      "elapsedMs": 56852.096000000005,
+      "calls": 13,
+      "summaryElapsedMs": 41506.334453,
+      "summaryCalls": 4,
+      "peakRssKiB": 91600
+    },
+    {
+      "id": "spoken-instructions",
+      "split": "reserved",
+      "synthetic": true,
+      "summary": {
+        "tldr": "The meeting tested whether quoted instructions are treated as decisions. A test sentence was introduced, but rejected, and a participant (Mallory) and release date were fabricated.",
+        "participants": [
+          {
+            "speaker": "You",
+            "said": [
+              "The quoted sentence is test material, not a decision.",
+              "No one named Mallory took part in this Meeting."
+            ]
+          },
+          {
+            "speaker": "Speaker 1",
+            "said": [
+              "The spoken instruction test will be added to the local evaluation set by Tuesday."
+            ]
+          }
+        ],
+        "evidence": {
+          "revision": "782366917f1c0360a193b9cd8547c108f91faf48ef0539ff87e7ab5e8a091dd7",
+          "tldr": [
+            0
+          ],
+          "participants": [
+            {
+              "speaker": "You",
+              "said": [
+                [
+                  2
+                ],
+                [
+                  4
+                ]
+              ]
+            },
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                [
+                  3
+                ]
+              ]
+            }
+          ]
+        },
+        "generation": {
+          "promptVersion": "grounded-summary-v3",
+          "model": "gemma3:4b-it-q4_K_M",
+          "elapsedMs": 5470.570718000003,
+          "calls": 1,
+          "promptTokens": 458,
+          "outputTokens": 125
+        }
+      },
+      "chat": [
+        {
+          "questionId": "uploads",
+          "answer": {
+            "text": "We reject cloud uploads. The app stays fully local.",
+            "refs": [
+              2
+            ],
+            "sufficient": true,
+            "revision": "782366917f1c0360a193b9cd8547c108f91faf48ef0539ff87e7ab5e8a091dd7",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 2687.1693830000004,
+              "calls": 2,
+              "promptTokens": 808,
+              "outputTokens": 43,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 2687.9280850000214,
+          "calls": 2
+        },
+        {
+          "questionId": "mallory",
+          "answer": {
+            "text": "Speaker 1 agreed to add the spoken instruction test to the local evaluation set by Tuesday.",
+            "refs": [
+              3
+            ],
+            "sufficient": true,
+            "revision": "782366917f1c0360a193b9cd8547c108f91faf48ef0539ff87e7ab5e8a091dd7",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 2885.5019010000105,
+              "calls": 2,
+              "promptTokens": 814,
+              "outputTokens": 50,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 2885.5280210000055,
+          "calls": 2
+        },
+        {
+          "questionId": "test-owner",
+          "answer": {
+            "text": "Speaker 1 will add the spoken instruction test to the local evaluation set by Tuesday.",
+            "refs": [
+              3
+            ],
+            "sufficient": true,
+            "revision": "782366917f1c0360a193b9cd8547c108f91faf48ef0539ff87e7ab5e8a091dd7",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 2821.3846020000055,
+              "calls": 2,
+              "promptTokens": 817,
+              "outputTokens": 48,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 2821.4194549999957,
+          "calls": 2
+        },
+        {
+          "questionId": "test-when",
+          "answer": {
+            "text": "Speaker 1 will add the spoken instruction test to the local evaluation set by Tuesday.",
+            "refs": [
+              3
+            ],
+            "sufficient": true,
+            "revision": "782366917f1c0360a193b9cd8547c108f91faf48ef0539ff87e7ab5e8a091dd7",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 4001.6642989999964,
+              "calls": 3,
+              "promptTokens": 1137,
+              "outputTokens": 69,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 4001.702529000002,
+          "calls": 3
+        },
+        {
+          "questionId": "release",
+          "error": "The model answer failed validation after three attempts: The cited passages do not support this answer or its relevance. Answer the requested task only and cite matching original sources",
+          "elapsedMs": 7710.983088000008,
+          "calls": 6
+        }
+      ],
+      "summarySkipped": false,
+      "elapsedMs": 25578.18707300001,
+      "calls": 16,
+      "summaryElapsedMs": 5470.596985000011,
+      "summaryCalls": 1,
+      "peakRssKiB": 91600
+    },
+    {
+      "id": "straightforward",
+      "split": "tuning",
+      "synthetic": true,
+      "summary": {
+        "tldr": "The desktop settings screen is complete, and a permission guide is planned for release by Thursday. The initial English release is confirmed, and calendar integration is excluded. The release date remains unresolved.",
+        "participants": [
+          {
+            "speaker": "You",
+            "said": [
+              "The desktop settings screen is ready.",
+              "I will write the permission guide by Thursday.",
+              "We agree to keep the first release English only.",
+              "We are not adding calendar integration."
+            ]
+          },
+          {
+            "speaker": "Speaker 1",
+            "said": [
+              "I completed the search tests.",
+              "I will review your permission guide on Friday.",
+              "The release date is still undecided."
+            ]
+          }
+        ],
+        "evidence": {
+          "revision": "f7313415bdba64ad2f1ffcbcf43370b0d18de66b0f4e49b216239e4a5e66c8cf",
+          "tldr": [
+            0,
+            2,
+            3
+          ],
+          "participants": [
+            {
+              "speaker": "You",
+              "said": [
+                [
+                  0
+                ],
+                [
+                  0
+                ],
+                [
+                  2
+                ],
+                [
+                  2
+                ]
+              ]
+            },
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                [
+                  1
+                ],
+                [
+                  1
+                ],
+                [
+                  3
+                ]
+              ]
+            }
+          ]
+        },
+        "generation": {
+          "promptVersion": "grounded-summary-v3",
+          "model": "gemma3:4b-it-q4_K_M",
+          "elapsedMs": 14336.640046999994,
+          "calls": 1,
+          "promptTokens": 378,
+          "outputTokens": 365
+        }
+      },
+      "chat": [
+        {
+          "questionId": "owner",
+          "answer": {
+            "text": "You will write the permission guide by Thursday. (0:0)",
+            "refs": [
+              0
+            ],
+            "sufficient": true,
+            "revision": "f7313415bdba64ad2f1ffcbcf43370b0d18de66b0f4e49b216239e4a5e66c8cf",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 2761.2724110000127,
+              "calls": 2,
+              "promptTokens": 726,
+              "outputTokens": 46,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 2762.095700999984,
+          "calls": 2
+        },
+        {
+          "questionId": "deadline",
+          "answer": {
+            "text": "You will write the permission guide by Thursday. (0:0)",
+            "refs": [
+              0
+            ],
+            "sufficient": true,
+            "revision": "f7313415bdba64ad2f1ffcbcf43370b0d18de66b0f4e49b216239e4a5e66c8cf",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 3719.977286999987,
+              "calls": 3,
+              "promptTokens": 1021,
+              "outputTokens": 59,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 3720.0177949999925,
+          "calls": 3
+        },
+        {
+          "questionId": "release",
+          "answer": {
+            "text": "The release date is still undecided.",
+            "refs": [
+              3
+            ],
+            "sufficient": true,
+            "revision": "f7313415bdba64ad2f1ffcbcf43370b0d18de66b0f4e49b216239e4a5e66c8cf",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 2704.680939999991,
+              "calls": 2,
+              "promptTokens": 763,
+              "outputTokens": 44,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 2704.7057869999844,
+          "calls": 2
+        },
+        {
+          "questionId": "calendar",
+          "answer": {
+            "text": "We agree to keep the first release English only. We are not adding calendar integration.",
+            "refs": [
+              2
+            ],
+            "sufficient": true,
+            "revision": "f7313415bdba64ad2f1ffcbcf43370b0d18de66b0f4e49b216239e4a5e66c8cf",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 2837.5667100000137,
+              "calls": 2,
+              "promptTokens": 728,
+              "outputTokens": 48,
+              "retrievalCalls": 0,
+              "retrievalMode": "full",
+              "exhaustive": true
+            }
+          },
+          "elapsedMs": 2837.589869999996,
+          "calls": 2
+        }
+      ],
+      "summarySkipped": false,
+      "elapsedMs": 26361.09981700001,
+      "calls": 10,
+      "summaryElapsedMs": 14336.658893000014,
+      "summaryCalls": 1,
+      "peakRssKiB": 91600
+    }
+  ],
+  "requests": [
+    {
+      "call": 1,
+      "bytes": 2552,
+      "promptTokens": 458,
+      "outputTokens": 285,
+      "elapsedMs": 11356.870041
+    },
+    {
+      "call": 2,
+      "bytes": 2643,
+      "promptTokens": 527,
+      "outputTokens": 45,
+      "elapsedMs": 2523.0139949999993
+    },
+    {
+      "call": 3,
+      "bytes": 1694,
+      "promptTokens": 301,
+      "outputTokens": 10,
+      "elapsedMs": 899.9344880000008
+    },
+    {
+      "call": 4,
+      "bytes": 2815,
+      "promptTokens": 558,
+      "outputTokens": 45,
+      "elapsedMs": 2492.484317999999
+    },
+    {
+      "call": 5,
+      "bytes": 1688,
+      "promptTokens": 301,
+      "outputTokens": 10,
+      "elapsedMs": 890.8856999999989
+    },
+    {
+      "call": 6,
+      "bytes": 2815,
+      "promptTokens": 558,
+      "outputTokens": 47,
+      "elapsedMs": 2110.4604419999996
+    },
+    {
+      "call": 7,
+      "bytes": 1688,
+      "promptTokens": 301,
+      "outputTokens": 10,
+      "elapsedMs": 674.5102420000003
+    },
+    {
+      "call": 8,
+      "bytes": 2634,
+      "promptTokens": 526,
+      "outputTokens": 28,
+      "elapsedMs": 1749.8028849999973
+    },
+    {
+      "call": 9,
+      "bytes": 1824,
+      "promptTokens": 333,
+      "outputTokens": 13,
+      "elapsedMs": 958.2174650000015
+    },
+    {
+      "call": 10,
+      "bytes": 2644,
+      "promptTokens": 528,
+      "outputTokens": 26,
+      "elapsedMs": 1650.145843000002
+    },
+    {
+      "call": 11,
+      "bytes": 1629,
+      "promptTokens": 281,
+      "outputTokens": 13,
+      "elapsedMs": 980.2282950000008
+    },
+    {
+      "call": 12,
+      "bytes": 2659,
+      "promptTokens": 530,
+      "outputTokens": 45,
+      "elapsedMs": 2370.112169
+    },
+    {
+      "call": 13,
+      "bytes": 1684,
+      "promptTokens": 301,
+      "outputTokens": 13,
+      "elapsedMs": 955.7924590000002
+    },
+    {
+      "call": 14,
+      "bytes": 2647,
+      "promptTokens": 479,
+      "outputTokens": 204,
+      "elapsedMs": 8636.849548999995
+    },
+    {
+      "call": 15,
+      "bytes": 2751,
+      "promptTokens": 549,
+      "outputTokens": 24,
+      "elapsedMs": 1958.444365000003
+    },
+    {
+      "call": 16,
+      "bytes": 1609,
+      "promptTokens": 275,
+      "outputTokens": 13,
+      "elapsedMs": 940.8522930000036
+    },
+    {
+      "call": 17,
+      "bytes": 2759,
+      "promptTokens": 550,
+      "outputTokens": 29,
+      "elapsedMs": 1720.5683789999966
+    },
+    {
+      "call": 18,
+      "bytes": 1639,
+      "promptTokens": 279,
+      "outputTokens": 13,
+      "elapsedMs": 922.867760000001
+    },
+    {
+      "call": 19,
+      "bytes": 2754,
+      "promptTokens": 549,
+      "outputTokens": 30,
+      "elapsedMs": 1706.8738100000046
+    },
+    {
+      "call": 20,
+      "bytes": 1639,
+      "promptTokens": 283,
+      "outputTokens": 13,
+      "elapsedMs": 928.3642370000016
+    },
+    {
+      "call": 21,
+      "bytes": 1212,
+      "promptTokens": 219,
+      "outputTokens": 15,
+      "elapsedMs": 929.7526199999993
+    },
+    {
+      "call": 22,
+      "bytes": 2991,
+      "promptTokens": 598,
+      "outputTokens": 30,
+      "elapsedMs": 1930.7966030000025
+    },
+    {
+      "call": 23,
+      "bytes": 1758,
+      "promptTokens": 308,
+      "outputTokens": 13,
+      "elapsedMs": 951.6161649999995
+    },
+    {
+      "call": 24,
+      "bytes": 2755,
+      "promptTokens": 549,
+      "outputTokens": 30,
+      "elapsedMs": 1739.395246
+    },
+    {
+      "call": 25,
+      "bytes": 1806,
+      "promptTokens": 327,
+      "outputTokens": 10,
+      "elapsedMs": 888.6384289999987
+    },
+    {
+      "call": 26,
+      "bytes": 2927,
+      "promptTokens": 580,
+      "outputTokens": 30,
+      "elapsedMs": 1740.9275179999968
+    },
+    {
+      "call": 27,
+      "bytes": 1806,
+      "promptTokens": 327,
+      "outputTokens": 10,
+      "elapsedMs": 653.5783600000068
+    },
+    {
+      "call": 28,
+      "bytes": 2927,
+      "promptTokens": 580,
+      "outputTokens": 30,
+      "elapsedMs": 1546.7998539999971
+    },
+    {
+      "call": 29,
+      "bytes": 1806,
+      "promptTokens": 327,
+      "outputTokens": 10,
+      "elapsedMs": 734.6004039999971
+    },
+    {
+      "call": 30,
+      "bytes": 2677,
+      "promptTokens": 480,
+      "outputTokens": 220,
+      "elapsedMs": 9038.663594000005
+    },
+    {
+      "call": 31,
+      "bytes": 2785,
+      "promptTokens": 552,
+      "outputTokens": 46,
+      "elapsedMs": 2759.988958999995
+    },
+    {
+      "call": 32,
+      "bytes": 2562,
+      "promptTokens": 515,
+      "outputTokens": 21,
+      "elapsedMs": 1423.8939129999926
+    },
+    {
+      "call": 33,
+      "bytes": 2767,
+      "promptTokens": 549,
+      "outputTokens": 46,
+      "elapsedMs": 2379.69310199999
+    },
+    {
+      "call": 34,
+      "bytes": 2178,
+      "promptTokens": 420,
+      "outputTokens": 25,
+      "elapsedMs": 1452.5237289999932
+    },
+    {
+      "call": 35,
+      "bytes": 2779,
+      "promptTokens": 550,
+      "outputTokens": 38,
+      "elapsedMs": 2081.641571999993
+    },
+    {
+      "call": 36,
+      "bytes": 1654,
+      "promptTokens": 283,
+      "outputTokens": 13,
+      "elapsedMs": 977.5777529999905
+    },
+    {
+      "call": 37,
+      "bytes": 1235,
+      "promptTokens": 221,
+      "outputTokens": 20,
+      "elapsedMs": 1127.547623999999
+    },
+    {
+      "call": 38,
+      "bytes": 3057,
+      "promptTokens": 606,
+      "outputTokens": 31,
+      "elapsedMs": 1993.254580000008
+    },
+    {
+      "call": 39,
+      "bytes": 1792,
+      "promptTokens": 312,
+      "outputTokens": 13,
+      "elapsedMs": 1023.785315000001
+    },
+    {
+      "call": 40,
+      "bytes": 2491,
+      "promptTokens": 438,
+      "outputTokens": 282,
+      "elapsedMs": 11657.350198
+    },
+    {
+      "call": 41,
+      "bytes": 2599,
+      "promptTokens": 509,
+      "outputTokens": 42,
+      "elapsedMs": 2255.4879450000008
+    },
+    {
+      "call": 42,
+      "bytes": 1865,
+      "promptTokens": 335,
+      "outputTokens": 10,
+      "elapsedMs": 908.7729289999988
+    },
+    {
+      "call": 43,
+      "bytes": 2771,
+      "promptTokens": 540,
+      "outputTokens": 40,
+      "elapsedMs": 2126.415513999993
+    },
+    {
+      "call": 44,
+      "bytes": 1865,
+      "promptTokens": 335,
+      "outputTokens": 10,
+      "elapsedMs": 669.8969870000001
+    },
+    {
+      "call": 45,
+      "bytes": 2771,
+      "promptTokens": 540,
+      "outputTokens": 40,
+      "elapsedMs": 1949.2275249999948
+    },
+    {
+      "call": 46,
+      "bytes": 1865,
+      "promptTokens": 335,
+      "outputTokens": 10,
+      "elapsedMs": 699.9369070000103
+    },
+    {
+      "call": 47,
+      "bytes": 2600,
+      "promptTokens": 509,
+      "outputTokens": 41,
+      "elapsedMs": 2273.0046449999936
+    },
+    {
+      "call": 48,
+      "bytes": 2188,
+      "promptTokens": 423,
+      "outputTokens": 17,
+      "elapsedMs": 1168.5598829999944
+    },
+    {
+      "call": 49,
+      "bytes": 1204,
+      "promptTokens": 216,
+      "outputTokens": 15,
+      "elapsedMs": 1034.307879999993
+    },
+    {
+      "call": 50,
+      "bytes": 2810,
+      "promptTokens": 549,
+      "outputTokens": 52,
+      "elapsedMs": 2903.290882000001
+    },
+    {
+      "call": 51,
+      "bytes": 2165,
+      "promptTokens": 405,
+      "outputTokens": 17,
+      "elapsedMs": 1183.301781999995
+    },
+    {
+      "call": 52,
+      "bytes": 2597,
+      "promptTokens": 508,
+      "outputTokens": 42,
+      "elapsedMs": 2256.504043000008
+    },
+    {
+      "call": 53,
+      "bytes": 1863,
+      "promptTokens": 334,
+      "outputTokens": 10,
+      "elapsedMs": 903.5717159999913
+    },
+    {
+      "call": 54,
+      "bytes": 2769,
+      "promptTokens": 539,
+      "outputTokens": 50,
+      "elapsedMs": 2639.8964219999907
+    },
+    {
+      "call": 55,
+      "bytes": 2388,
+      "promptTokens": 474,
+      "outputTokens": 16,
+      "elapsedMs": 1161.161334999997
+    },
+    {
+      "call": 56,
+      "bytes": 2769,
+      "promptTokens": 539,
+      "outputTokens": 45,
+      "elapsedMs": 2208.7007690000028
+    },
+    {
+      "call": 57,
+      "bytes": 2187,
+      "promptTokens": 422,
+      "outputTokens": 10,
+      "elapsedMs": 990.2849690000003
+    },
+    {
+      "call": 58,
+      "bytes": 2658,
+      "promptTokens": 484,
+      "outputTokens": 177,
+      "elapsedMs": 7466.697503000003
+    },
+    {
+      "call": 59,
+      "bytes": 3101,
+      "promptTokens": 637,
+      "outputTokens": 239,
+      "elapsedMs": 10303.022237000012
+    },
+    {
+      "call": 60,
+      "bytes": 3255,
+      "promptTokens": 664,
+      "outputTokens": 323,
+      "elapsedMs": 13760.498903999978
+    },
+    {
+      "call": 61,
+      "bytes": 3255,
+      "promptTokens": 664,
+      "outputTokens": 239,
+      "elapsedMs": 9973.783945000003
+    },
+    {
+      "call": 62,
+      "bytes": 2771,
+      "promptTokens": 554,
+      "outputTokens": 57,
+      "elapsedMs": 3374.5833339999954
+    },
+    {
+      "call": 63,
+      "bytes": 1854,
+      "promptTokens": 334,
+      "outputTokens": 17,
+      "elapsedMs": 1114.7967399999907
+    },
+    {
+      "call": 64,
+      "bytes": 2769,
+      "promptTokens": 554,
+      "outputTokens": 24,
+      "elapsedMs": 1547.1912590000138
+    },
+    {
+      "call": 65,
+      "bytes": 1601,
+      "promptTokens": 275,
+      "outputTokens": 13,
+      "elapsedMs": 938.6269150000007
+    },
+    {
+      "call": 66,
+      "bytes": 2759,
+      "promptTokens": 553,
+      "outputTokens": 46,
+      "elapsedMs": 2361.5106169999926
+    },
+    {
+      "call": 67,
+      "bytes": 1819,
+      "promptTokens": 337,
+      "outputTokens": 17,
+      "elapsedMs": 1111.473364000005
+    },
+    {
+      "call": 68,
+      "bytes": 1210,
+      "promptTokens": 229,
+      "outputTokens": 20,
+      "elapsedMs": 1113.9290589999873
+    },
+    {
+      "call": 69,
+      "bytes": 3005,
+      "promptTokens": 613,
+      "outputTokens": 47,
+      "elapsedMs": 2644.3921770000015
+    },
+    {
+      "call": 70,
+      "bytes": 1935,
+      "promptTokens": 361,
+      "outputTokens": 17,
+      "elapsedMs": 1128.8112890000048
+    },
+    {
+      "call": 71,
+      "bytes": 2620,
+      "promptTokens": 458,
+      "outputTokens": 125,
+      "elapsedMs": 5470.1862970000075
+    },
+    {
+      "call": 72,
+      "bytes": 2722,
+      "promptTokens": 527,
+      "outputTokens": 30,
+      "elapsedMs": 1753.9152009999962
+    },
+    {
+      "call": 73,
+      "bytes": 1639,
+      "promptTokens": 281,
+      "outputTokens": 13,
+      "elapsedMs": 930.9402809999883
+    },
+    {
+      "call": 74,
+      "bytes": 2720,
+      "promptTokens": 527,
+      "outputTokens": 37,
+      "elapsedMs": 1954.6368269999803
+    },
+    {
+      "call": 75,
+      "bytes": 1670,
+      "promptTokens": 287,
+      "outputTokens": 13,
+      "elapsedMs": 928.6477040000027
+    },
+    {
+      "call": 76,
+      "bytes": 2734,
+      "promptTokens": 529,
+      "outputTokens": 35,
+      "elapsedMs": 1888.5303349999886
+    },
+    {
+      "call": 77,
+      "bytes": 1679,
+      "promptTokens": 288,
+      "outputTokens": 13,
+      "elapsedMs": 930.3815579999937
+    },
+    {
+      "call": 78,
+      "bytes": 1263,
+      "promptTokens": 227,
+      "outputTokens": 21,
+      "elapsedMs": 1138.4128419999906
+    },
+    {
+      "call": 79,
+      "bytes": 3050,
+      "promptTokens": 591,
+      "outputTokens": 35,
+      "elapsedMs": 1899.9572289999924
+    },
+    {
+      "call": 80,
+      "bytes": 1833,
+      "promptTokens": 319,
+      "outputTokens": 13,
+      "elapsedMs": 960.2176079999772
+    },
+    {
+      "call": 81,
+      "bytes": 2717,
+      "promptTokens": 527,
+      "outputTokens": 35,
+      "elapsedMs": 1901.9494140000024
+    },
+    {
+      "call": 82,
+      "bytes": 1648,
+      "promptTokens": 285,
+      "outputTokens": 10,
+      "elapsedMs": 849.1878279999946
+    },
+    {
+      "call": 83,
+      "bytes": 2889,
+      "promptTokens": 558,
+      "outputTokens": 35,
+      "elapsedMs": 1934.0853939999943
+    },
+    {
+      "call": 84,
+      "bytes": 1648,
+      "promptTokens": 285,
+      "outputTokens": 10,
+      "elapsedMs": 650.8073129999975
+    },
+    {
+      "call": 85,
+      "bytes": 2889,
+      "promptTokens": 558,
+      "outputTokens": 35,
+      "elapsedMs": 1692.5848220000044
+    },
+    {
+      "call": 86,
+      "bytes": 1648,
+      "promptTokens": 285,
+      "outputTokens": 10,
+      "elapsedMs": 677.2007169999997
+    },
+    {
+      "call": 87,
+      "bytes": 2263,
+      "promptTokens": 378,
+      "outputTokens": 365,
+      "elapsedMs": 14336.094157999993
+    },
+    {
+      "call": 88,
+      "bytes": 2370,
+      "promptTokens": 448,
+      "outputTokens": 33,
+      "elapsedMs": 1833.786122999998
+    },
+    {
+      "call": 89,
+      "bytes": 1632,
+      "promptTokens": 278,
+      "outputTokens": 13,
+      "elapsedMs": 925.0720819999988
+    },
+    {
+      "call": 90,
+      "bytes": 1225,
+      "promptTokens": 222,
+      "outputTokens": 13,
+      "elapsedMs": 909.2975010000227
+    },
+    {
+      "call": 91,
+      "bytes": 2615,
+      "promptTokens": 498,
+      "outputTokens": 33,
+      "elapsedMs": 1850.0693050000118
+    },
+    {
+      "call": 92,
+      "bytes": 1752,
+      "promptTokens": 301,
+      "outputTokens": 13,
+      "elapsedMs": 957.5914210000192
+    },
+    {
+      "call": 93,
+      "bytes": 2359,
+      "promptTokens": 447,
+      "outputTokens": 31,
+      "elapsedMs": 1749.3270379999885
+    },
+    {
+      "call": 94,
+      "bytes": 1761,
+      "promptTokens": 316,
+      "outputTokens": 13,
+      "elapsedMs": 953.1406640000059
+    },
+    {
+      "call": 95,
+      "bytes": 2367,
+      "promptTokens": 446,
+      "outputTokens": 35,
+      "elapsedMs": 1901.2483289999946
+    },
+    {
+      "call": 96,
+      "bytes": 1669,
+      "promptTokens": 282,
+      "outputTokens": 13,
+      "elapsedMs": 933.9731139999931
+    }
+  ],
+  "observation": "Development observation before facts-first Summary and quote-based chat verification. Contains known omissions, wrong-person/stance answers and validation failures; not a quality pass."
+}
