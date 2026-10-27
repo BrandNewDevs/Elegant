@@ -48,6 +48,7 @@ export function validateFixture(value: unknown): EvaluationFixture {
   if (!fixture || typeof fixture.id !== "string" || !["tuning", "reserved"].includes(fixture.split) || typeof fixture.synthetic !== "boolean"
       || !Array.isArray(fixture.transcript?.segments) || !Array.isArray(fixture.points) || !Array.isArray(fixture.questions)) throw new Error("Invalid evaluation fixture");
   if (fixture.expectationsPrepared === false) throw new Error("Prepare and review expected points, decisions and questions before evaluating this private draft; then set expectationsPrepared to true");
+  if (!fixture.points.length || !fixture.questions.length) throw new Error("Prepare at least one expected point and question before evaluating; an empty review cannot establish quality");
   const nonempty = (s: unknown): s is string => typeof s === "string" && s.trim().length > 0;
   let previousStart = -Infinity;
   fixture.transcript.segments.forEach(s => {
