@@ -1,4 +1,4 @@
-// The Meeting Recorder engine. Speaks the JSON-lines protocol on stdio; see app/src/engine/protocol.ts.
+// The Elegant engine. Speaks the JSON-lines protocol on stdio; see app/src/engine/protocol.ts.
 // Reports which processes use the microphone, records two tracks on request, and obeys shutdown.
 import Foundation
 

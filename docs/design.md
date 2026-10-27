@@ -1,6 +1,6 @@
 # Design
 
-Working name: **Elegant** (display name only; the name will change). Domain vocabulary is in [`GLOSSARY.md`](../GLOSSARY.md). Decisions that are hard to reverse are in [`docs/adr/`](./adr/).
+Name: **Elegant** (permanent). Domain vocabulary is in [`GLOSSARY.md`](../GLOSSARY.md). Decisions that are hard to reverse are in [`docs/adr/`](./adr/).
 
 A personal macOS menu-bar app that notices when you are in an online call, offers to record it, and produces a transcript and summary entirely on your own machine. Single user. No calendar.
 

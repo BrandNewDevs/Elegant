@@ -1,6 +1,6 @@
 # AGENTS.md
 
-A personal macOS app that detects online calls and records, transcribes and summarises them locally. Working name Elegant; the name will change, so don't hard-code it.
+A personal macOS app that detects online calls and records, transcribes and summarises them locally. The app is called Elegant (permanent). Take the display name from `DISPLAY_NAME` in `app/src/config.ts` rather than hard-coding it.
 
 Read before changing anything:
 

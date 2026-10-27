@@ -3,7 +3,7 @@
   "version": "0.1.1",
   "private": true,
   "type": "module",
-  "description": "Meeting Recorder: detects online calls, records, transcribes and summarises them locally.",
+  "description": "Elegant: detects online calls, records, transcribes and summarises them locally.",
   "main": "dist/main/main.js",
   "scripts": {
     "typecheck": "tsc --noEmit && tsc -p tsconfig.renderer.json",
