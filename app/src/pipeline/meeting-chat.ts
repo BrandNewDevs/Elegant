@@ -16,7 +16,7 @@ export type MeetingChatGenerator = (input: {
   /** Main process only: never expose this authorization directly through renderer IPC. */
   allowSummaryProcessing?: boolean;
 }) => Promise<{ answer: ChatAnswer; generation: ChatGeneration; revision: string }>;
-export const CHAT_PROMPT_VERSION = "meeting-chat-v12";
+export const CHAT_PROMPT_VERSION = "meeting-chat-v13";
 export const CHAT_ABSENT = "Not established in the available Transcript.";
 export const CHAT_UNVERIFIED = "I could not establish a reliable answer from the available evidence.";
 export const CHAT_INCOMPLETE = "I could not review enough of the Transcript to answer reliably. Please ask a narrower question.";
@@ -49,8 +49,11 @@ function parseAnswer(json: string, sources: SourceFragment[]): ModelAnswer {
       || !answer.sentenceIds.every(id => typeof id === "string" && allowed.has(id))) throw new InvalidChatAnswer("Use only the supplied original sentenceIds, with at most 64 selections");
   const selected = sentences.filter(sentence => (answer.sentenceIds as string[]).includes(sentence.id));
   if (answer.sufficient && !selected.length) return { text: CHAT_UNVERIFIED, sourceIds: [], sentenceIds: [], sufficient: false, unverified: true };
-  return { text: selected.map(sentence => `${sentence.speaker}: “${sentence.text}”`).join("\n"),
-    sourceIds: [...new Set(selected.map(sentence => sentence.sourceId))], sentenceIds: selected.map(sentence => sentence.id), sufficient: answer.sufficient };
+  // Keep adjacent qualifications and commitments from the same original fragment together.
+  // Selection identifies relevant speech; publishing only its isolated sentence could reverse its meaning.
+  const published = sources.filter(source => selected.some(sentence => sentence.sourceId === source.id));
+  return { text: published.map(source => `${source.speaker}: “${source.text}”`).join("\n"),
+    sourceIds: published.map(source => source.id), sentenceIds: selected.map(sentence => sentence.id), sufficient: answer.sufficient };
 }
 
 function calendarDateAnswerIsTyped(question: string, text: string): boolean {
@@ -256,7 +259,7 @@ export function createMeetingChat({ store, model, modelName = AI_SETTINGS.model,
             if (personWasSubstituted(input.question, candidate.text, speakers) || personWasSubstituted(resolvedQuestion, candidate.text, speakers)) {
               throw new SemanticUnverifiedAnswer("The answer substitutes another person, task or fact type. If the requested fact is not established, set sufficient false; do not give another true fact");
             }
-            const originalAnswerText = sourceSentences(context.sources).filter(sentence => candidate.sentenceIds.includes(sentence.id)).map(sentence => sentence.text).join(" ");
+            const originalAnswerText = context.sources.filter(source => candidate.sourceIds.includes(source.id)).map(source => source.text).join(" ");
             if (!budgetAnswerIsTyped(input.question, originalAnswerText) || !budgetAnswerIsTyped(resolvedQuestion, originalAnswerText)) {
               throw new SemanticUnverifiedAnswer("The requested budget value needs an amount, currency or fraction, or an explicit missing-budget statement. If not established, set sufficient false");
             }

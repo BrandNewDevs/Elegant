@@ -81,6 +81,42 @@ describe("extractive Meeting chat", () => {
     expect(result.answer.text).not.toContain("Speaker 2:");
   });
 
+  it("keeps a review commitment beside its writing limitation when either sentence is selected", async () => {
+    const source: Transcript = { segments: [
+      { start: 0, end: 5, speaker: "You", text: "I cannot write the guide." },
+      { start: 5, end: 10, speaker: "Speaker 1", text: "I can commit to reviewing the guide after someone writes it. I am not committing to writing it." },
+      { start: 10, end: 15, speaker: "Speaker 2", text: "We also discussed an unrelated keyboard." },
+    ] };
+    const { store, id, expectedRevision } = setup(source);
+    const model = fake(() => ({ sentenceIds: ["1:0/s1"], sufficient: true }));
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "Who agreed to review the guide?" });
+    expect(result.answer).toEqual({ text: `Speaker 1: “${source.segments[1]!.text}”`, refs: [1], sufficient: true });
+    expect(result.answer.text).not.toContain("You:");
+    expect(result.answer.text).not.toContain("Speaker 2:");
+    expect(result.answer.text).not.toContain("keyboard");
+    expect(model.requests).toHaveLength(1);
+  });
+
+  it("publishes each selected original fragment once in chronology even when several of its sentences were selected", async () => {
+    const source: Transcript = { segments: [
+      { start: 0, end: 5, speaker: "You", text: "Monday was provisional. The final decision is Friday." },
+      { start: 5, end: 10, speaker: "Speaker 1", text: "I agree to Friday. I will prepare the guide by Wednesday." },
+    ] };
+    const { store, id, expectedRevision } = setup(source);
+    const model = fake(() => ({ sentenceIds: ["1:0/s1", "0:0/s1", "1:0/s0", "1:0/s1"], sufficient: true }));
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "What is the final plan?" });
+    expect(result.answer).toEqual({ text: `You: “${source.segments[0]!.text}”\nSpeaker 1: “${source.segments[1]!.text}”`, refs: [0, 1], sufficient: true });
+  });
+
+  it("checks the published fragment rather than an isolated selection for an explicit budget value", async () => {
+    const text = "The budget is $500. We will review it next week.";
+    const { store, id, expectedRevision } = setup({ segments: [{ start: 0, end: 5, speaker: "You", text }] });
+    const model = fake(() => ({ sentenceIds: ["0:0/s1"], sufficient: true }));
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "What is the project budget?" });
+    expect(result.answer).toEqual({ text: `You: “${text}”`, refs: [0], sufficient: true });
+    expect(model.requests).toHaveLength(1);
+  });
+
   it("allows reported speech mentioning another Participant without changing who said it", async () => {
     const source: Transcript = { segments: [{ start: 0, end: 5, speaker: "You", text: "Speaker 1 promised to review the guide." }] };
     const { store, id, expectedRevision } = setup(source);
@@ -306,7 +342,7 @@ describe("extractive Meeting chat", () => {
     const result = await createMeetingChat({ store: scoped, model })({ ...input(id, expectedRevision), question: "Who will write the launch guide?", onStage: stage => stages.push(stage) });
     expect(answers).toBe(2);
     expect(stages.filter(stage => stage === "retrieving")).toHaveLength(2);
-    expect(result.answer.text).toBe("You: “I will write the launch guide by Wednesday.”");
+    expect(result.answer.text).toBe(`You: “${source.segments[4]!.text}”`);
     expect(result.answer.refs).toEqual([4]);
     expect(result.generation).toMatchObject({ retrievalMode: "scan", exhaustive: true });
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
