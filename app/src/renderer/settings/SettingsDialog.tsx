@@ -204,7 +204,7 @@ export function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex max-h-[88vh] max-w-xl flex-col gap-0 overflow-hidden p-0"
+        className="flex max-h-[88vh] max-w-3xl flex-col gap-0 overflow-hidden p-0"
         // The content below arrives a moment after the dialog opens, so by default focus would land on the close button, the
         // only thing there yet. Put it on the dialog itself instead: Esc and Tab work, and nothing looks focused.
         onOpenAutoFocus={(event) => {
