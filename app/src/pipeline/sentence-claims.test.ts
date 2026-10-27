@@ -14,7 +14,7 @@ describe("original sentence extraction contract", () => {
   it("retains independent outcomes, commitments and uncertainty as unchanged original clauses", () => {
     const primary = originalSentences(sources);
     const kinds = ["update", "update", "update", "commitment", "unresolved"];
-    const result = parseSentenceClassifications(JSON.stringify({ classifications: Object.fromEntries(primary.map((sentence, index) => [sentence.id, kinds[index]])) }), primary, lookup);
+    const result = parseSentenceClassifications(JSON.stringify({ classifications: kinds }), primary, lookup);
     expect(result.map(fact => fact.text)).toEqual(primary.map(sentence => sentence.text));
     expect(result.map(fact => fact.kind)).toEqual(kinds);
     expect(result.map(fact => fact.refs)).toEqual([[178], [178], [178], [182], [182]]);
@@ -22,38 +22,38 @@ describe("original sentence extraction contract", () => {
     expect(result.every(fact => sources.some(source => source.text.includes(fact.text)))).toBe(true);
   });
 
-  it("shares one kind definition while requiring every original sentence ID", () => {
+  it("shares one kind definition while requiring exactly one label per original sentence", () => {
     const primary = originalSentences(sources);
     const schema = sentenceClassificationSchema(primary);
-    expect(schema.properties.classifications.required).toEqual(primary.map(sentence => sentence.id));
-    expect(Object.keys(schema.properties.classifications.properties)).toEqual(primary.map(sentence => sentence.id));
-    expect(schema.$defs.kind.enum).toContain("unresolved");
-    expect(schema.$defs.kind.enum).toContain("procedure");
+    expect(schema.properties.classifications.minItems).toBe(primary.length);
+    expect(schema.properties.classifications.maxItems).toBe(primary.length);
+    expect(schema.properties.classifications.items.enum).toContain("unresolved");
+    expect(schema.properties.classifications.items.enum).toContain("procedure");
     expect(JSON.stringify(schema).match(/"procedure"/g)).toHaveLength(1);
   });
 
   it("can omit an explicitly classified procedural sentence without losing another claim", () => {
     const primary = originalSentences(sources.slice(1));
-    const result = parseSentenceClassifications(JSON.stringify({ classifications: { [primary[0]!.id]: "procedure", [primary[1]!.id]: "unresolved" } }), primary, lookup);
+    const result = parseSentenceClassifications(JSON.stringify({ classifications: ["procedure", "unresolved"] }), primary, lookup);
     expect(result.map(fact => fact.text)).toEqual(["No one has measured the M4 memory peak yet."]);
   });
 
   it("rejects generated prose and attribution outside the classification contract", () => {
     const primary = originalSentences(sources);
-    const classifications = Object.fromEntries(primary.map(sentence => [sentence.id, "update"]));
+    const classifications = primary.map(() => "update");
     for (const extra of [{ text: "Invented outcome" }, { speaker: "Someone else" }, { refs: [0] }]) {
       expect(() => parseSentenceClassifications(JSON.stringify({ classifications, ...extra }), primary, lookup))
         .toThrow("Return only classifications");
     }
   });
 
-  it.each(["missing", "unknown", "context", "bad-kind"])("rejects %s classifications instead of silently losing source content", invalid => {
+  it.each(["missing", "extra", "object", "bad-kind"])("rejects %s classifications instead of silently losing source content", invalid => {
     const primary = originalSentences(sources.slice(1));
-    const classifications: Record<string, unknown> = Object.fromEntries(primary.map(sentence => [sentence.id, "update"]));
-    if (invalid === "missing") delete classifications[primary[1]!.id];
-    else if (invalid === "unknown") classifications.invented = "update";
-    else if (invalid === "context") classifications["178:0:0"] = "update";
-    else classifications[primary[0]!.id] = "approved";
-    expect(() => parseSentenceClassifications(JSON.stringify({ classifications }), primary, lookup)).toThrow();
+    const classifications: unknown[] = primary.map(() => "update");
+    if (invalid === "missing") classifications.pop();
+    else if (invalid === "extra") classifications.push("update");
+    else if (invalid === "bad-kind") classifications[0] = "approved";
+    const value = invalid === "object" ? { [primary[0]!.id]: "update", [primary[1]!.id]: "update" } : classifications;
+    expect(() => parseSentenceClassifications(JSON.stringify({ classifications: value }), primary, lookup)).toThrow();
   });
 });

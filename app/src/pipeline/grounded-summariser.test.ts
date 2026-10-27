@@ -34,7 +34,7 @@ const payload = (request: TextRequest): Payload => (JSON.parse(request.messages[
 function hierarchicalReply(request: TextRequest): unknown {
   const input = payload(request);
   if ("revisions" in (request.schema as { properties: object }).properties) return { revisions: Object.fromEntries(input.candidates!.map(fact => [String(fact.id), "unchanged"])) };
-  if (input.primary) return { classifications: Object.fromEntries(input.primary.map(sentence => [sentence.id, sentence.id.endsWith(":0") ? "update" : "procedure"])) };
+  if (input.primary) return { classifications: input.primary.map(sentence => sentence.id.endsWith(":0") ? "update" : "procedure") };
   if (input.candidates && !("candidateIds" in (request.schema as { properties: object }).properties)) return Object.fromEntries(input.candidates.map(fact => [String(fact.id), fact.id]));
   const candidate = input.candidates![0]!;
   return { candidateIds: [candidate.id] };
@@ -410,9 +410,11 @@ describe("evidence-backed Summary generation", () => {
       const sources = input.sources ?? [...(input.primary ?? []), ...(input.context ?? [])];
       const schema = request.schema as { properties: Record<string, { items?: { enum?: unknown[]; properties?: Record<string, { items?: { enum?: unknown[] }; enum?: unknown[] }> } }> };
       if (schema.properties.classifications) {
-        const classification = schema.properties.classifications as unknown as { properties: object; required: string[] };
-        expect(Object.keys(classification.properties)).toEqual(input.primary!.map(sentence => sentence.id));
-        expect(classification.required).toEqual(input.primary!.map(sentence => sentence.id));
+        const classification = schema.properties.classifications as unknown as { type: string; minItems: number; maxItems: number; items: { enum: string[] } };
+        expect(classification.type).toBe("array");
+        expect(classification.minItems).toBe(input.primary!.length);
+        expect(classification.maxItems).toBe(input.primary!.length);
+        expect(classification.items.enum).toEqual(["proposal", "decision", "commitment", "disagreement", "unresolved", "update", "procedure"]);
         expect(input.primary!.every(sentence => !Object.hasOwn(sentence, "ref") && !Object.hasOwn(sentence, "start"))).toBe(true);
       } else if ("revisions" in schema.properties) {
         expect(input.sources!.length).toBeGreaterThan(0);
@@ -427,13 +429,65 @@ describe("evidence-backed Summary generation", () => {
     }
   });
 
-  it("rejects unknown extraction IDs and never accepts generated text or attribution", async () => {
+  it("rejects classification objects instead of the required ordered array", async () => {
     const model = fake(request => {
       const input = payload(request);
       if (input.primary) return { classifications: { missing: "update" } };
       return hierarchicalReply(request);
     });
     await expect(createGroundedSummariser({ model, attempts: 1 })(longTranscript())).rejects.toThrow("failed validation");
+  });
+
+  it.each([null, [], {}, { classifications: null }, { classifications: {} }, { classifications: "update" }])(
+    "rejects malformed classification output %j without creating a Summary", async output => {
+      const model = fake(request => payload(request).primary ? output : hierarchicalReply(request));
+      await expect(createGroundedSummariser({ model, attempts: 1 })(longTranscript())).rejects.toThrow("failed validation");
+      expect(model.requests).toHaveLength(1);
+    });
+
+  it.each(["invented", 0, null])("rejects an unknown classification at a primary position: %j", async kind => {
+    const model = fake(request => {
+      const input = payload(request);
+      return input.primary ? { classifications: input.primary.map((_, index) => index === 0 ? kind : "update") } : hierarchicalReply(request);
+    });
+    await expect(createGroundedSummariser({ model, attempts: 1 })(longTranscript())).rejects.toThrow("Use a supplied sentence kind");
+    expect(model.requests).toHaveLength(1);
+  });
+
+  it.each(["text", "speaker", "refs"])("rejects extra model-authored %s beside valid classifications", async field => {
+    const model = fake(request => {
+      const input = payload(request);
+      return input.primary ? { classifications: input.primary.map(() => "update"), [field]: "invented" } : hierarchicalReply(request);
+    });
+    await expect(createGroundedSummariser({ model, attempts: 1 })(longTranscript())).rejects.toThrow("Return only classifications");
+  });
+
+  it("maps all supplied kinds by original primary position while omitting only procedure", async () => {
+    const kinds = ["proposal", "decision", "commitment", "disagreement", "unresolved", "update", "procedure"];
+    const source = longTranscript();
+    const first = source.segments.length;
+    kinds.forEach((kind, index) => source.segments.push({ start: 1500 + index * 2, end: 1501 + index * 2,
+      speaker: index % 2 ? "Speaker 2" : "You", text: `Original ${kind} words remain unchanged.` }));
+    const model = fake(request => {
+      const input = payload(request);
+      if (input.primary) return { classifications: input.primary.map(sentence =>
+        kinds.find(kind => sentence.text === `Original ${kind} words remain unchanged.`) ?? "procedure") };
+      return hierarchicalReply(request);
+    });
+    const result = await createGroundedSummariser({ model })(source);
+    for (const [index, kind] of kinds.entries()) {
+      const speaker = index % 2 ? "Speaker 2" : "You";
+      const points = result.participants.find(participant => participant.speaker === speaker)!.said;
+      const point = points.indexOf(`Original ${kind} words remain unchanged.`);
+      if (kind === "procedure") expect(point).toBe(-1);
+      else {
+        expect(point).toBeGreaterThanOrEqual(0);
+        expect(result.evidence!.participants.find(participant => participant.speaker === speaker)!.said[point]).toEqual([first + index]);
+      }
+    }
+    expect(result.participants.flatMap(participant => participant.said)).toHaveLength(6);
+    const firstRequest = model.requests.find(request => payload(request).primary)!;
+    expect(firstRequest.messages[1]!.content).toContain("Element i classifies ONLY primary[i]");
   });
 
   it("classifies every primary sentence once while using previous original context only for classification", async () => {
@@ -460,14 +514,14 @@ describe("evidence-backed Summary generation", () => {
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
-  it("rejects a context sentence classification even when all primary IDs are present", async () => {
+  it("rejects an extra context classification after all primary positions are present", async () => {
     let contextRequestSeen = false;
     const model = fake(request => {
       const input = payload(request);
-      const output = hierarchicalReply(request) as { classifications?: Record<string, string> };
+      const output = hierarchicalReply(request) as { classifications?: string[] };
       if (input.context?.length) {
         contextRequestSeen = true;
-        output.classifications![input.context[0]!.id] = "update";
+        output.classifications!.push("update");
       }
       return output;
     });
@@ -483,9 +537,8 @@ describe("evidence-backed Summary generation", () => {
     const source = { segments: [{ start: 0, end: 1, speaker: "You", text: "Deploy branch Alpha. Deploy branch alpha. ".repeat(200) }] };
     const model = fake(request => {
       const input = payload(request);
-      if (input.primary) return { classifications: Object.fromEntries(input.primary.map(sentence => [sentence.id,
-        sentence.text === "Deploy branch Alpha." || sentence.text === "Deploy branch alpha." ? "commitment" : "procedure",
-      ])) };
+      if (input.primary) return { classifications: input.primary.map(sentence =>
+        sentence.text === "Deploy branch Alpha." || sentence.text === "Deploy branch alpha." ? "commitment" : "procedure") };
       captured = input.candidates!;
       return hierarchicalReply(request);
     });
@@ -509,9 +562,8 @@ describe("evidence-backed Summary generation", () => {
       "I will rerun the offline workflow on Thursday. No one has measured the M4 memory peak yet." });
     const model = fake(request => {
       const input = payload(request);
-      if (input.primary) return { classifications: Object.fromEntries(input.primary.map(sentence => [sentence.id,
-        sentence.text.startsWith("No one has measured") ? "unresolved" : sentence.text.startsWith("I will rerun") ? "commitment" : "update",
-      ])) };
+      if (input.primary) return { classifications: input.primary.map(sentence =>
+        sentence.text.startsWith("No one has measured") ? "unresolved" : sentence.text.startsWith("I will rerun") ? "commitment" : "update") };
       return hierarchicalReply(request);
     });
     const result = await createGroundedSummariser({ model })(source);
@@ -534,7 +586,7 @@ describe("evidence-backed Summary generation", () => {
     const source: Transcript = { segments: [{ start: 0, end: 3600, speaker: "You", text: "Go. ".repeat(1400) }] };
     const model = fake(request => {
       const input = payload(request);
-      if (input.primary) return { classifications: Object.fromEntries(input.primary.map(sentence => [sentence.id, "update"])) };
+      if (input.primary) return { classifications: input.primary.map(() => "update") };
       return hierarchicalReply(request);
     });
     const result = await createGroundedSummariser({ model })(source);
@@ -566,10 +618,10 @@ describe("evidence-backed Summary generation", () => {
   it("fails after three attempts when any primary sentence classification is omitted", async () => {
     const model = fake(request => {
       const input = payload(request);
-      if (input.primary) return { classifications: Object.fromEntries(input.primary.slice(1).map(sentence => [sentence.id, "update"])) };
+      if (input.primary) return { classifications: input.primary.slice(1).map(() => "update") };
       return hierarchicalReply(request);
     });
-    await expect(createGroundedSummariser({ model })(longTranscript())).rejects.toThrow("Classify every primary sentence ID");
+    await expect(createGroundedSummariser({ model })(longTranscript())).rejects.toThrow("Classify every primary sentence exactly once");
     expect(model.requests).toHaveLength(3);
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
