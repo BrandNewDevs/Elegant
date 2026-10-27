@@ -166,6 +166,24 @@ describe("grounded Meeting chat", () => {
     }
   });
 
+  it("resolves a possessive task follow-up before retrieving or answering", async () => {
+    const { store, id, expectedRevision } = setup();
+    const model = fake(request => {
+      expect(contents(request).data.question).toBe("What is the permission guide deadline?");
+      expect(contents(request).data.originalQuestion).toBe("What is its deadline?");
+      return positive;
+    }, { resolve: () => ({ question: "What is the permission guide deadline?" }) });
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "What is its deadline?",
+      history: [{ question, answer: "You will write the guide." }] });
+    expect(result.answer.refs).toEqual([0]);
+    expect(model.requests.filter(request => "question" in (request.schema as { properties: object }).properties)).toHaveLength(1);
+    expect(result.generation.calls).toBe(3);
+    const unresolved = fake(() => positive, { resolve: () => ({ question: "What is its deadline?" }) });
+    await expect(createMeetingChat({ store, model: unresolved })({ ...input(id, expectedRevision), question: "What is its deadline?",
+      history: [{ question, answer: "You will write the guide." }] })).rejects.toThrow("standalone question failed validation after three attempts");
+    expect(unresolved.requests).toHaveLength(3);
+  });
+
   it("never supplies a generated Summary as factual evidence and allows a failed Summary's Transcript", async () => {
     const { store, id, expectedRevision } = setup();
     store.saveSummary(id, { tldr: "PRIVATE WRONG SUMMARY OWNER", participants: [{ speaker: "You", said: ["A made-up deadline"] }] });
