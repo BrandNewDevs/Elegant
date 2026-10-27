@@ -392,6 +392,52 @@ describe("evidence-backed Summary generation", () => {
     await expect(createGroundedSummariser({ model, attempts: 1 })(source)).rejects.toThrow("failed validation");
   });
 
+  it("retains primary facts without retrying when extraction also repeats a valid context-only fact", async () => {
+    const source: Transcript = { segments: Array.from({ length: 85 }, (_, index) => ({
+      start: index, end: index + 1, speaker: "You", text: `Original task ${index}: ` + "supporting discussion ".repeat(5),
+    })) };
+    const extractionStarts: string[] = [];
+    let largestPrimaryWithContext = 0;
+    const model = fake(request => {
+      const input = payload(request);
+      const output = hierarchicalReply(request) as { facts?: Fact[] };
+      if (input.primary) {
+        extractionStarts.push(input.primary[0]!.id);
+        if (input.context?.length) {
+          largestPrimaryWithContext = Math.max(largestPrimaryWithContext, input.primary.length);
+          output.facts!.push({ id: -1, speaker: input.context[0]!.speaker, text: "Context-only repeated fact.",
+            sourceIds: [input.context[0]!.id], kind: "update" });
+        }
+      }
+      return output;
+    });
+    const result = await createGroundedSummariser({ model })(source);
+    expect(largestPrimaryWithContext).toBeGreaterThanOrEqual(7);
+    expect(new Set(extractionStarts).size).toBe(extractionStarts.length);
+    expect(result.participants.flatMap(participant => participant.said)).toEqual(source.segments.map((_, ref) => `Important point from ${ref}:0.`));
+    expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it.each(["unknown-source", "wrong-speaker", "blank-text"])("still rejects %s in a context-only extraction fact", async invalid => {
+    let contextRequestSeen = false;
+    const model = fake(request => {
+      const input = payload(request);
+      if (input.context?.length) {
+        contextRequestSeen = true;
+        const context = input.context[0]!;
+        return { facts: [{ speaker: invalid === "wrong-speaker" ? "Invented Speaker" : context.speaker,
+          text: invalid === "blank-text" ? " " : "Repeated context claim.",
+          sourceIds: [invalid === "unknown-source" ? "missing:0" : context.id], kind: "update" }] };
+      }
+      return hierarchicalReply(request);
+    });
+    const source: Transcript = { segments: Array.from({ length: 85 }, (_, index) => ({
+      start: index, end: index + 1, speaker: "You", text: `Original task ${index}: ` + "supporting discussion ".repeat(5),
+    })) };
+    await expect(createGroundedSummariser({ model, attempts: 1 })(source)).rejects.toThrow("failed validation");
+    expect(contextRequestSeen).toBe(true);
+  });
+
   it("does not deduplicate case-sensitive identifiers before consolidation", async () => {
     let captured: Fact[] = [];
     const source = { segments: [{ start: 0, end: 1, speaker: "You", text: "Deploy branch Alpha and deploy branch alpha. ".repeat(200) }] };

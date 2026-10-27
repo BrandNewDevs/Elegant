@@ -116,15 +116,19 @@ export function parseRefinedPoints(json: string, draft: SupportedPoint[]): Suppo
 export function parseFacts(json: string, sources: SourcePiece[], primary?: SourcePiece[]): SupportedFact[] {
   const value = object(json);
   if (!Array.isArray(value.facts)) return problem("facts must be a list");
-  return value.facts.map(value => {
+  const facts = value.facts.map(value => {
     if (!record(value) || typeof value.kind !== "string" || !["proposal", "decision", "commitment", "disagreement", "unresolved", "update"].includes(value.kind)) return problem("Use a supported fact kind");
     if (!Array.isArray(value.sourceIds) || !value.sourceIds.length || !value.sourceIds.every(id => typeof id === "string" && sources.some(source => source.id === id))) return problem("Cite sourceIds supplied with the original passages");
     const selected = sources.filter(source => (value.sourceIds as string[]).includes(source.id));
     // The model cites one identifier system. Derive public ordinals from validated original pieces.
     const p = point({ ...value, refs: [...new Set(selected.map(source => source.ref))] }, selected);
-    if (primary && !selected.some(source => source.speaker === p.speaker && primary.some(piece => piece.id === source.id))) return problem("Extract only points made by speakers in the primary source pieces");
     return { ...p, kind: value.kind as FactKind, sources: selected };
   });
+  // Validate the entire response first. Neighbor-only facts were primary in the
+  // preceding chunk; ignore those repetitions without discarding valid new facts.
+  // Context can clarify a fact only alongside this speaker's primary evidence.
+  return primary ? facts.filter(fact => fact.sources.some(source => source.speaker === fact.speaker
+    && primary.some(piece => piece.id === source.id))) : facts;
 }
 
 export function parseReducedFacts(json: string, sources: SourcePiece[], candidates: SupportedFact[]): SupportedFact[] {
