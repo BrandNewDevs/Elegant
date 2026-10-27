@@ -64,6 +64,47 @@ describe("complete long Summary coverage", () => {
     expect(requests.filter(request => !("candidateIds" in (request.schema as { properties: object }).properties) && data(request).candidates).length).toBeGreaterThan(1);
   });
 
+  it("omits a bare numbered topic heading while retaining the facts in its segment", async () => {
+    const transcript = uniqueCommitments();
+    transcript.segments[0]!.text = `Review round 1, topic permissions. ${original("I will complete the permission setup by Friday.")}`;
+    const inner = adapter();
+    let classified: string[] = [];
+    const model: TextModel = { async complete(request) {
+      const input = data(request);
+      if (!input.primary) return inner.model.complete(request);
+      classified.push(...input.primary.map(sentence => sentence.text));
+      return { text: JSON.stringify({ classifications: input.primary.map(sentence =>
+        sentence.text.includes("permission setup") ? kindCode("commitment") : kindCode("update")) }),
+        metadata: { model: "agenda:test", elapsedMs: 1 } };
+    } };
+    const result = await createGroundedSummariser({ model })(transcript);
+    expect(classified).not.toContain("Review round 1, topic permissions.");
+    expect(result.participants.flatMap(participant => participant.said)).not.toContain("Review round 1, topic permissions.");
+    expect(result.participants.find(participant => participant.speaker === "You")!.said)
+      .toContain("I will complete the permission setup by Friday.");
+  });
+
+  it("deduplicates an exact same-speaker sentence despite differing model kind labels", async () => {
+    const repeated = "The permission flow has separate microphone and system-audio steps.";
+    const transcript: Transcript = { segments: Array.from({ length: 9 }, (_, index) => ({
+      start: index * 30, end: index * 30 + 20, speaker: "You", text: original(index < 2 ? repeated : `I will complete Task_${index} by day ${index + 1}.`),
+    })) };
+    const { model } = assignmentAdapter((facts, request) => Object.fromEntries(facts.map(fact => [String(fact.id), fact.id])));
+    const fake = model as TextModel;
+    const wrapped: TextModel = { async complete(request) {
+      const input = data(request);
+      if (input.primary) return { text: JSON.stringify({ classifications: input.primary.map(sentence =>
+        sentence.text === repeated ? (sentence.id.startsWith("0:") ? kindCode("proposal") : kindCode("commitment")) : kindCode("update")) }),
+        metadata: { model: "repeat-kind:test", elapsedMs: 1 } };
+      return fake.complete(request);
+    } };
+    const result = await createGroundedSummariser({ model: wrapped })(transcript);
+    const owner = result.participants.find(participant => participant.speaker === "You")!;
+    expect(owner.said.filter(point => point === repeated)).toHaveLength(1);
+    expect(result.evidence!.participants.find(participant => participant.speaker === "You")!.said[owner.said.indexOf(repeated)])
+      .toEqual([0, 1]);
+  });
+
   it("selects whole immutable long-Meeting claims and derives their sources instead of accepting TLDR prose", async () => {
     const transcript = uniqueCommitments();
     const inner = adapter();
@@ -446,6 +487,20 @@ describe("complete long Summary coverage", () => {
     expect(result.participants[0]!.said.some(point => point.startsWith("Earlier"))).toBe(false);
   });
 
+  it("does not treat a later release decision in the same Transcript segment as a corrected test result", async () => {
+    const transcript = uniqueCommitments();
+    transcript.segments[0]!.text = original("The final offline review failed for the PDF path.");
+    transcript.segments[8]!.text = original("Final decision: launch Friday instead of Monday. Markdown replaces PDF as the export format.");
+    const { model, requests } = adapter();
+    const result = await createGroundedSummariser({ model })(transcript);
+    const owner = result.participants.find(participant => participant.speaker === "You")!;
+    const outcome = owner.said.find(point => point.includes("The final offline review failed for the PDF path."))!;
+    expect(outcome).toContain("The final offline review failed for the PDF path.");
+    expect(outcome).not.toContain("Earlier");
+    expect(requests.some(request => "revisions" in (request.schema as { properties: object }).properties)).toBe(false);
+    expect(result.evidence!.participants.find(participant => participant.speaker === "You")!.said[owner.said.indexOf(outcome)]).toEqual([0]);
+  });
+
   it("requires every eligible candidate and constrains its correction choices to later explicit original revisions", async () => {
     const transcript = uniqueCommitments();
     transcript.segments[0]!.text = original("I propose launching on Monday.");
@@ -523,7 +578,7 @@ describe("complete long Summary coverage", () => {
   });
 
   it("accepts correction evidence in a later fragment of the same original segment", async () => {
-    const transcript: Transcript = { segments: [{ start: 0, end: 60, speaker: "You", text: "Monday launch proposal. " + "Background discussion. ".repeat(50) + "Friday replaces Monday. " + "Later discussion. ".repeat(400) }] };
+    const transcript: Transcript = { segments: [{ start: 0, end: 60, speaker: "You", text: "Monday launch proposal. " + "Background discussion. ".repeat(50) + "Friday launch replaces Monday. " + "Later discussion. ".repeat(400) }] };
     const inner = adapter();
     let sameOrdinalCorrection = false;
     const model: TextModel = { async complete(request) {

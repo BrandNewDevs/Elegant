@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SENTENCE_KINDS, originalSentences, parseSentenceClassifications, sentenceClassificationSchema } from "./sentence-claims.js";
+import { SENTENCE_KINDS, originalSentences, parseSentenceClassifications, sentenceClassificationSchema, isBareAgendaHeading } from "./sentence-claims.js";
 import type { SourcePiece } from "./grounded-format.js";
 
 const sources: SourcePiece[] = [
@@ -11,6 +11,12 @@ const sources: SourcePiece[] = [
 const lookup = new Map(sources.map(source => [source.id, source]));
 
 describe("original sentence extraction contract", () => {
+  it("recognizes only bare numbered topic headings as procedural", () => {
+    expect(isBareAgendaHeading("Review round 22, topic permissions.")).toBe(true);
+    expect(isBareAgendaHeading("Review round 3, topic system audio settings.")).toBe(true);
+    expect(isBareAgendaHeading("Review round 22, topic packaging has no assigned owner.")).toBe(false);
+    expect(isBareAgendaHeading("Review round 22, topic permissions. The new permission request is ready.")).toBe(false);
+  });
   it("retains independent outcomes, commitments and uncertainty as unchanged original clauses", () => {
     const primary = originalSentences(sources);
     const kinds = ["update", "update", "update", "commitment", "unresolved"];

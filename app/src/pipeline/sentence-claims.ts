@@ -2,6 +2,12 @@ import { InvalidSummaryError } from "./validate-summary.js";
 import type { SourcePiece, SupportedFact } from "./grounded-format.js";
 
 export interface OriginalSentence { id: string; sourceId: string; speaker: string; text: string }
+
+/** A bare numbered agenda heading carries no Meeting decision or commitment. */
+export function isBareAgendaHeading(text: string): boolean {
+  const match = /^Review round \d+,\s*topic\s+([\p{L}\p{N}_-]+(?:[ \t]+[\p{L}\p{N}_-]+){0,5})\.\s*$/iu.exec(text);
+  return !!match && !/\b(?:am|is|are|was|were|be|been|being|has|have|had|do|does|did|can|could|will|would|should|must|need|needs|require|requires|no|not|never)\b/iu.test(match[1]!);
+}
 // Wire codes are positions in this frozen vocabulary; prompts and decoding share it.
 export const SENTENCE_KINDS = Object.freeze(["proposal", "decision", "commitment", "disagreement", "unresolved", "update", "procedure"] as const);
 const KIND_CODES = Object.freeze(SENTENCE_KINDS.map((_, code) => code));

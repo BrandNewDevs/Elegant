@@ -1,5 +1,5 @@
 import { groupFacts } from "./fact-grouping.js";
-import { SENTENCE_KINDS, originalSentences, sentenceClassificationSchema, parseSentenceClassifications, type OriginalSentence } from "./sentence-claims.js";
+import { SENTENCE_KINDS, isBareAgendaHeading, originalSentences, sentenceClassificationSchema, parseSentenceClassifications, type OriginalSentence } from "./sentence-claims.js";
 import type { TextModel, TextRequest } from "./language-model.js";
 import type { PipelineContext, Summary, Transcript } from "./pipeline.js";
 import { transcriptRevision } from "./evidence.js";
@@ -9,7 +9,7 @@ import { groundedSchema, refinementSchema, reductionSchema, tldrSchema, parseGro
   type GroundedOutput, type SourcePiece, type SupportedFact, type SupportedPoint } from "./grounded-format.js";
 
 export interface GroundedSummariserOptions { model: TextModel; attempts?: number; maxCalls?: number; deadlineMs?: number }
-export const SUMMARY_PROMPT_VERSION = "grounded-summary-v23";
+export const SUMMARY_PROMPT_VERSION = "grounded-summary-v24";
 const RETRY = " The previous output failed validation: ";
 const RETRY_REASON_LIMIT = 160;
 // Validation diagnostics contain rules and local ID/speaker metadata, never Transcript prose. Reserve exact ASCII bytes.
@@ -171,7 +171,7 @@ export function createGroundedSummariser({ model, attempts = 3, maxCalls = 128, 
       }
     } else {
       const facts: SupportedFact[] = [];
-      const sentences = originalSentences(sources);
+      const sentences = originalSentences(sources).filter(sentence => !isBareAgendaHeading(sentence.text));
       const sourceById = new Map(sources.map(source => [source.id, source]));
       let position = 0;
       while (position < sentences.length) {
@@ -212,7 +212,7 @@ export function createGroundedSummariser({ model, attempts = 3, maxCalls = 128, 
   };
 }
 
-const claimKey = (fact: SupportedFact) => JSON.stringify([fact.speaker, fact.kind, fact.text]);
+const claimKey = (fact: SupportedFact) => JSON.stringify([fact.speaker, fact.text]);
 /** Exact claims can share evidence; identifiers and all distinct clauses remain case-sensitive. */
 function distinctFacts(facts: SupportedFact[]): SupportedFact[] {
   const claims = new Map<string, SupportedFact>();
@@ -220,7 +220,8 @@ function distinctFacts(facts: SupportedFact[]): SupportedFact[] {
     const key = claimKey(fact), previous = claims.get(key);
     if (!previous) { claims.set(key, fact); continue; }
     const sources = uniqueSources([...previous.sources, ...fact.sources]);
-    claims.set(key, { ...previous, sources, refs: [...new Set(sources.map(source => source.ref))].sort((a, b) => a - b),
+    const latest = Math.max(...fact.refs) >= Math.max(...previous.refs) ? fact : previous;
+    claims.set(key, { ...latest, sources, refs: [...new Set(sources.map(source => source.ref))].sort((a, b) => a - b),
       leaves: [...(previous.leaves ?? [previous]), ...(fact.leaves ?? [fact])] });
   }
   return [...claims.values()].sort((a, b) => Math.max(...a.refs) - Math.max(...b.refs));
@@ -254,7 +255,7 @@ function equivalentDetails(fact: SupportedFact): string {
     text = text.slice(0, time.index) + text.slice(time.index! + time[0].length);
   }
   const terms = text.match(/[\p{L}\p{N}_]+(?:['’][\p{L}\p{N}_]+)*/gu) ?? [];
-  return JSON.stringify({ speaker: fact.speaker, kind: fact.kind, terms, deadline, identifiers,
+  return JSON.stringify({ speaker: fact.speaker, terms, deadline, identifiers,
     symbols: [...text].filter(character => /[^\p{L}\p{N}_\s,.]/u.test(character)),
     question: fact.text.includes("?"), quotations: fact.text.match(/["“”]/g) ?? [] });
 }
@@ -291,15 +292,22 @@ const REVISION_NON_TOPIC = new Set(("a an the i you we they them their my your o
   + "proposal proposed propose decision decided final earlier later previous initial provisional plan position "
   + "review reviewed reviewing round topic requirement requirements task assignment commitment "
   + "replace replaces replaced instead cancel cancelled canceled withdrawn superseded reverse reversed switch switched").split(" "));
-const revisionWords = (text: string) => new Set((text.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? []).filter(word => !REVISION_NON_TOPIC.has(word)));
+const revisionWords = (text: string) => new Set((text.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? [])
+  .filter(word => !REVISION_NON_TOPIC.has(word)).map(word => word.length > 5 && word.endsWith("ing") ? word.slice(0, -3) : word));
 function correctionSources(sources: SourcePiece[], fact: Pick<FactCandidate, "speaker" | "text" | "sourceIds">): SourcePiece[] {
   const own = sources.filter(source => source.speaker === fact.speaker && fact.sourceIds.includes(source.id)).sort(sourceOrder).at(-1);
   if (!own) return [];
   const words = revisionWords(fact.text);
-  // Cues and overlap only constrain possible evidence. They never supersede a
-  // claim without the model's comparison of that claim to the original source.
-  return sources.filter(source => sourceOrder(source, own) > 0 && REVISION_CUE.test(source.text)
-    && [...revisionWords(source.text)].some(word => words.has(word)));
+  const sourceById = new Map(sources.map(source => [source.id, source]));
+  // Match a particular later sentence, not an unrelated sentence sharing the
+  // same Transcript fragment. Cues and overlap only constrain possible evidence;
+  // the model still compares every candidate to the unchanged original speech.
+  const correctionIds = originalSentences(sources).filter(sentence => {
+    const source = sourceById.get(sentence.sourceId);
+    return !!source && sourceOrder(source, own) > 0 && REVISION_CUE.test(sentence.text)
+      && [...revisionWords(sentence.text)].filter(word => words.has(word)).length >= 2;
+  }).map(sentence => sentence.sourceId);
+  return uniqueSources(sources.filter(source => correctionIds.includes(source.id)));
 }
 function dispositionSchema(sources: SourcePiece[], facts: FactCandidate[]) {
   return { type: "object", properties: { revisions: { type: "object", properties: Object.fromEntries(facts.map((fact, id) => [String(id), {
