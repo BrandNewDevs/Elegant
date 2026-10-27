@@ -12,7 +12,7 @@ The app runs on macOS; Linux can exercise the TypeScript pipeline and evaluation
 
 ## Export an actual Transcript for evaluation
 
-The database path is `join(app.getPath("userData"), "meetings.db")` in `app/src/main/main.ts`. Use the **running build's actual userData directory**; the display name could differ between builds, so do not hard-code it into a path. On macOS the default location is under `~/Library/Application Support/`, but the directory name depends on the build. Read `app.getPath("userData")` locally in the Electron main-process debugger if needed. Do not choose an unrelated copy of the database.
+The database path is `join(app.getPath("userData"), "meetings.db")` in `app/src/main/main.ts`. Use the **running build's actual userData directory**; the directory name depends on how the build was packaged (a run from source and the packaged app can differ), so do not hard-code it into a path. On macOS the default location is under `~/Library/Application Support/`. Read `app.getPath("userData")` locally in the Electron main-process debugger if needed. Do not choose an unrelated copy of the database.
 
 Wait for Recording and transcription to finish. A Meeting marked failed can still be exported when it has a completed Transcript, such as after Summary failure. The exporter rejects Recording/processing states and empty Transcripts. Quit the app after completion for the simplest snapshot; the tool also uses a consistent SQLite read transaction if the app is open.
 
