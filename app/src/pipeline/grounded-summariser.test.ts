@@ -370,7 +370,7 @@ describe("evidence-backed Summary generation", () => {
         const properties = schema.properties.facts.items!.properties!;
         expect(properties).not.toHaveProperty("refs");
         expect(new Set(properties.sourceIds!.items!.enum)).toEqual(new Set(sources.map(source => source.id)));
-        expect(new Set(properties.speaker!.enum)).toEqual(new Set((input.primary ?? sources).map(source => source.speaker)));
+        expect(new Set(properties.speaker!.enum)).toEqual(new Set((input.candidates ?? input.primary ?? sources).map(source => source.speaker)));
         if (input.candidates) expect(properties.covers!.items!.enum).toEqual(input.candidates.map((_, index) => index));
       } else if (schema.properties.sourceIds) {
         expect(new Set(schema.properties.sourceIds.items!.enum)).toEqual(new Set(sources.map(source => source.id)));

@@ -66,12 +66,12 @@ describe("complete long Summary coverage", () => {
     transcript.segments[8]!.speaker = "Speaker 1";
     transcript.segments[8]!.text = original("Final decision: launch Friday instead of Monday.");
     let compared = false;
-    const { model } = adapter(facts => {
+    const { model } = adapter((facts, sources) => {
       const proposal = facts.find(fact => fact.text.includes("propose launching"));
-      const decision = facts.find(fact => fact.text.includes("Final decision"));
+      const decision = sources.find(source => source.text.includes("Final decision"));
       if (proposal && decision) compared = true;
       return facts.map(fact => ({ ...fact, covers: [fact.id], ...(proposal && decision && fact.id === proposal.id ? {
-        text: "Proposed Monday; Speaker 1 later set Friday instead.", sourceIds: [...proposal.sourceIds, ...decision.sourceIds],
+        text: "Proposed Monday; Speaker 1 later set Friday instead.", sourceIds: [...proposal.sourceIds, decision.id],
       } : {}) }));
     });
     const result = await createGroundedSummariser({ model })(transcript);
@@ -83,6 +83,34 @@ describe("complete long Summary coverage", () => {
     const proposerEvidence = result.evidence!.participants.find(participant => participant.speaker === "You")!;
     expect(proposerEvidence.said[proposer.said.indexOf("Proposed Monday; Speaker 1 later set Friday instead.")]).toEqual([0, 8]);
     expect(result.evidence!.participants.find(participant => participant.speaker === "Speaker 1")!.said).toEqual([[8]]);
+  });
+
+  it("scopes mixed-topic comparisons to each of three speakers without losing another speaker's candidates", async () => {
+    const transcript = uniqueCommitments();
+    const speakers = ["You", "Speaker 1", "Speaker 2"];
+    transcript.segments.forEach((segment, index) => {
+      segment.speaker = speakers[Math.floor(index / 3)]!;
+      segment.text = original(`Topic_${index % 3}: distinct obligation_${index}.`);
+    });
+    let mixedContextCalls = 0;
+    const { model, requests } = adapter((facts, sources, request) => {
+      const owners = [...new Set(facts.map(fact => fact.speaker))];
+      // Models that focus on the first actor lose the others in a mixed request.
+      // Speaker-scoped requests must retain them all without weakening covers.
+      const output = facts.filter(fact => fact.speaker === owners[0]);
+      expect(owners).toHaveLength(1);
+      if (new Set(sources.map(source => source.speaker)).size > 1) mixedContextCalls++;
+      const schema = request.schema as { properties: { facts: { items: { properties: { speaker: { enum: string[] } } } } } };
+      expect(schema.properties.facts.items.properties.speaker.enum).toEqual(owners);
+      return output.map(fact => ({ ...fact, covers: [fact.id] }));
+    });
+    const result = await createGroundedSummariser({ model })(transcript);
+    expect(mixedContextCalls).toBeGreaterThan(0);
+    for (const speaker of speakers) {
+      expect(result.participants.find(participant => participant.speaker === speaker)!.said)
+        .toEqual(transcript.segments.filter(segment => segment.speaker === speaker).map(segment => prefix(segment.text)));
+    }
+    expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
   it("rejects missing candidate coverage rather than publishing a shortened partial Summary", async () => {
