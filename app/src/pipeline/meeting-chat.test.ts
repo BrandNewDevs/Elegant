@@ -250,12 +250,33 @@ describe("extractive Meeting chat", () => {
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
-  it("bounds invalid standalone rewrites and keeps their context within the request budget", async () => {
+  it.each(["not JSON", JSON.stringify({ question: "When is that due?" }), JSON.stringify({ question: "" })])(
+    "preserves original follow-up intent after one unusable rewrite: %s", async rewrite => {
+      const { store, id, expectedRevision } = setup();
+      const asked = "When is that due?";
+      const model = fake(request => {
+        expect(contents(request).data.question).toBe(`Previous subject question: ${question}\nCurrent question: ${asked}`);
+        expect(contents(request).data.priorUserQuestion).toBe(question);
+        return positive;
+      }, { resolve: () => rewrite });
+      const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: asked,
+        history: [{ question, answer: "A previous answer is not evidence." }] });
+      expect(result.answer.text).toBe(quote);
+      expect(model.requests.filter(isRewrite)).toHaveLength(1);
+      expect(result.generation.calls).toBe(3);
+      expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+    });
+
+  it("does not truncate oversized original questions to manufacture follow-up context", async () => {
     const { store, id, expectedRevision } = setup();
-    const model = fake(() => positive, { resolve: () => ({ question: "What is its deadline?" }) });
-    await expect(createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "What is its deadline?",
-      history: [{ question, answer: "You." }] })).rejects.toThrow("standalone question failed validation after three attempts");
-    expect(model.requests).toHaveLength(3);
+    const asked = "When is that due? " + "details ".repeat(190);
+    const prior = "Who will write the guide? " + "context ".repeat(190);
+    const model = fake(() => { throw new Error("No answer should be generated"); }, { resolve: () => ({ question: "When is that due?" }) });
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: asked,
+      history: [{ question: prior, answer: "" }] });
+    expect(result.answer).toEqual({ text: CHAT_INCOMPLETE, refs: [], sufficient: false });
+    expect(model.requests.filter(isAnswer)).toHaveLength(0);
+    expect(model.requests.filter(isRewrite).length).toBeLessThanOrEqual(1);
   });
 
   it("passes only the latest four exchanges, dropping whole oldest history before evidence", async () => {

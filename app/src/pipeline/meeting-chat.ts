@@ -16,7 +16,7 @@ export type MeetingChatGenerator = (input: {
   /** Main process only: never expose this authorization directly through renderer IPC. */
   allowSummaryProcessing?: boolean;
 }) => Promise<{ answer: ChatAnswer; generation: ChatGeneration; revision: string }>;
-export const CHAT_PROMPT_VERSION = "meeting-chat-v9";
+export const CHAT_PROMPT_VERSION = "meeting-chat-v10";
 export const CHAT_ABSENT = "Not established in the available Transcript.";
 export const CHAT_UNVERIFIED = "I could not establish a reliable answer from the available evidence.";
 export const CHAT_INCOMPLETE = "I could not review enough of the Transcript to answer reliably. Please ask a narrower question.";
@@ -200,35 +200,29 @@ export function createMeetingChat({ store, model, modelName = AI_SETTINGS.model,
     async function resolveQuestion() {
       if (!needsFollowUpResolution) return;
       stage("retrieving");
-      let reason: string | undefined;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        check();
-        const context = [...history];
-        const make = (feedback?: string): Pick<TextRequest, "messages" | "schema"> => ({
-          messages: [{ role: "system", content: SYSTEM }, { role: "user", content: JSON.stringify({
-            instruction: RESOLVE_TASK + (feedback ? ` Previous question rewrite was invalid: ${feedback}. Correct it.` : ""),
+      check();
+      const context = [...history];
+      const make = (): Pick<TextRequest, "messages" | "schema"> => ({
+        messages: [{ role: "system", content: "Rewrite a follow-up question using conversation intent. Do not answer it or invent facts." },
+          { role: "user", content: JSON.stringify({ instruction: RESOLVE_TASK,
             data: { question: input.question, priorUserQuestion, history: context },
           }) }], schema: { type: "object", properties: { question: { type: "string" } }, required: ["question"] },
-        });
-        while (requestBytes(make("x".repeat(160))) > AI_SETTINGS.maxInputBytes && context.length) context.shift();
-        if (requestBytes(make("x".repeat(160))) > AI_SETTINGS.maxInputBytes) throw new ChatCallLimit("Question context exceeds the standalone rewrite budget");
-        const response = await counted.complete({ ...make(reason), signal, maxOutputTokens: 256, timeoutMs: remaining() });
-        let value: unknown;
-        try { value = JSON.parse(response.text); } catch { reason = "Return a JSON object containing question"; continue; }
-        if (!value || typeof value !== "object" || Array.isArray(value) || typeof (value as { question?: unknown }).question !== "string"
-            || !(value as { question: string }).question.trim() || (value as { question: string }).question.length > 2000) {
-          reason = "question must be a non-empty string of at most 2000 characters"; continue;
-        }
-        const rewritten = (value as { question: string }).question.trim();
-        if (UNRESOLVED_REFERENCE.test(rewritten)) {
-          reason = "Name the task or person from priorUserQuestion explicitly; remove unresolved pronouns such as it, they, their, that, this, he or she";
-          continue;
-        }
+      });
+      while (requestBytes(make()) > AI_SETTINGS.maxInputBytes && context.length) context.shift();
+      if (requestBytes(make()) > AI_SETTINGS.maxInputBytes) throw new ChatCallLimit("Question context exceeds the follow-up request budget");
+      const response = await counted.complete({ ...make(), signal, maxOutputTokens: 256, timeoutMs: remaining() });
+      let value: unknown;
+      try { value = JSON.parse(response.text); } catch { /* Preserve the original intent below instead of guessing a subject. */ }
+      const rewritten = value && typeof value === "object" && !Array.isArray(value)
+        && typeof (value as { question?: unknown }).question === "string" ? (value as { question: string }).question.trim() : "";
+      if (rewritten && rewritten.length <= 2000 && !UNRESOLVED_REFERENCE.test(rewritten)) {
         resolvedQuestion = rewritten;
-        questionRewritten = true;
-        return;
+      } else {
+        // Copy user intent verbatim; a failed model rewrite must not invent an owner or block a simple follow-up.
+        resolvedQuestion = `Previous subject question: ${priorUserQuestion}\nCurrent question: ${input.question}`;
+        if (resolvedQuestion.length > 2000) throw new ChatCallLimit("The follow-up and previous subject exceed the question budget; ask a standalone question");
       }
-      throw new InvalidChatAnswer(`The standalone question failed validation after three attempts: ${reason}`);
+      questionRewritten = true; // At most one rewrite, including the retrieval layer.
     }
     async function retrieve(forceScan = false) {
       check();
