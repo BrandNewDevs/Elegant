@@ -8,7 +8,7 @@ import { factsSchema, groundedSchema, refinementSchema, reductionSchema, tldrSch
   type GroundedOutput, type SourcePiece, type SupportedFact, type SupportedPoint } from "./grounded-format.js";
 
 export interface GroundedSummariserOptions { model: TextModel; attempts?: number; maxCalls?: number; deadlineMs?: number }
-export const SUMMARY_PROMPT_VERSION = "grounded-summary-v15";
+export const SUMMARY_PROMPT_VERSION = "grounded-summary-v16";
 const RETRY = " The previous output failed validation: ";
 const RETRY_REASON_LIMIT = 160;
 // Validation diagnostics contain rules and local ID/speaker metadata, never Transcript prose. Reserve exact ASCII bytes.

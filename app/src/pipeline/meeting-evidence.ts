@@ -4,7 +4,7 @@ import { buildPassages, type EvidencePassage } from "./passages.js";
 import type { TextModel, TextRequest } from "./language-model.js";
 import { AI_SETTINGS, requestBytes } from "./model-request.js";
 
-export const EVIDENCE_PROMPT_VERSION = "meeting-evidence-v5";
+export const EVIDENCE_PROMPT_VERSION = "meeting-evidence-v6";
 
 type RetrievalStore = Pick<Store, "getMeeting" | "listPassages" | "searchPassages">;
 export type EvidenceStage = "retrieving" | "rewriting" | "scanning" | "consolidating";
@@ -127,8 +127,8 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
         }, required: ["sourceIds", "sufficient"] };
       return { messages: [{ role: "system", content: SYSTEM }, { role: "user", content: JSON.stringify({
         instruction: TASK[mode] + (reason ? ` Previous output was invalid: ${reason}. Correct it.` : ""),
-        data: { question: input.question, history: context, ...(mode === "rewrite" ? {} : { sources }),
-          ...(comparison.length ? { comparisonSourceIds: comparison.map(source => source.id) } : {}) },
+        data: { ...(mode === "rewrite" ? {} : { sources }), history: context,
+          ...(comparison.length ? { comparisonSourceIds: comparison.map(source => source.id) } : {}), question: input.question },
       }) }], schema };
     }
     function prepared(mode: Mode, sources: SourceFragment[], reason?: string, comparison: SourceFragment[] = []) {
