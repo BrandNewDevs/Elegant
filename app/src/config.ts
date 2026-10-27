@@ -6,3 +6,6 @@ export const BUNDLE_ID = "dev.bnd.elegant";
 
 /** The WhisperKit variant that transcribes Recordings. A starting choice, to be settled by the accuracy evaluation in docs/ai-brief.md. */
 export const SPEECH_MODEL = "large-v3-v20240930_626MB";
+
+/** The GitHub repository whose published releases the update check reads (see docs/design.md). */
+export const RELEASES_REPO = "BrandNewDevs/Elegant";

@@ -105,3 +105,23 @@ it("turns Show in Dock on and off, starting from the stored setting", () => {
   fireEvent.click(toggle);
   expect(send.setShowInDock).toHaveBeenLastCalledWith(false);
 });
+
+it("turns Check for updates on and off, starting from the stored setting", () => {
+  const send = pushSetupState(nothingDone);
+  const { rerender } = render(<SettingsDialog open onOpenChange={() => {}} checkForUpdates={false} />);
+  const toggle = screen.getByRole("switch", { name: "Check for updates" });
+  expect(toggle.getAttribute("aria-checked")).toBe("false");
+  fireEvent.click(toggle);
+  expect(send.setCheckForUpdates).toHaveBeenLastCalledWith(true);
+
+  rerender(<SettingsDialog open onOpenChange={() => {}} checkForUpdates />);
+  expect(toggle.getAttribute("aria-checked")).toBe("true");
+  fireEvent.click(toggle);
+  expect(send.setCheckForUpdates).toHaveBeenLastCalledWith(false);
+});
+
+it("has Check for updates on by default", () => {
+  pushSetupState(nothingDone);
+  render(<SettingsDialog open onOpenChange={() => {}} />);
+  expect(screen.getByRole("switch", { name: "Check for updates" }).getAttribute("aria-checked")).toBe("true");
+});

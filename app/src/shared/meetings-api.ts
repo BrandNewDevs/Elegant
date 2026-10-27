@@ -1,3 +1,4 @@
+import type { UpdateNotice } from "../core/update-check.js";
 import type { MeetingsViewState } from "./meetings-view-state.js";
 
 export interface SendQuestionInput { meetingId: number; requestId: string; question: string }
@@ -11,6 +12,11 @@ export interface MeetingsApi {
   onState(callback: (state: MeetingsViewState) => void): () => void;
   settings(open: boolean): void;
   setShowInDock(show: boolean): void;
+  setCheckForUpdates(check: boolean): void;
+  /** Runs when a newer release was found, once the window is open to show it. */
+  onUpdateAvailable(callback: (update: UpdateNotice) => void): () => void;
+  /** Opens the release page of the update just announced in the default browser. */
+  openRelease(): void;
   select(id: number): void;
   search(query: string): void;
   rename(payload: { meetingId: number; label: string; name: string }): void;

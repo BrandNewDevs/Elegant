@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { AppCore } from "../core/app-core.js";
 import { formatElapsed } from "../core/elapsed.js";
 import { ignoredAppsFile } from "../core/ignored-apps.js";
+import { checkForUpdate } from "../core/update-check.js";
 import { ProcessEngine } from "../engine/process-engine.js";
 import { createEngineTranscriber } from "../pipeline/engine-transcriber.js";
 import { createMeetingChat } from "../pipeline/meeting-chat.js";
@@ -12,7 +13,7 @@ import { checkOllama, OllamaClient, DEFAULT_SUMMARY_MODEL } from "../pipeline/ol
 import { createGroundedSummariser } from "../pipeline/grounded-summariser.js";
 import { Setup } from "../setup/setup.js";
 import { openStore } from "../store/store.js";
-import { DISPLAY_NAME, SPEECH_MODEL } from "../config.js";
+import { DISPLAY_NAME, RELEASES_REPO, SPEECH_MODEL } from "../config.js";
 import { showPrompt } from "./prompt-window.js";
 import { Launch } from "./launch.js";
 import { MeetingsWindow } from "./meetings-window.js";
@@ -196,6 +197,17 @@ app.whenReady().then(() => {
   // Permissions that were granted before are checked silently once the engine is up. Onboarding opens only when one is
   // missing, even at login, and on a first launch it opens before the Meetings window does.
   launch.start();
+  // A run from source never checks. The toast waits for the Meetings window; nothing opens one for it.
+  if (app.isPackaged) {
+    void checkForUpdate({
+      currentVersion: app.getVersion(),
+      repo: RELEASES_REPO,
+      userAgent: `${DISPLAY_NAME}/${app.getVersion()}`,
+      fetch,
+      enabled: () => core!.checkForUpdates,
+      lastNotified: () => core!.lastNotifiedUpdate,
+    }).then((update) => update && meetingsWindow?.offerUpdate(update));
+  }
 
   let quitting = false;
   app.on("before-quit", (event) => {

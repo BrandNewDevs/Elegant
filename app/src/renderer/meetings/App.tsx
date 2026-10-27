@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { useJobToasts } from "./job-toasts";
 import type { MeetingsViewState } from "../../shared/meetings-view-state";
 import { MeetingDetail } from "./MeetingDetail";
@@ -65,6 +66,7 @@ function MeetingListRow({ meeting, selected, onSelect }: { meeting: MeetingListI
 export function MeetingsApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showInDock, setShowInDock] = useState(true);
+  const [checkForUpdates, setCheckForUpdates] = useState(true);
   // Profile is a page of its own in the main area; picking a Meeting brings the Meetings back.
   const [page, setPage] = useState<"meetings" | "profile">("meetings");
   const [query, setQuery] = useState("");
@@ -82,12 +84,25 @@ export function MeetingsApp() {
       setJobs(state.jobs);
       setSettingsOpen(state.settingsOpen);
       setShowInDock(state.showInDock);
+      setCheckForUpdates(state.checkForUpdates);
       setQuery(state.query);
       setMeetings(state.meetings);
       setSelected(state.selected);
     });
+    // A newer release stays on screen until the person closes it; it only links to the release page, nothing is installed.
+    const unsubscribeUpdate = window.electron.meetings.onUpdateAvailable((update) => {
+      toast(`Version ${update.version} is available`, {
+        id: `update-${update.version}`,
+        duration: Infinity,
+        closeButton: true,
+        action: { label: "View release", onClick: () => window.electron.meetings.openRelease() },
+      });
+    });
     window.electron.meetings.ready();
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      unsubscribeUpdate();
+    };
   }, []);
 
   const onSearch = (e: React.FormEvent) => {
@@ -146,7 +161,7 @@ export function MeetingsApp() {
         </main>
       </ScrollArea>
       <Toaster position="bottom-right" />
-      <SettingsDialog open={settingsOpen} showInDock={showInDock} onOpenChange={(open) => window.electron.meetings.settings(open)} />
+      <SettingsDialog open={settingsOpen} showInDock={showInDock} checkForUpdates={checkForUpdates} onOpenChange={(open) => window.electron.meetings.settings(open)} />
     </div>
   );
 }

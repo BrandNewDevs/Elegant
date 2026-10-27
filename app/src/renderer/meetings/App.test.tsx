@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
+import type { UpdateNotice } from "../../core/update-check";
 import type { Meeting } from "../../store/store";
 import type { MeetingsViewState } from "../../shared/meetings-view-state";
 import { createMeetingsApi, nothingDone } from "@/lib/test-electron";
@@ -31,7 +32,7 @@ beforeEach(() => {
 
 it("shows the query in the box, escaped, and says when nothing matches", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
-    callback({ settingsOpen: false, showInDock: false, meetings: [], selected: undefined, query: `"><script>` });
+    callback({ settingsOpen: false, showInDock: false, checkForUpdates: true, meetings: [], selected: undefined, query: `"><script>` });
     return () => {};
   });
   render(<MeetingsApp />);
@@ -44,7 +45,7 @@ it("lists Meetings and selects one", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
     callback({
       settingsOpen: false,
-      showInDock: false,
+      showInDock: false, checkForUpdates: true,
       meetings: [{ id: 7, app: "zoom.us", startedAt: "2026-10-24T10:00:00.000Z", state: "done" }],
       selected: undefined,
       query: "x",
@@ -57,7 +58,7 @@ it("lists Meetings and selects one", () => {
 
 it("offers a rename field for each Participant, showing their label and current name", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
-    callback({ settingsOpen: false, showInDock: false, meetings: [], selected: meeting, query: "" });
+    callback({ settingsOpen: false, showInDock: false, checkForUpdates: true, meetings: [], selected: meeting, query: "" });
     return () => {};
   });
   render(<MeetingsApp />);
@@ -67,7 +68,7 @@ it("offers a rename field for each Participant, showing their label and current 
 
 it("opens Settings from the sidebar", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
-    callback({ settingsOpen: false, showInDock: false, meetings: [], selected: undefined, query: "" });
+    callback({ settingsOpen: false, showInDock: false, checkForUpdates: true, meetings: [], selected: undefined, query: "" });
     return () => {};
   });
   render(<MeetingsApp />);
@@ -78,7 +79,7 @@ it("opens Settings from the sidebar", () => {
 
 it("shows Settings as a dialog over the Meetings when it is open, and asks to close it", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
-    callback({ settingsOpen: true, showInDock: true, meetings: [], selected: undefined, query: "" });
+    callback({ settingsOpen: true, showInDock: true, checkForUpdates: true, meetings: [], selected: undefined, query: "" });
     return () => {};
   });
   window.electron.setup = {
@@ -101,7 +102,7 @@ it("shows Settings as a dialog over the Meetings when it is open, and asks to cl
 
 it("opens the Profile page from the sidebar and goes back to the Meeting when one is picked", () => {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
-    callback({ settingsOpen: false, showInDock: false, meetings: [meeting], selected: meeting, query: "" });
+    callback({ settingsOpen: false, showInDock: false, checkForUpdates: true, meetings: [meeting], selected: meeting, query: "" });
     return () => {};
   });
   window.electron.setup = {
@@ -126,4 +127,20 @@ it("opens the Profile page from the sidebar and goes back to the Meeting when on
   fireEvent.click(screen.getByRole("button", { name: /zoom\.us/ }));
   expect(screen.getByRole("heading", { name: "zoom.us" })).toBeTruthy();
   expect(screen.queryByRole("heading", { name: "Profile" })).toBeNull();
+});
+
+it("toasts a newer release with a View release button that asks to open its page", async () => {
+  let announce: (update: UpdateNotice) => void = () => {};
+  window.electron.meetings.onUpdateAvailable = vi.fn((callback: (update: UpdateNotice) => void) => {
+    announce = callback;
+    return () => {};
+  });
+  render(<MeetingsApp />);
+  expect(screen.queryByText("Version 0.2.0 is available")).toBeNull();
+
+  act(() => announce({ version: "0.2.0", url: "https://github.com/BrandNewDevs/Elegant/releases/tag/v0.2.0" }));
+  expect(await screen.findByText("Version 0.2.0 is available")).toBeTruthy();
+  expect(window.electron.meetings.openRelease).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "View release" }));
+  expect(window.electron.meetings.openRelease).toHaveBeenCalledTimes(1);
 });
