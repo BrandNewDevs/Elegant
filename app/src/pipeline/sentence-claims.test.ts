@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { originalSentences, parseSentenceClassifications } from "./sentence-claims.js";
+import { originalSentences, parseSentenceClassifications, sentenceClassificationSchema } from "./sentence-claims.js";
 import type { SourcePiece } from "./grounded-format.js";
 
 const sources: SourcePiece[] = [
@@ -20,6 +20,16 @@ describe("original sentence extraction contract", () => {
     expect(result.map(fact => fact.refs)).toEqual([[178], [178], [178], [182], [182]]);
     expect(result.every(fact => fact.speaker === "Speaker 2")).toBe(true);
     expect(result.every(fact => sources.some(source => source.text.includes(fact.text)))).toBe(true);
+  });
+
+  it("shares one kind definition while requiring every original sentence ID", () => {
+    const primary = originalSentences(sources);
+    const schema = sentenceClassificationSchema(primary);
+    expect(schema.properties.classifications.required).toEqual(primary.map(sentence => sentence.id));
+    expect(Object.keys(schema.properties.classifications.properties)).toEqual(primary.map(sentence => sentence.id));
+    expect(schema.$defs.kind.enum).toContain("unresolved");
+    expect(schema.$defs.kind.enum).toContain("procedure");
+    expect(JSON.stringify(schema).match(/"procedure"/g)).toHaveLength(1);
   });
 
   it("can omit an explicitly classified procedural sentence without losing another claim", () => {

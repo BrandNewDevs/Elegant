@@ -14,9 +14,10 @@ export function originalSentences(sources: SourcePiece[]): OriginalSentence[] {
 }
 
 export function sentenceClassificationSchema(primary: OriginalSentence[]) {
-  return { type: "object", properties: { classifications: { type: "object", properties: Object.fromEntries(primary.map(sentence => [sentence.id, {
-    type: "string", enum: KINDS,
-  }])), required: primary.map(sentence => sentence.id), additionalProperties: false } }, required: ["classifications"], additionalProperties: false };
+  return { type: "object", $defs: { kind: { type: "string", enum: KINDS } },
+    properties: { classifications: { type: "object", properties: Object.fromEntries(primary.map(sentence => [sentence.id, {
+      $ref: "#/$defs/kind",
+    }])), required: primary.map(sentence => sentence.id), additionalProperties: false } }, required: ["classifications"], additionalProperties: false };
 }
 
 /** Every primary sentence receives an explicit disposition before any facts are returned. */
