@@ -73,7 +73,7 @@ python3 evaluation/report.py /tmp/current.json --fixtures evaluation/fixtures --
 python3 -m unittest discover -s evaluation -p 'test_*.py'
 ```
 
-The review JSON maps each fixture ID to `coveredPointIds` (an array), nonnegative integer counts `unsupportedClaims`, `criticalUnsupportedClaims`, `attributionErrors`, `invalidReferences`, `retrievalMisses`, `citationSupportErrors`, and booleans `criticalDecisionsCovered`, `chatCriticalCorrect`. Review against the original passages. Do not mark chat correct while it is skipped. Without complete human review the quality gate stays pending. Each result saves model output, errors, calls, timings and process peak RSS. Chat is reported as skipped until its production module is integrated.
+The review JSON maps each fixture ID to `coveredPointIds` (an array), nonnegative integer counts `unsupportedClaims`, `criticalUnsupportedClaims`, `attributionErrors`, `invalidReferences`, `retrievalMisses`, `citationSupportErrors`, and booleans `criticalDecisionsCovered`, `chatCriticalCorrect`. Review against the original passages. Do not mark chat correct while it is skipped. Without complete human review the quality gate stays pending. Each result saves model output, errors, calls, timings and process peak RSS. Chat runs in `current` and `chat` modes; baseline and Summary-only modes report it as skipped.
 
 Optional `--speech /private/speech-review.json` accepts `{"excerpts":[{"reference":"corrected words","hypothesis":"recognized words","referenceSpeaker":"You","hypothesisSpeaker":"You"}]}`. Align excerpts by hand. WER is normalized word edit distance; speaker mismatch counts are excerpt-level observations, not diarization error rate. Neither measures overlapping-speaker accuracy on its own.
 

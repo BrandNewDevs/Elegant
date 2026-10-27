@@ -1,0 +1,102 @@
+{
+  "metadata": {
+    "sourceCommit": "8f486a4144c9ced5a9a085261ca235ee14d017e2",
+    "sourceDirty": false,
+    "recordedAt": "2026-10-27T06:40:56.166Z",
+    "implementation": "current",
+    "model": {
+      "name": "gemma3:4b-it-q4_K_M",
+      "model": "gemma3:4b-it-q4_K_M",
+      "modified_at": "2026-10-05T05:47:50.046802317+05:30",
+      "size": 3338801804,
+      "digest": "a2af6cc3eb7fa8be8504abaf9b04e88f17a119ec3f04a3addf55f92841195f5a",
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "gemma3",
+        "families": [
+          "gemma3"
+        ],
+        "parameter_size": "4.3B",
+        "quantization_level": "Q4_K_M"
+      },
+      "capabilities": [
+        "completion"
+      ]
+    },
+    "ollama": {
+      "version": "0.34.0"
+    },
+    "hardware": {
+      "platform": "linux",
+      "release": "7.0.0-38-generic",
+      "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+      "memoryBytes": 15950901248,
+      "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU, 4096 MiB"
+    },
+    "settings": {
+      "numCtx": 8192,
+      "temperature": 0,
+      "maxInputBytes": 5500,
+      "maxOutputTokens": 2048,
+      "think": false
+    },
+    "promptVersion": "grounded-summary-v22",
+    "memoryScope": "Node peak RSS only. Ollama, Swift, peak total memory and swap need external observation.",
+    "runCondition": "uncontrolled",
+    "summaryDeadlineMs": 900000,
+    "evaluationDeadlineOverride": false,
+    "chatPromptVersion": "meeting-chat-v14",
+    "evidencePromptVersion": "meeting-evidence-v8"
+  },
+  "synthetic": true,
+  "fixture": "long-discussion",
+  "outcome": "Summary incomplete: the generation deadline was reached",
+  "summaryPublished": false,
+  "elapsedMs": 900003.171437,
+  "modelCalls": 91,
+  "modes": {
+    "classification": {
+      "calls": 30,
+      "elapsedMs": 549030.9464969999,
+      "promptTokens": 32112,
+      "outputTokens": 3886,
+      "maximumRequestBytes": 5232,
+      "failedCalls": 0
+    },
+    "revision": {
+      "calls": 1,
+      "elapsedMs": 9301.990282000042,
+      "promptTokens": 1181,
+      "outputTokens": 50,
+      "maximumRequestBytes": 5249,
+      "failedCalls": 0
+    },
+    "grouping": {
+      "calls": 59,
+      "elapsedMs": 338895.49916600017,
+      "promptTokens": 65078,
+      "outputTokens": 1242,
+      "maximumRequestBytes": 5248,
+      "failedCalls": 0
+    }
+  },
+  "resources": {
+    "peakProcessTreeRssKiB": 111380,
+    "peakOllamaRssKiB": 9905320,
+    "peakNvidiaUsedMiBByDevice": {
+      "0": 2848.0
+    },
+    "initialSystemSwapUsedKiB": 671096,
+    "peakSystemSwapUsedKiB": 3660184,
+    "lastSystemSwapUsedKiB": 3112020
+  },
+  "resourceScope": [
+    "RSS sums can double count shared pages; they are not unique physical memory or a total device peak.",
+    "Existing model servers are outside the command process tree; optional Ollama measurements are separate and may overlap it.",
+    "System swap and GPU usage include other applications. Sampling can miss short-lived peaks.",
+    "Process-group cleanup cannot control a command that deliberately detaches into a new session.",
+    "The run label is operator supplied; the wrapper does not unload models or establish a cold/warm state.",
+    "Command output and arguments are not captured. These observations do not establish quality or M4 acceptance."
+  ]
+}
