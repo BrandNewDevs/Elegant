@@ -23,7 +23,7 @@ func requestMicrophoneAccess() async -> Bool {
 func requestSystemAudioAccess() -> Bool {
     let description = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
     description.uuid = UUID()
-    description.name = "meeting-recorder-permission-check"
+    description.name = "elegant-permission-check"
     description.muteBehavior = .unmuted
     var tapID = AudioObjectID(kAudioObjectUnknown)
     guard AudioHardwareCreateProcessTap(description, &tapID) == noErr else { return false }
@@ -31,7 +31,7 @@ func requestSystemAudioAccess() -> Bool {
 
     var aggregateID = AudioObjectID(kAudioObjectUnknown)
     let aggregate: [String: Any] = [
-        kAudioAggregateDeviceNameKey: "meeting-recorder-permission-check",
+        kAudioAggregateDeviceNameKey: "elegant-permission-check",
         kAudioAggregateDeviceUIDKey: UUID().uuidString,
         kAudioAggregateDeviceIsPrivateKey: true,
         kAudioAggregateDeviceIsStackedKey: false,

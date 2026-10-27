@@ -1,4 +1,4 @@
-### Elegant
+# Elegant
 
 A personal macOS menu-bar app that notices when you are in an online call, offers to record it, and produces a transcript and summary entirely on your own machine. No audio, transcript or summary ever leaves the Mac ([ADR 0002](./docs/adr/0002-fully-local-processing.md)).
 
@@ -15,7 +15,7 @@ A personal macOS menu-bar app that notices when you are in an online call, offer
 - **Launches at login** when installed as the packaged app.
 - **AI work is queued.** Model preparation, transcription, summaries and chat run one at a time, shown as toasts. Detection and recording stay responsive.
 
-Out of scope: live captions, calendar integration, in-person meetings, languages other than English, any cloud processing, and cross-meeting chat. See [`docs/design.md`](./docs/design.md) for the full design.
+**Out of scope:** live captions, calendar integration, in-person meetings, languages other than English, any cloud processing, and cross-meeting chat. See [`docs/design.md`](./docs/design.md) for the full design.
 
 ## Requirements
 

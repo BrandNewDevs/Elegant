@@ -189,7 +189,7 @@ final class Recorder {
     /// stopped and nothing is left on disk.
     func beginRecording() throws {
         let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("meeting-recorder-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("elegant-\(UUID().uuidString)", isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             try mic.startWriting(to: directory.appendingPathComponent("mic.raw"))
@@ -324,7 +324,7 @@ final class Recorder {
     private func startSystemAudio() throws {
         let description = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
         description.uuid = UUID()
-        description.name = "meeting-recorder-tap"
+        description.name = "elegant-tap"
         description.muteBehavior = .unmuted
         var status = AudioHardwareCreateProcessTap(description, &tapID)
         guard status == noErr else { throw RecordingError(description: "cannot tap system audio (status \(status)); allow system audio recording in System Settings > Privacy & Security") }
@@ -338,7 +338,7 @@ final class Recorder {
         }
 
         let aggregate: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "meeting-recorder-aggregate",
+            kAudioAggregateDeviceNameKey: "elegant-aggregate",
             kAudioAggregateDeviceUIDKey: UUID().uuidString,
             kAudioAggregateDeviceIsPrivateKey: true,
             kAudioAggregateDeviceIsStackedKey: false,

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-A personal macOS app that detects online calls and records, transcribes and summarises them locally. Working name Elegant; the name will change, so don't hard-code it.
+A personal macOS app that detects online calls and records, transcribes and summarises them locally. The app is called Elegant (permanent). Take the display name from `DISPLAY_NAME` in `app/src/config.ts` rather than hard-coding it.
 
 Read before changing anything:
 
@@ -21,4 +21,4 @@ Rules:
 
 - Everything runs locally. No cloud APIs for audio, transcription or summaries.
 - Never commit audio recordings, real Transcripts of real people, or `.env` files.
-- The bundle identifier is `dev.bnd.meetingrecorder` and is permanent.
+- The bundle identifier is `dev.bnd.elegant` and is permanent (changed once from `dev.bnd.meetingrecorder` when the app was named Elegant).

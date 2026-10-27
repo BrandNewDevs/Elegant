@@ -1,4 +1,4 @@
-# Meeting Recorder
+# Elegant
 
 A personal macOS app that notices when you are in an online call, offers to record it, and produces a transcript and summary entirely on your own machine.
 
