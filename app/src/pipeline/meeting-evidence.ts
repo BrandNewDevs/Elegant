@@ -4,7 +4,7 @@ import { buildPassages, type EvidencePassage } from "./passages.js";
 import type { TextModel, TextRequest } from "./language-model.js";
 import { AI_SETTINGS, requestBytes } from "./model-request.js";
 
-export const EVIDENCE_PROMPT_VERSION = "meeting-evidence-v3";
+export const EVIDENCE_PROMPT_VERSION = "meeting-evidence-v4";
 
 type RetrievalStore = Pick<Store, "getMeeting" | "listPassages" | "searchPassages">;
 export type EvidenceStage = "retrieving" | "rewriting" | "scanning" | "consolidating";
@@ -56,14 +56,14 @@ const unique = (sources: SourceFragment[]) => [...new Map(sources.map(source => 
   .sort((a, b) => a.ref - b.ref || a.part - b.part);
 const broad = (question: string) => /\b(all|overall|throughout|everything|entire|summari[sz]e|overview|whole meeting|decisions|action items|commitments|unresolved matters|final|latest|eventually|end(?:ed)? up)\b/i.test(question);
 const followUp = (question: string, history: EvidenceRequest["history"]) => !!history?.length &&
-  (/\b(it|that|they|their|this|those|them|he|she|his|her|same)\b|^\s*(and\b|what about\b)/i.test(question) || question.trim().split(/\s+/).length <= 5);
+  (/\b(it|its|that|they|their|this|those|them|he|she|his|her|same)\b|^\s*(and\b|what about\b)/i.test(question) || question.trim().split(/\s+/).length <= 5);
 // Query grammar is intent for the model, not useful OR terms for lexical ranking. Keep negation,
 // dates/numbers and canonical speaker labels (including "You") so filtering cannot reverse the question.
 const QUESTION_STOP_WORDS = new Set([
   "a", "an", "the", "who", "what", "which", "when", "where", "why", "how", "is", "are", "was", "were",
   "do", "does", "did", "will", "would", "could", "should", "can", "have", "has", "had", "been", "be",
   "to", "of", "for", "with", "in", "on", "at", "by", "about", "please", "tell", "me", "us", "and", "or",
-  "we", "our", "your", "it", "that", "this", "they", "their", "them", "he", "she", "his", "her",
+  "we", "our", "your", "it", "its", "that", "this", "they", "their", "them", "he", "she", "his", "her",
 ]);
 function lexicalQuery(question: string): string {
   return (question.match(/[\p{L}\p{N}]+/gu) ?? []).filter(word => !QUESTION_STOP_WORDS.has(word.toLowerCase())).join(" ");
@@ -82,8 +82,9 @@ function parseSelection(json: string, sources: SourceFragment[]): Selection {
   if (!Array.isArray(value.sourceIds) || !value.sourceIds.every(id => typeof id === "string" && allowed.has(id))) throw new InvalidSelection("Use only sourceIds supplied in this request");
   if (typeof value.sufficient !== "boolean") throw new InvalidSelection("sufficient must be a boolean");
   const sourceIds = [...new Set(value.sourceIds)] as string[];
-  if (value.sufficient && !sourceIds.length) throw new InvalidSelection("A sufficient selection must identify original supporting passages");
-  return { sourceIds, sufficient: value.sufficient };
+  // An empty selection cannot support a fact, regardless of the model's flag.
+  // Treat it conservatively as no usable evidence so the caller can scan or abstain.
+  return { sourceIds, sufficient: value.sufficient && sourceIds.length > 0 };
 }
 
 /** Meeting/revision-scoped retrieval; every returned word comes from the current original Transcript. */

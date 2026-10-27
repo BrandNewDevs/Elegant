@@ -52,6 +52,18 @@ describe("Meeting-specific evidence retrieval", () => {
     expect(local.requests).toHaveLength(0);
   });
 
+  it("treats an empty selection as unsupported even when the model claims sufficiency", async () => {
+    const { store, id } = meeting(long());
+    const local = model(request => instruction(request).startsWith("Rewrite")
+      ? { query: "unrecorded budget" } : { sourceIds: [], sufficient: true });
+    const result = await createMeetingEvidence({ store, model: local })({
+      meetingId: id, question: "What budget was approved?", forceScan: true, fits: byCount(2),
+    });
+    expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: false, sources: [] });
+    expect(local.requests.length).toBeGreaterThan(1);
+    expect(local.requests.every(request => !instruction(request).includes("Previous output was invalid"))).toBe(true);
+  });
+
   it("includes FTS hits, neighbors and a later correction even before the last passage", async () => {
     const source = long();
     source.segments[0]!.text = "Launch Friday. " + source.segments[0]!.text;
@@ -98,6 +110,21 @@ describe("Meeting-specific evidence retrieval", () => {
     expect(data(huge.requests[0]!).question).toBe("And the deadline?");
     expect(data(huge.requests[0]!).history).toEqual([]);
     expect(huge.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it("resolves a possessive follow-up and excludes the pronoun from lexical terms", async () => {
+    const { store, id, passages } = meeting(long());
+    const queries: string[] = [];
+    const scoped = { ...fixedHits(store, []), searchPassages: (_id: number, _revision: string, query: string) => {
+      queries.push(query); return [passages[2]!];
+    } };
+    const local = model(selection);
+    const asked = "What completion deadline has been agreed for its implementation?";
+    await createMeetingEvidence({ store: scoped, model: local })({ meetingId: id, question: asked,
+      history: [{ question: "Who will prepare the launch guide?", answer: "You." }], fits: byCount(4) });
+    expect(local.requests.filter(request => instruction(request).startsWith("Rewrite"))).toHaveLength(1);
+    expect(queries[0]).toBe("completion deadline agreed implementation");
+    expect(queries[0]).not.toMatch(/\bits\b/);
   });
 
   it("skips a second lexical query rewrite after chat has already resolved its follow-up", async () => {
