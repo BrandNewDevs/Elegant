@@ -23,8 +23,8 @@ function adapter(reduce: (facts: Fact[], sources: Piece[], request: TextRequest)
     else if (input.primary) output = { facts: input.primary.filter(piece => piece.part === 0).map(piece => ({
       speaker: piece.speaker, text: prefix(piece.text), kind: /propose|suggest/i.test(piece.text) ? "proposal" : /final decision/i.test(piece.text) ? "decision" : "commitment", sourceIds: [piece.id],
     })) };
-    else if (input.candidates && !("tldr" in (request.schema as { properties: object }).properties)) output = Object.fromEntries(reduce(input.candidates, input.sources!, request).flatMap(fact => (fact.covers ?? []).map(id => [String(id), Math.min(...fact.covers!)])));
-    else output = { tldr: "The selected commitments and final decisions remain supported by the original discussion.", sourceIds: input.sources!.map(piece => piece.id) };
+    else if (input.candidates && !("candidateIds" in (request.schema as { properties: object }).properties)) output = Object.fromEntries(reduce(input.candidates, input.sources!, request).flatMap(fact => (fact.covers ?? []).map(id => [String(id), Math.min(...fact.covers!)])));
+    else output = { candidateIds: input.candidates!.slice(0, 3).map(fact => fact.id) };
     return { text: JSON.stringify(output), metadata: { model: "coverage:test", elapsedMs: 1 } };
   } };
   return { model, requests };
@@ -36,7 +36,7 @@ function assignmentAdapter(assign: (facts: Fact[], request: TextRequest) => unkn
   const model: TextModel = { async complete(request) {
     requests.push(request);
     const input = data(request);
-    if (input.candidates && !("updates" in (request.schema as { properties: object }).properties) && !("tldr" in (request.schema as { properties: object }).properties)) {
+    if (input.candidates && !("updates" in (request.schema as { properties: object }).properties) && !("candidateIds" in (request.schema as { properties: object }).properties)) {
       return { text: JSON.stringify(assign(input.candidates, request)), metadata: { model: "assignment:test", elapsedMs: 1 } };
     }
     return inner.model.complete(request);
@@ -57,7 +57,39 @@ describe("complete long Summary coverage", () => {
     expect(final.totalFacts).toBe(9);
     expect(final.otherFactsRetained).toBeGreaterThan(0);
     for (const fact of final.candidates!) expect(fact.sourceIds.every(id => final.sources!.some(piece => piece.id === id))).toBe(true);
-    expect(requests.filter(request => !("tldr" in (request.schema as { properties: object }).properties) && data(request).candidates).length).toBeGreaterThan(1);
+    expect(requests.filter(request => !("candidateIds" in (request.schema as { properties: object }).properties) && data(request).candidates).length).toBeGreaterThan(1);
+  });
+
+  it("selects whole immutable long-Meeting claims and derives their sources instead of accepting TLDR prose", async () => {
+    const transcript = uniqueCommitments();
+    const inner = adapter();
+    let selected: Fact[] = [];
+    const model: TextModel = { async complete(request) {
+      if (!("candidateIds" in (request.schema as { properties: object }).properties)) return inner.model.complete(request);
+      const input = data(request);
+      selected = input.candidates!.slice(0, 2);
+      return { text: JSON.stringify({ candidateIds: selected.map(fact => fact.id),
+        tldr: "Invented deadline and owner.", sourceIds: ["missing:0"],
+      }), metadata: { model: "selection:test", elapsedMs: 1 } };
+    } };
+    const result = await createGroundedSummariser({ model })(transcript);
+    expect(selected).toHaveLength(2);
+    expect(result.tldr).toBe(selected.map(fact => `${fact.speaker}: ${fact.text}`).join(" "));
+    expect(result.tldr).not.toContain("Invented");
+    const refs = selected.flatMap(fact => fact.sourceIds.map(id => Number(id.split(":")[0])));
+    expect(result.evidence!.tldr).toEqual([...new Set(refs)].sort((a, b) => a - b));
+  });
+
+  it("rejects unknown final claim IDs after three attempts instead of publishing unauthored fallback prose", async () => {
+    const inner = adapter();
+    let attempts = 0;
+    const model: TextModel = { async complete(request) {
+      if (!("candidateIds" in (request.schema as { properties: object }).properties)) return inner.model.complete(request);
+      attempts++;
+      return { text: JSON.stringify({ candidateIds: [999] }), metadata: { model: "selection:test", elapsedMs: 1 } };
+    } };
+    await expect(createGroundedSummariser({ model })(uniqueCommitments())).rejects.toThrow("Select supplied point IDs");
+    expect(attempts).toBe(3);
   });
 
   it("merges interleaved repetitions while retaining every distinct case-sensitive topic", async () => {
@@ -121,7 +153,7 @@ describe("complete long Summary coverage", () => {
     });
     const result = await createGroundedSummariser({ model })(transcript);
     expect(mixedContextCalls).toBe(0);
-    expect(requests.filter(request => data(request).candidates && !("updates" in (request.schema as { properties: object }).properties) && !("tldr" in (request.schema as { properties: object }).properties))).toHaveLength(0);
+    expect(requests.filter(request => data(request).candidates && !("updates" in (request.schema as { properties: object }).properties) && !("candidateIds" in (request.schema as { properties: object }).properties))).toHaveLength(0);
     for (const speaker of speakers) {
       expect(result.participants.find(participant => participant.speaker === speaker)!.said)
         .toEqual(transcript.segments.filter(segment => segment.speaker === speaker).map(segment => prefix(segment.text)));
@@ -155,7 +187,7 @@ describe("complete long Summary coverage", () => {
   it("rejects missing candidate coverage rather than publishing a shortened partial Summary", async () => {
     const { model, requests } = adapter(facts => facts.slice(0, -1).map(fact => ({ ...fact, covers: [fact.id] })));
     await expect(createGroundedSummariser({ model, attempts: 2 })(uniqueCommitments())).rejects.toThrow("Missing candidate IDs");
-    expect(requests.every(request => !((request.schema as { properties: object }).properties && "tldr" in (request.schema as { properties: object }).properties))).toBe(true);
+    expect(requests.every(request => !((request.schema as { properties: object }).properties && "candidateIds" in (request.schema as { properties: object }).properties))).toBe(true);
   });
 
   it("repairs an omitted candidate only when retry feedback names its ID and original speaker", async () => {
@@ -176,7 +208,7 @@ describe("complete long Summary coverage", () => {
     expect(result.participants[0]!.said).toHaveLength(9);
     expect(result.evidence!.participants[0]!.said).toEqual(Array.from({ length: 9 }, (_, ref) => [ref]));
     expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
-    for (const request of requests.filter(request => data(request).candidates && !("updates" in (request.schema as { properties: object }).properties) && !("tldr" in (request.schema as { properties: object }).properties))) {
+    for (const request of requests.filter(request => data(request).candidates && !("updates" in (request.schema as { properties: object }).properties) && !("candidateIds" in (request.schema as { properties: object }).properties))) {
       const instruction = (JSON.parse(request.messages.at(-1)!.content) as { instruction: string }).instruction;
       if (instruction.includes("Missing candidate IDs:")) expect(instruction).not.toContain("I will complete Task_");
     }
@@ -189,7 +221,7 @@ describe("complete long Summary coverage", () => {
       return inner.model.complete(request);
     } };
     await expect(createGroundedSummariser({ model, deadlineMs: 10 })(uniqueCommitments())).rejects.toThrow("deadline");
-    expect(inner.requests.every(request => !("tldr" in (request.schema as { properties: object }).properties))).toBe(true);
+    expect(inner.requests.every(request => !("candidateIds" in (request.schema as { properties: object }).properties))).toBe(true);
   });
 
   it("normalizes earlier-ID chains while retaining every immutable original clause and leaf bundle", async () => {
@@ -226,7 +258,7 @@ describe("complete long Summary coverage", () => {
     });
     await expect(createGroundedSummariser({ model })(uniqueCommitments())).rejects.toThrow("failed validation after 3 attempts");
     expect(reductions).toBe(3);
-    expect(requests.some(request => "tldr" in (request.schema as { properties: object }).properties)).toBe(false);
+    expect(requests.some(request => "candidateIds" in (request.schema as { properties: object }).properties)).toBe(false);
     expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
   it("does not reuse assignments for the same candidates when comparison context changes", async () => {

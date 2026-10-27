@@ -11,10 +11,10 @@ const refsSchema = { type: "array", items: { type: "integer" }, minItems: 1, uni
 const pointProperties = { speaker: { type: "string" }, text: { type: "string" }, refs: refsSchema };
 export const GROUNDED_SCHEMA = {
   type: "object", properties: {
-    // Generate grounded points before compressing them into the TLDR.
+    // Generate claims first; TLDR selection cannot author a different factual claim.
     points: { type: "array", items: { type: "object", properties: pointProperties, required: ["speaker", "text", "refs"] } },
-    tldr: { type: "string" }, tldrRefs: refsSchema,
-  }, required: ["points", "tldr", "tldrRefs"],
+    tldrPointIds: { type: "array", minItems: 1, maxItems: 3, uniqueItems: true, items: { type: "integer", minimum: 0 } },
+  }, required: ["points", "tldrPointIds"],
 };
 export const FACTS_SCHEMA = {
   type: "object", properties: { facts: { type: "array", items: {
@@ -26,7 +26,7 @@ export const FACTS_SCHEMA = {
 /** Restrict structured output to evidence that was actually supplied in this request. */
 export function groundedSchema(sources: SourcePiece[]) {
   const refs = { ...refsSchema, items: { type: "integer", enum: [...new Set(sources.map(source => source.ref))] } };
-  return { ...GROUNDED_SCHEMA, properties: { ...GROUNDED_SCHEMA.properties, tldrRefs: refs,
+  return { ...GROUNDED_SCHEMA, properties: { ...GROUNDED_SCHEMA.properties,
     points: { ...GROUNDED_SCHEMA.properties.points, items: { ...GROUNDED_SCHEMA.properties.points.items,
       properties: { ...pointProperties, refs, speaker: { type: "string", enum: [...new Set(sources.map(source => source.speaker))] } } } } } };
 }
@@ -58,10 +58,10 @@ export function parseFactAssignments(json: string, candidates: SupportedFact[]):
     return seed;
   });
 }
-export function tldrSchema(sources: SourcePiece[]) {
-  return { type: "object", properties: { tldr: { type: "string" },
-    sourceIds: { type: "array", minItems: 1, uniqueItems: true, items: { type: "string", enum: sources.map(source => source.id) } },
-  }, required: ["tldr", "sourceIds"] };
+export function tldrSchema(candidates: readonly unknown[]) {
+  return { type: "object", properties: { candidateIds: { type: "array", minItems: 1, maxItems: 3, uniqueItems: true,
+    items: { type: "integer", enum: candidates.map((_, id) => id) },
+  } }, required: ["candidateIds"], additionalProperties: false };
 }
 
 /** Refinement cites draft point IDs; application code carries their original evidence forward. */
@@ -105,7 +105,8 @@ function point(value: unknown, sources: SourcePiece[]): SupportedPoint {
 export function parseGrounded(json: string, sources: SourcePiece[]): GroundedOutput {
   const value = object(json);
   if (!Array.isArray(value.points)) return problem("points must be a list");
-  return { tldr: text(value.tldr), tldrRefs: references(value.tldrRefs, sources), points: value.points.map(value => point(value, sources)) };
+  const points = value.points.map(value => point(value, sources));
+  return { ...composeTldr(value.tldrPointIds, points), points };
 }
 export function parseRefinedPoints(json: string, draft: SupportedPoint[]): SupportedPoint[] {
   const value = object(json);
@@ -143,11 +144,18 @@ export function parseFacts(json: string, sources: SourcePiece[], primary?: Sourc
     && primary.some(piece => piece.id === source.id))) : facts;
 }
 
-export function parseTldrSources(json: string, sources: SourcePiece[]): { tldr: string; tldrRefs: number[] } {
-  const value = object(json);
-  if (!Array.isArray(value.sourceIds) || !value.sourceIds.length
-      || !value.sourceIds.every(id => typeof id === "string" && sources.some(source => source.id === id))) return problem("Cite original sourceIds supplied with the TLDR facts");
-  return { tldr: text(value.tldr), tldrRefs: [...new Set(sources.filter(source => (value.sourceIds as string[]).includes(source.id)).map(source => source.ref))].sort((a, b) => a - b) };
+/** Whole immutable claims keep a TLDR from transferring another task's date or owner. */
+function composeTldr(value: unknown, points: SupportedPoint[]): { tldr: string; tldrRefs: number[] } {
+  if (!Array.isArray(value) || !value.length
+      || !value.every(id => Number.isInteger(id) && id >= 0 && id < points.length)) return problem("Select supplied point IDs for the TLDR");
+  const ids = [...new Set(value)] as number[];
+  if (ids.length > 3) return problem("Select at most three distinct whole claims for the TLDR");
+  const selected = ids.map(id => points[id]!);
+  return { tldr: selected.map(point => `${point.speaker}: ${point.text}`).join(" "),
+    tldrRefs: [...new Set(selected.flatMap(point => point.refs))].sort((a, b) => a - b) };
+}
+export function parseTldrSelection(json: string, candidates: SupportedPoint[]): { tldr: string; tldrRefs: number[] } {
+  return composeTldr(object(json).candidateIds, candidates);
 }
 
 /** Source pieces are original text, never generated intermediate prose. */

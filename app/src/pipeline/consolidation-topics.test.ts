@@ -32,7 +32,7 @@ function topicModel(nameFor: (text: string) => string = topic) {
         return { speaker: piece.speaker, kind: "update", sourceIds: [piece.id],
           text: round % 2 ? `${name} retains local processing, review round ${round}.` : `In review round ${round}, ${name} remains local.` };
       }) };
-    } else if (payload.candidates && !("tldr" in (request.schema as { properties: object }).properties)) {
+    } else if (payload.candidates && !("candidateIds" in (request.schema as { properties: object }).properties)) {
       const facts = payload.candidates!;
       const original = new Map(payload.sources!.map(piece => [piece.id, piece]));
       reductions.push({ topics: facts.map(fact => nameFor(fact.text)),
@@ -47,7 +47,7 @@ function topicModel(nameFor: (text: string) => string = topic) {
       }
       output = Object.fromEntries([...latest.values()].flatMap(({ covers }) => covers.map(id => [String(id), Math.min(...covers)])));
     } else {
-      output = { tldr: "The reviewed requirements remain fully local.", sourceIds: payload.sources!.map(piece => piece.id) };
+      output = { candidateIds: payload.candidates!.slice(0, 3).map(fact => fact.id) };
     }
     return { text: JSON.stringify(output), metadata: { model: "faithful-topics:test", elapsedMs: 1 } };
   } };
