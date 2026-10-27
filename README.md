@@ -11,7 +11,7 @@ A personal macOS menu-bar app that notices when you are in an online call, offer
 - **Chat with a meeting.** Ask questions about one meeting in the Chat view. Answers cite transcript segments, history is saved per meeting, and you can cancel, retry or clear a chat.
 - **Meetings window.** Browse, full-text search, and open a meeting in its Summary, Transcript or Chat view. Regenerate a summary, export a meeting to Markdown (summary, transcript and supporting timestamps), or delete a meeting and all its data.
 - **Profile.** Set your name once on the local Profile page and it replaces "You" in transcripts, summaries and exports.
-- **Menu-bar controls.** Open the app, Settings (⌘,), keep audio after transcription (off by default; audio is otherwise deleted once transcription succeeds), show in Dock (off by default), ignored apps, and apps you chose "Never" for.
+- **Menu-bar controls.** Open the app, Settings (⌘,), keep audio after transcription (off by default; audio is otherwise deleted once transcription succeeds), show in Dock (on by default), ignored apps, and apps you chose "Never" for.
 - **Launches at login** when installed as the packaged app.
 - **AI work is queued.** Model preparation, transcription, summaries and chat run one at a time, shown as toasts. Detection and recording stay responsive.
 
