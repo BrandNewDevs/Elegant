@@ -183,6 +183,28 @@ describe("complete long Summary coverage", () => {
     expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
+  it("condenses an equivalent subset within a topic while retaining a distinct task and all source evidence", async () => {
+    const transcript = uniqueCommitments();
+    const earlier = "I will test the permission flow by Thursday.";
+    const latest = "By Thursday, I will test the permission flow.";
+    const distinct = "I will review the permission guide on Friday.";
+    transcript.segments[0]!.text = original(earlier);
+    transcript.segments[1]!.text = original(latest);
+    transcript.segments[2]!.text = original(distinct);
+    const { model, requests } = assignmentAdapter(facts => {
+      const related = facts.filter(fact => fact.sourceIds.some(id => ["0:0", "1:0", "2:0"].includes(id)));
+      return Object.fromEntries(facts.map(fact => [String(fact.id), related.includes(fact) ? related[0]!.id : fact.id]));
+    });
+    const result = await createGroundedSummariser({ model })(transcript);
+    const point = `${latest}\n${distinct}`;
+    const owner = result.participants[0]!;
+    expect(owner.said).toContain(point);
+    expect(owner.said.some(text => text.includes(earlier))).toBe(false);
+    expect(owner.said).toHaveLength(7);
+    expect(result.evidence!.participants[0]!.said[owner.said.indexOf(point)]).toEqual([0, 1, 2]);
+    expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
   it.each([
     ["deadline", "I will test the permission flow by Thursday.", "By Friday, I will test permission flow."],
     ["owner", "I will test the permission flow by Thursday.", "By Thursday, Speaker 1 will test permission flow."],
@@ -330,9 +352,15 @@ describe("complete long Summary coverage", () => {
       contextsByCandidates.set(key, contexts);
       return Object.fromEntries(facts.map(fact => [String(fact.id), fact.speaker === "Speaker 1" ? 0 : fact.id]));
     });
-    const result = await createGroundedSummariser({ model })(transcript);
-    // Other topic groups shrink between rounds. The same owned candidates must
-    // still reach the model again when their original comparison context differs.
+    const summarise = createGroundedSummariser({ model });
+    const result = await summarise(transcript);
+    const changedContext = structuredClone(transcript);
+    for (const segment of changedContext.segments) {
+      if (segment.speaker === "Speaker 1") segment.text = segment.text.replaceAll("Original supporting discussion.", "Altered supporting discussion.");
+    }
+    await summarise(changedContext);
+    // Keep candidate claims and byte lengths fixed while changing foreign
+    // original context. No previous assignment may bypass that new comparison.
     expect([...contextsByCandidates.values()].some(contexts => contexts.size > 1)).toBe(true);
     expect(new Set(result.participants.flatMap(participant => participant.said.flatMap(point => point.split("\n")))))
       .toEqual(new Set(transcript.segments.map(segment => prefix(segment.text))));
