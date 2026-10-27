@@ -5,9 +5,11 @@ import { requestBytes } from "./model-request.js";
 import type { Transcript } from "./pipeline.js";
 import type { TextModel, TextRequest } from "./language-model.js";
 
+type WireSentence = Omit<OriginalSentence, "sourceId">;
+const sourceId = (sentence: WireSentence) => sentence.id.slice(0, sentence.id.lastIndexOf(":"));
 interface Piece { id: string; ref: number; part: number; speaker: string; text: string }
 interface Fact { id: number; speaker: string; text: string; kind: string; sourceIds: string[]; covers?: number[] }
-interface Payload { requiredCoverage?: Record<string, number[]>; primary?: OriginalSentence[]; sources?: Piece[]; candidates?: Fact[]; totalFacts?: number; otherFactsRetained?: number }
+interface Payload { requiredCoverage?: Record<string, number[]>; primary?: WireSentence[]; sources?: Piece[]; candidates?: Fact[]; totalFacts?: number; otherFactsRetained?: number }
 const data = (request: TextRequest): Payload => (JSON.parse(request.messages.at(-1)!.content) as { data: Payload }).data;
 const prefix = (text: string) => text.split(" | ")[0]!;
 function original(text: string) { return `${text} | ` + "The surrounding discussion is original evidence and remains available without being shortened. ".repeat(9); }
@@ -22,7 +24,7 @@ function adapter(reduce: (facts: Fact[], sources: Piece[], request: TextRequest)
     let output: unknown;
     if ("revisions" in (request.schema as { properties: object }).properties) output = { revisions: Object.fromEntries(input.candidates!.map(fact => [String(fact.id), "unchanged"])) };
     else if (input.primary) output = { classifications: Object.fromEntries(input.primary.map(piece => [piece.id,
-      piece.sourceId.endsWith(":0") && piece.id.endsWith(":0")
+      sourceId(piece).endsWith(":0") && piece.id.endsWith(":0")
         ? /propose|suggest/i.test(piece.text) ? "proposal" : /final decision/i.test(piece.text) ? "decision" : "commitment" : "procedure",
     ])) };
     else if (input.candidates && !("candidateIds" in (request.schema as { properties: object }).properties)) output = Object.fromEntries(reduce(input.candidates, input.sources!, request).flatMap(fact => (fact.covers ?? []).map(id => [String(id), Math.min(...fact.covers!)])));
@@ -393,8 +395,8 @@ describe("complete long Summary coverage", () => {
       const primary = data(request).primary;
       if (!primary) return inner.model.complete(request);
       return { text: JSON.stringify({ classifications: Object.fromEntries(primary.map(piece => [piece.id,
-        !piece.sourceId.endsWith(":0") || !piece.id.endsWith(":0") ? "procedure" : Number(piece.sourceId.split(":")[0]) === 19 ? "unresolved"
-          : [17, 18].includes(Number(piece.sourceId.split(":")[0])) ? "commitment" : "decision",
+        !sourceId(piece).endsWith(":0") || !piece.id.endsWith(":0") ? "procedure" : Number(sourceId(piece).split(":")[0]) === 19 ? "unresolved"
+          : [17, 18].includes(Number(sourceId(piece).split(":")[0])) ? "commitment" : "decision",
       ])) }), metadata: { model: "priority:test", elapsedMs: 1 } };
     } };
     await createGroundedSummariser({ model })(transcript);

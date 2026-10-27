@@ -5,9 +5,11 @@ import type { Transcript } from "./pipeline.js";
 import { createGroundedSummariser } from "./grounded-summariser.js";
 import { requestBytes } from "./model-request.js";
 
+type WireSentence = Omit<OriginalSentence, "sourceId">;
+const sourceId = (sentence: WireSentence) => sentence.id.slice(0, sentence.id.lastIndexOf(":"));
 interface Piece { id: string; ref: number; part: number; speaker: string; text: string }
 interface Candidate { id: number; speaker: string; text: string; sourceIds: string[]; kind: string }
-interface Payload { primary?: OriginalSentence[]; candidates?: Candidate[]; sources?: Piece[] }
+interface Payload { primary?: WireSentence[]; candidates?: Candidate[]; sources?: Piece[] }
 const input = (request: TextRequest): Payload => {
   const value = JSON.parse(request.messages[1]!.content) as Payload & { data?: Payload };
   return value.data ?? value;
@@ -28,7 +30,7 @@ function topicModel(nameFor: (text: string) => string = topic) {
     if ("revisions" in (request.schema as { properties: object }).properties) { output = { revisions: Object.fromEntries(payload.candidates!.map(fact => [String(fact.id), "unchanged"])) }; }
     else if (payload.primary) {
       output = { classifications: Object.fromEntries(payload.primary.map(piece => [piece.id,
-        piece.sourceId.endsWith(":0") && piece.id.endsWith(":0") ? "update" : "procedure",
+        sourceId(piece).endsWith(":0") && piece.id.endsWith(":0") ? "update" : "procedure",
       ])) };
     } else if (payload.candidates && !("candidateIds" in (request.schema as { properties: object }).properties)) {
       const facts = payload.candidates!;

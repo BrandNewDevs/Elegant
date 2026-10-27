@@ -23,9 +23,11 @@ function fake(reply: (request: TextRequest, call: number) => unknown): TextModel
       metadata: { model: "local:test", elapsedMs: 1, promptTokens: 30, outputTokens: 20 } };
   } };
 }
+type WireSentence = Omit<OriginalSentence, "sourceId">;
+const sourceId = (sentence: WireSentence) => sentence.id.slice(0, sentence.id.lastIndexOf(":"));
 interface Piece { id: string; ref: number; part: number; speaker: string; text: string }
 interface Fact { id: number; speaker: string; text: string; refs?: number[]; sourceIds: string[]; kind: string }
-interface Payload { sources?: Piece[]; primary?: OriginalSentence[]; context?: OriginalSentence[]; candidates?: Fact[]; draft?: unknown }
+interface Payload { sources?: Piece[]; primary?: WireSentence[]; context?: WireSentence[]; candidates?: Fact[]; draft?: unknown }
 const payload = (request: TextRequest): Payload => (JSON.parse(request.messages[1]!.content) as { data: Payload }).data;
 
 /** A deterministic adapter exercises orchestration, budgets and provenance, not factual model quality. */
@@ -523,7 +525,7 @@ describe("evidence-backed Summary generation", () => {
       const input = payload(request);
       expect(input).not.toHaveProperty("sources");
       for (const sentence of input.primary!) {
-        expect(source.segments[Number(sentence.sourceId.split(":")[0])]!.text).toContain(sentence.text);
+        expect(source.segments[Number(sourceId(sentence).split(":")[0])]!.text).toContain(sentence.text);
       }
     }
   });
@@ -540,10 +542,25 @@ describe("evidence-backed Summary generation", () => {
     const primary = requests.flatMap(request => payload(request).primary!);
     expect(primary).toHaveLength(1400);
     expect(new Set(primary.map(sentence => sentence.id)).size).toBe(1400);
-    expect(requests.filter(request => payload(request).primary!.some(sentence => sentence.sourceId === "0:0")).length).toBeGreaterThan(1);
+    expect(requests.filter(request => payload(request).primary!.some(sentence => sourceId(sentence) === "0:0")).length).toBeGreaterThan(1);
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
     expect(result.participants).toEqual([{ speaker: "You", said: ["Go."] }]);
     expect(result.evidence!.participants[0]!.said).toEqual([[0]]);
+  });
+
+  it("fits at least twenty complete original sentence records with one shared kind schema", async () => {
+    const source: Transcript = { segments: Array.from({ length: 80 }, (_, index) => ({
+      start: index * 2, end: index * 2 + 1, speaker: "You", text: `Task_${index} requires local processing.`,
+    })) };
+    const model = fake(hierarchicalReply);
+    await createGroundedSummariser({ model })(source);
+    const first = model.requests.find(request => payload(request).primary)!;
+    const primary = payload(first).primary!;
+    expect(primary.length).toBeGreaterThanOrEqual(20);
+    expect(requestBytes(first)).toBeLessThanOrEqual(5500);
+    expect(primary.every(sentence => Object.keys(sentence).join(",") === "id,speaker,text")).toBe(true);
+    expect(JSON.stringify(first.schema).match(/"procedure"/g)).toHaveLength(1);
+    expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
   it("fails after three attempts when any primary sentence classification is omitted", async () => {
