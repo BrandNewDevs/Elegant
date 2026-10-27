@@ -396,7 +396,7 @@ describe("evidence-backed Summary generation", () => {
 
   it("retains primary facts without retrying when extraction also repeats a valid context-only fact", async () => {
     const source: Transcript = { segments: Array.from({ length: 85 }, (_, index) => ({
-      start: index, end: index + 1, speaker: "You", text: `Original task ${index}: ` + "supporting discussion ".repeat(5),
+      start: index * 2, end: index * 2 + 1, speaker: "You", text: `Original task ${index}: ` + "supporting discussion ".repeat(5),
     })) };
     const extractionStarts: string[] = [];
     let largestPrimaryWithContext = 0;
@@ -434,7 +434,7 @@ describe("evidence-backed Summary generation", () => {
       return hierarchicalReply(request);
     });
     const source: Transcript = { segments: Array.from({ length: 85 }, (_, index) => ({
-      start: index, end: index + 1, speaker: "You", text: `Original task ${index}: ` + "supporting discussion ".repeat(5),
+      start: index * 2, end: index * 2 + 1, speaker: "You", text: `Original task ${index}: ` + "supporting discussion ".repeat(5),
     })) };
     await expect(createGroundedSummariser({ model, attempts: 1 })(source)).rejects.toThrow("failed validation");
     expect(contextRequestSeen).toBe(true);

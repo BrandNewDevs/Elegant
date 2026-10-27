@@ -250,4 +250,42 @@ describe("complete long Summary coverage", () => {
     expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
+  it("merges exact repeated claims across references while keeping all evidence and compact TLDR originals", async () => {
+    const transcript = uniqueCommitments();
+    transcript.segments.forEach(segment => { segment.text = original("I will complete the offline check by Thursday."); });
+    const { model, requests } = adapter();
+    const result = await createGroundedSummariser({ model })(transcript);
+    expect(result.participants[0]!.said).toEqual(["I will complete the offline check by Thursday."]);
+    expect(result.evidence!.participants[0]!.said).toEqual([transcript.segments.map((_, ref) => ref)]);
+    const final = data(requests.at(-1)!);
+    expect(final.candidates).toHaveLength(1);
+    expect(final.candidates![0]!.sourceIds).toEqual(["8:0"]);
+    expect(final.sources).toHaveLength(1);
+    expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it("seeds outcomes and uncertainty while prioritizing distinct commitments over repetitive review decisions", async () => {
+    const transcript: Transcript = { segments: Array.from({ length: 20 }, (_, ref) => ({
+      start: ref * 20, end: ref * 20 + 15, speaker: "You", text: `Original substantive source ${ref}: ` + "supporting passage ".repeat(5),
+    })) };
+    const inner = adapter();
+    const requests: TextRequest[] = [];
+    const model: TextModel = { async complete(request) {
+      requests.push(request);
+      const primary = data(request).primary;
+      if (!primary) return inner.model.complete(request);
+      return { text: JSON.stringify({ facts: primary.map(piece => ({ speaker: piece.speaker, sourceIds: [piece.id],
+        kind: piece.ref === 19 ? "unresolved" : piece.ref === 17 || piece.ref === 18 ? "commitment" : "decision",
+        text: piece.ref === 19 ? "Packaging has no owner." : piece.ref === 18 ? "Will retest offline on Thursday."
+          : piece.ref === 17 ? "Will update the guide on Wednesday." : `Distinct earlier outcome ${piece.ref}.`,
+      })) }), metadata: { model: "priority:test", elapsedMs: 1 } };
+    } };
+    await createGroundedSummariser({ model })(transcript);
+    const final = data(requests.at(-1)!);
+    expect(final.candidates!.slice(0, 4).map(fact => fact.text)).toEqual([
+      "Distinct earlier outcome 16.", "Will retest offline on Thursday.", "Packaging has no owner.", "Will update the guide on Wednesday.",
+    ]);
+    expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
 });
