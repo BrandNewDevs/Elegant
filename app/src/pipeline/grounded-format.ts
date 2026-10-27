@@ -25,10 +25,14 @@ export const FACTS_SCHEMA = {
 
 /** Restrict structured output to evidence that was actually supplied in this request. */
 export function groundedSchema(sources: SourcePiece[]) {
-  const refs = { ...refsSchema, items: { type: "integer", enum: [...new Set(sources.map(source => source.ref))] } };
+  const speakers = [...new Set(sources.map(source => source.speaker))];
   return { ...GROUNDED_SCHEMA, properties: { ...GROUNDED_SCHEMA.properties,
-    points: { ...GROUNDED_SCHEMA.properties.points, items: { ...GROUNDED_SCHEMA.properties.points.items,
-      properties: { ...pointProperties, refs, speaker: { type: "string", enum: [...new Set(sources.map(source => source.speaker))] } } } } } };
+    points: { ...GROUNDED_SCHEMA.properties.points, items: { anyOf: speakers.map(speaker => ({
+      type: "object", properties: { ...pointProperties, speaker: { type: "string", enum: [speaker] },
+        refs: { ...refsSchema, items: { type: "integer", enum: [...new Set(sources.filter(source => source.speaker === speaker).map(source => source.ref))] } },
+      }, required: ["speaker", "text", "refs"], additionalProperties: false,
+    })) } },
+  } };
 }
 export function factsSchema(sources: SourcePiece[], speakers = sources) {
   const facts = FACTS_SCHEMA.properties.facts;
@@ -95,17 +99,20 @@ function references(value: unknown, sources: SourcePiece[]): number[] {
   // Repeating a valid identifier adds no evidence; normalize without spending a model retry.
   return [...new Set(value)].sort((a, b) => a - b) as number[];
 }
-function point(value: unknown, sources: SourcePiece[]): SupportedPoint {
+function point(value: unknown, sources: SourcePiece[], ownSpeechOnly = false): SupportedPoint {
   if (!record(value)) return problem("Every point must be an object");
   const speaker = text(value.speaker);
   const refs = references(value.refs, sources);
   if (!sources.some(source => source.speaker === speaker && refs.includes(source.ref))) return problem("Attribute each point to a supplied speaker with that speaker's evidence");
+  if (ownSpeechOnly && !refs.every(ref => sources.some(source => source.ref === ref && source.speaker === speaker))) {
+    return problem("Direct Participant points must cite only their own speech; put another speaker's correction under that speaker");
+  }
   return { speaker, text: text(value.text), refs };
 }
 export function parseGrounded(json: string, sources: SourcePiece[]): GroundedOutput {
   const value = object(json);
   if (!Array.isArray(value.points)) return problem("points must be a list");
-  const points = value.points.map(value => point(value, sources));
+  const points = value.points.map(value => point(value, sources, true));
   return { ...composeTldr(value.tldrPointIds, points), points };
 }
 export function parseRefinedPoints(json: string, draft: SupportedPoint[]): SupportedPoint[] {

@@ -97,11 +97,11 @@ describe("evidence-backed Summary generation", () => {
   });
 
   it("groups multiple points by exact speaker labels without duplicate Participant entries", async () => {
-    const model = fake(() => ({ ...good, points: [...good.points, { speaker: "You", text: "No launch date is agreed.", refs: [0, 1] }] }));
+    const model = fake(() => ({ ...good, points: [...good.points, { speaker: "You", text: "The guide is my Thursday task.", refs: [0] }] }));
     const result = await createGroundedSummariser({ model })(transcript);
     expect(result.participants).toHaveLength(2);
     expect(result.participants[0]!.said).toHaveLength(2);
-    expect(result.evidence!.participants[0]!.said).toEqual([[0], [0, 1]]);
+    expect(result.evidence!.participants[0]!.said).toEqual([[0], [0]]);
   });
 
   it("does not refine seven distinct straightforward points merely because speakers have several points", async () => {
@@ -321,6 +321,19 @@ describe("evidence-backed Summary generation", () => {
       await expect(createGroundedSummariser({ model, attempts: 1 })(transcript)).rejects.toThrow("failed validation");
       expect(model.requests).toHaveLength(1);
     }
+  });
+
+  it("rejects direct Participant points borrowing another speaker's evidence even when own evidence is also present", async () => {
+    const model = fake(() => ({ ...good, points: [
+      { speaker: "You", text: "Will write the guide; no launch date is agreed.", refs: [0, 1] },
+    ], tldrPointIds: [0] }));
+    await expect(createGroundedSummariser({ model, attempts: 1 })(transcript)).rejects.toThrow("must cite only their own speech");
+    expect(model.requests).toHaveLength(1);
+    const schema = model.requests[0]!.schema as { properties: { points: { items: { anyOf: {
+      properties: { speaker: { enum: string[] }; refs: { items: { enum: number[] } } };
+    }[] } } } };
+    expect(schema.properties.points.items.anyOf.map(branch => [branch.properties.speaker.enum, branch.properties.refs.items.enum]))
+      .toEqual([[["You"], [0]], [["Speaker 1"], [1]]]);
   });
 
   it("normalizes repeated citation identifiers without changing their source meaning", async () => {
