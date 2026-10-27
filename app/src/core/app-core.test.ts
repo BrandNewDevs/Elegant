@@ -1634,3 +1634,24 @@ describe("show in Dock", () => {
     expect(new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).showInDock).toBe(true);
   });
 });
+
+describe("update check settings", () => {
+  it("checks until the user turns it off, and a stored false is kept across a restart", () => {
+    const store = openStore(":memory:");
+    const core = new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() });
+    expect(core.checkForUpdates).toBe(true);
+    core.setCheckForUpdates(false);
+    expect(store.getSetting("checkForUpdates")).toBe("false");
+    expect(new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).checkForUpdates).toBe(false);
+    core.setCheckForUpdates(true);
+    expect(new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).checkForUpdates).toBe(true);
+  });
+
+  it("remembers the last release the person was told about", () => {
+    const store = openStore(":memory:");
+    const core = new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() });
+    expect(core.lastNotifiedUpdate).toBeUndefined();
+    core.setLastNotifiedUpdate("0.2.0");
+    expect(new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).lastNotifiedUpdate).toBe("0.2.0");
+  });
+});

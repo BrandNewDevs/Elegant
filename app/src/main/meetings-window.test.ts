@@ -44,7 +44,7 @@ vi.mock("electron", () => electron);
 type ChatInput = Parameters<MeetingChatGenerator>[0];
 type ChatResult = Awaited<ReturnType<MeetingChatGenerator>>;
 type TestWindow = typeof electron.windows[number];
-interface TestContext { core: AppCore; store: Store; engine: FakeEngine; setup: Setup; window: TestWindow; id: number }
+interface TestContext { core: AppCore; store: Store; engine: FakeEngine; setup: Setup; view: MeetingsWindow; window: TestWindow; id: number }
 const contexts: TestContext[] = [];
 const finishers: (() => void)[] = [];
 const turn = () => new Promise<void>(resolve => setImmediate(resolve));
@@ -73,7 +73,7 @@ function context(generate: MeetingChatGenerator = async input => { input.onStage
   view.show();
   const window = electron.windows.at(-1)!;
   window.loaded();
-  const ctx = { core, store, engine, setup, window, id };
+  const ctx = { core, store, engine, setup, view, window, id };
   contexts.push(ctx);
   emit(ctx, "meetings:select", id);
   return ctx;
@@ -130,6 +130,68 @@ describe("Meetings window application bridge", () => {
     expect(latest(ctx).settingsOpen).toBe(true);
     emit(ctx, "setup:ready");
     expect(ctx.window.webContents.send.mock.calls.some(([channel, value]) => channel === "setup:state" && (value as { userName: string }).userName === "Jordan")).toBe(true);
+  });
+
+  it("holds an update toast until a Meetings window is ready, opens no window for it, and announces it once", () => {
+    const store = openStore(":memory:");
+    const engine = new FakeEngine();
+    const core = new AppCore({ engine, store, pipeline: fakePipeline() });
+    const setup = new Setup(engine, store, { speechModel: "tiny.en", modelsDirectory: "/tmp/synthetic-models", jobs: core.jobs, checkOllama: async () => ({ status: "ready" }) });
+    const view = new MeetingsWindow(core, setup, new SetupBridge(setup, { done: () => {}, openSettings: () => {} }));
+    const update = { version: "0.2.0", url: "https://github.com/BrandNewDevs/Elegant/releases/tag/v0.2.0" };
+
+    view.offerUpdate(update);
+    expect(electron.windows).toHaveLength(0);
+    expect(core.lastNotifiedUpdate).toBeUndefined();
+
+    view.show();
+    const window = electron.windows[0]!;
+    window.loaded();
+    const updates = () => window.webContents.send.mock.calls.filter(([channel]) => channel === "meetings:update-available");
+    expect(updates()).toHaveLength(0); // the page has not subscribed yet
+    electron.events.get("meetings:ready")!({ sender: window.webContents });
+    expect(updates()).toEqual([["meetings:update-available", update]]);
+    expect(core.lastNotifiedUpdate).toBe("0.2.0");
+
+    electron.events.get("meetings:ready")!({ sender: window.webContents });
+    expect(updates()).toHaveLength(1);
+
+    window.close();
+    store.close();
+  });
+
+  it("sends an update straight to the open window, and opens the release page only for an announced github.com URL", () => {
+    const ctx = context();
+    emit(ctx, "meetings:ready");
+    emit(ctx, "meetings:open-release");
+    expect(electron.shell.openExternal).not.toHaveBeenCalled(); // nothing announced yet
+
+    const update = { version: "0.2.0", url: "https://github.com/BrandNewDevs/Elegant/releases/tag/v0.2.0" };
+    ctx.view.offerUpdate(update);
+    expect(ctx.window.webContents.send).toHaveBeenCalledWith("meetings:update-available", update);
+    expect(ctx.core.lastNotifiedUpdate).toBe("0.2.0");
+
+    emit(ctx, "meetings:open-release", undefined, {});
+    expect(electron.shell.openExternal).not.toHaveBeenCalled(); // another web contents
+    emit(ctx, "meetings:open-release");
+    expect(electron.shell.openExternal).toHaveBeenCalledExactlyOnceWith(update.url);
+
+    ctx.view.offerUpdate({ version: "0.3.0", url: "https://evil.example/x" });
+    emit(ctx, "meetings:open-release");
+    expect(electron.shell.openExternal).toHaveBeenCalledTimes(1);
+  });
+
+  it("stores the Check for updates switch from the page and publishes it", () => {
+    const ctx = context();
+    expect(latest(ctx).checkForUpdates).toBe(true);
+    emit(ctx, "meetings:check-for-updates", false);
+    expect(ctx.core.checkForUpdates).toBe(false);
+    expect(latest(ctx).checkForUpdates).toBe(false);
+    emit(ctx, "meetings:check-for-updates", "true");
+    emit(ctx, "meetings:check-for-updates", true, {});
+    expect(ctx.core.checkForUpdates).toBe(false);
+    emit(ctx, "meetings:check-for-updates", true);
+    expect(latest(ctx).checkForUpdates).toBe(true);
   });
 
   it("rejects every invoke from another web contents before reading or mutating Meeting data", async () => {

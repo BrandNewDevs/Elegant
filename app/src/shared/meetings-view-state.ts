@@ -7,6 +7,8 @@ export type MeetingsViewState = {
   settingsOpen: boolean;
   /** The "Show in Dock" setting, shown in the Settings dialog. */
   showInDock: boolean;
+  /** The "Check for updates" setting, shown in the Settings dialog. */
+  checkForUpdates: boolean;
   meetings: MeetingListItem[];
   selected: Meeting | undefined;
   query: string;

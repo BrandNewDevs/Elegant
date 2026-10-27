@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Cpu, Dock, Download, ExternalLink, Loader2, RefreshCw, Settings, ShieldCheck, Sparkles, XCircle, type LucideIcon } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle2, Cpu, Dock, Download, ExternalLink, Loader2, RefreshCw, Settings, ShieldCheck, Sparkles, XCircle, type LucideIcon } from "lucide-react";
 import { type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -108,6 +108,26 @@ function DockCard({ showInDock, name }: { showInDock: boolean; name: string }) {
   );
 }
 
+function UpdatesCard({ checkForUpdates, name }: { checkForUpdates: boolean; name: string }) {
+  return (
+    <Card>
+      <CardHeader className="flex-row items-start justify-between gap-4 space-y-0 pb-6">
+        <div className="space-y-1.5">
+          <CardHeading icon={Bell}>
+            <Label htmlFor="check-for-updates" className="text-base">
+              Check for updates
+            </Label>
+          </CardHeading>
+          <CardDescription>
+            When {name} starts, it asks GitHub whether a newer release is out and tells you with a link. It sends nothing about you or your Meetings, and installs nothing.
+          </CardDescription>
+        </div>
+        <Switch id="check-for-updates" checked={checkForUpdates} onCheckedChange={(checked) => window.electron.meetings.setCheckForUpdates(checked)} />
+      </CardHeader>
+    </Card>
+  );
+}
+
 function ModelsCard({ models, name }: { models: Step & { fraction: number }; name: string }) {
   const percent = Math.round(models.fraction * 100);
   return (
@@ -171,7 +191,7 @@ function SummariesCard({ ollama }: { ollama: Step }) {
   );
 }
 
-function SettingsContent({ showInDock }: { showInDock: boolean }) {
+function SettingsContent({ showInDock, checkForUpdates }: { showInDock: boolean; checkForUpdates: boolean }) {
   const view = useSetup();
   if (!view) return null;
   const { name, state } = view;
@@ -179,6 +199,7 @@ function SettingsContent({ showInDock }: { showInDock: boolean }) {
   return (
     <div className="space-y-5">
       <DockCard showInDock={showInDock} name={name} />
+      <UpdatesCard checkForUpdates={checkForUpdates} name={name} />
       <Card>
         <CardHeader className="pb-1">
           <CardHeading icon={ShieldCheck}>Permissions</CardHeading>
@@ -196,15 +217,17 @@ function SettingsContent({ showInDock }: { showInDock: boolean }) {
   );
 }
 
-/** Settings, as a dialog over the main window: Show in Dock, the permissions, the model download and the Ollama check. */
+/** Settings, as a dialog over the main window: Show in Dock, Check for updates, the permissions, the model download and the Ollama check. */
 export function SettingsDialog({
   open,
   onOpenChange,
   showInDock = true,
+  checkForUpdates = true,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   showInDock?: boolean;
+  checkForUpdates?: boolean;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -226,7 +249,7 @@ export function SettingsDialog({
           <DialogDescription>The Dock, the permissions, and what summaries need.</DialogDescription>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto p-6">
-          <SettingsContent showInDock={showInDock} />
+          <SettingsContent showInDock={showInDock} checkForUpdates={checkForUpdates} />
         </div>
       </DialogContent>
     </Dialog>

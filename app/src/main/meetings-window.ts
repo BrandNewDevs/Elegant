@@ -1,7 +1,8 @@
-import { BrowserWindow, dialog, ipcMain, type WebContents } from "electron";
+import { BrowserWindow, dialog, ipcMain, shell, type WebContents } from "electron";
 import { writeFile } from "node:fs/promises";
 import type { AppCore } from "../core/app-core.js";
 import { DISPLAY_NAME } from "../config.js";
+import { isGithubUrl, type UpdateNotice } from "../core/update-check.js";
 import type { Setup } from "../setup/setup.js";
 import type { MeetingsViewState } from "../shared/meetings-view-state.js";
 import type { SetupBridge } from "./setup-bridge.js";
@@ -47,6 +48,12 @@ export class MeetingsWindow {
   private selectedId: number | undefined;
   private query = "";
   private pageLoaded = false;
+  /** Whether the page has subscribed to the push channels, so a message sent now is not lost. */
+  private rendererReady = false;
+  /** A release found while no window was open to show it, announced the next time one opens. */
+  private pendingUpdate: UpdateNotice | undefined;
+  /** The release announced last, the only page "View release" opens. */
+  private announcedUpdate: UpdateNotice | undefined;
 
   constructor(
     private readonly core: AppCore,
@@ -72,7 +79,9 @@ export class MeetingsWindow {
   private registerIpc(): void {
     ipcMain.on("meetings:ready", (event) => {
       if (!this.fromThis(event.sender)) return;
+      this.rendererReady = true;
       this.pushState();
+      this.announceUpdate();
     });
     ipcMain.on("meetings:settings", (event, open: boolean) => {
       if (!this.fromThis(event.sender) || typeof open !== "boolean") return;
@@ -81,6 +90,15 @@ export class MeetingsWindow {
     ipcMain.on("meetings:show-in-dock", (event, show: unknown) => {
       if (!this.fromThis(event.sender) || typeof show !== "boolean") return;
       this.core.setShowInDock(show);
+    });
+    ipcMain.on("meetings:check-for-updates", (event, check: unknown) => {
+      if (!this.fromThis(event.sender) || typeof check !== "boolean") return;
+      this.core.setCheckForUpdates(check);
+      this.pushState();
+    });
+    ipcMain.on("meetings:open-release", (event) => {
+      if (!this.fromThis(event.sender) || !isGithubUrl(this.announcedUpdate?.url)) return;
+      void shell.openExternal(this.announcedUpdate.url);
     });
     ipcMain.on("meetings:select", (event, id: number) => {
       if (!this.fromThis(event.sender) || !validMeetingId(id)) return;
@@ -168,6 +186,7 @@ export class MeetingsWindow {
       window.on("closed", () => {
         this.window = undefined;
         this.pageLoaded = false;
+        this.rendererReady = false;
       });
       window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
       this.bridge.attach(window.webContents);
@@ -182,6 +201,24 @@ export class MeetingsWindow {
     }
     this.window.show();
     this.window.focus();
+  }
+
+  /**
+   * A newer release was found. The toast needs a visible window, so it goes to the open one now, or waits for the next time one
+   * opens; this never opens a window itself. Once announced, the person has been told about that version.
+   */
+  offerUpdate(update: UpdateNotice): void {
+    this.pendingUpdate = update;
+    this.announceUpdate();
+  }
+
+  private announceUpdate(): void {
+    const update = this.pendingUpdate;
+    if (!update || !this.window || this.window.isDestroyed() || !this.rendererReady) return;
+    this.pendingUpdate = undefined;
+    this.announcedUpdate = update;
+    this.core.setLastNotifiedUpdate(update.version);
+    this.window.webContents.send("meetings:update-available", update);
   }
 
   private setSettingsOpen(open: boolean, push = true): void {
@@ -240,6 +277,7 @@ export class MeetingsWindow {
     const payload: MeetingsViewState = {
       settingsOpen: this.settingsOpen,
       showInDock: this.core.showInDock,
+      checkForUpdates: this.core.checkForUpdates,
       meetings,
       selected,
       query: this.query,

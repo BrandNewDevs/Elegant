@@ -20,6 +20,12 @@ const KEEP_AUDIO_SETTING = "keepAudio";
 /** The store setting behind `AppCore.showInDock`. */
 const SHOW_IN_DOCK_SETTING = "showInDock";
 
+/** The store setting behind `AppCore.checkForUpdates`. */
+const CHECK_FOR_UPDATES_SETTING = "checkForUpdates";
+
+/** The store setting behind `AppCore.lastNotifiedUpdate`. */
+const LAST_NOTIFIED_UPDATE_SETTING = "lastNotifiedUpdate";
+
 /** The store setting behind `AppCore.neverApps`: a JSON array of app names. */
 const NEVER_APPS_SETTING = "neverApps";
 
@@ -320,6 +326,25 @@ export class AppCore {
 
   onShowInDockChange(listener: (show: boolean) => void): void {
     this.showInDockListeners.push(listener);
+  }
+
+  /** Whether the app asks GitHub at launch for a newer release. On unless the user turned it off. */
+  get checkForUpdates(): boolean {
+    return this.deps.store.getSetting(CHECK_FOR_UPDATES_SETTING) !== "false";
+  }
+
+  /** Applies from the next launch on. */
+  setCheckForUpdates(check: boolean): void {
+    this.deps.store.setSetting(CHECK_FOR_UPDATES_SETTING, String(check));
+  }
+
+  /** The newest release version the person has been told about, so the same release is not announced at every launch. */
+  get lastNotifiedUpdate(): string | undefined {
+    return this.deps.store.getSetting(LAST_NOTIFIED_UPDATE_SETTING);
+  }
+
+  setLastNotifiedUpdate(version: string): void {
+    this.deps.store.setSetting(LAST_NOTIFIED_UPDATE_SETTING, version);
   }
 
   /** Removes a Meeting and all its data, including any kept audio. */
