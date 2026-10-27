@@ -16,14 +16,6 @@ export const GROUNDED_SCHEMA = {
     tldrPointIds: { type: "array", minItems: 1, maxItems: 3, uniqueItems: true, items: { type: "integer", minimum: 0 } },
   }, required: ["points", "tldrPointIds"],
 };
-export const FACTS_SCHEMA = {
-  type: "object", properties: { facts: { type: "array", items: {
-    type: "object", properties: { kind: { type: "string", enum: ["proposal", "decision", "commitment", "disagreement", "unresolved", "update"] },
-      sourceIds: { type: "array", items: { type: "string" }, minItems: 1, uniqueItems: true }, speaker: pointProperties.speaker, text: pointProperties.text },
-    required: ["kind", "sourceIds", "speaker", "text"],
-  } } }, required: ["facts"],
-};
-
 /** Restrict structured output to evidence that was actually supplied in this request. */
 export function groundedSchema(sources: SourcePiece[]) {
   const speakers = [...new Set(sources.map(source => source.speaker))];
@@ -35,14 +27,6 @@ export function groundedSchema(sources: SourcePiece[]) {
     })) } },
   } };
 }
-export function factsSchema(sources: SourcePiece[], speakers = sources) {
-  const facts = FACTS_SCHEMA.properties.facts;
-  return { ...FACTS_SCHEMA, properties: { facts: { ...facts, items: { ...facts.items, properties: { ...facts.items.properties,
-    speaker: { type: "string", enum: [...new Set(speakers.map(source => source.speaker))] },
-    sourceIds: { ...facts.items.properties.sourceIds, items: { type: "string", enum: sources.map(source => source.id) } },
-  } } } } };
-}
-
 /** Consolidation must account for every candidate without moving contributions between speakers. */
 export function reductionSchema(_sources: SourcePiece[], candidates: readonly unknown[]) {
   // Every candidate has a required assignment; the model cannot omit claims or
@@ -132,24 +116,6 @@ export function parseRefinedPoints(json: string, draft: SupportedPoint[]): Suppo
   });
   if (covered.size !== draft.length) return problem(coverageReason("Missing draft IDs", draft.map((_, id) => id).filter(id => !covered.has(id)), draft));
   return points;
-}
-
-export function parseFacts(json: string, sources: SourcePiece[], primary?: SourcePiece[]): SupportedFact[] {
-  const value = object(json);
-  if (!Array.isArray(value.facts)) return problem("facts must be a list");
-  const facts = value.facts.map(value => {
-    if (!record(value) || typeof value.kind !== "string" || !["proposal", "decision", "commitment", "disagreement", "unresolved", "update"].includes(value.kind)) return problem("Use a supported fact kind");
-    if (!Array.isArray(value.sourceIds) || !value.sourceIds.length || !value.sourceIds.every(id => typeof id === "string" && sources.some(source => source.id === id))) return problem("Cite sourceIds supplied with the original passages");
-    const selected = sources.filter(source => (value.sourceIds as string[]).includes(source.id));
-    // The model cites one identifier system. Derive public ordinals from validated original pieces.
-    const p = point({ ...value, refs: [...new Set(selected.map(source => source.ref))] }, selected);
-    return { ...p, kind: value.kind as FactKind, sources: selected };
-  });
-  // Validate the entire response first. Neighbor-only facts were primary in the
-  // preceding chunk; ignore those repetitions without discarding valid new facts.
-  // Context can clarify a fact only alongside this speaker's primary evidence.
-  return primary ? facts.filter(fact => fact.sources.some(source => source.speaker === fact.speaker
-    && primary.some(piece => piece.id === source.id))) : facts;
 }
 
 /** Whole immutable claims keep a TLDR from transferring another task's date or owner. */

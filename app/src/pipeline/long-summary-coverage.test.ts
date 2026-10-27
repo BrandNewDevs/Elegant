@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { OriginalSentence } from "./sentence-claims.js";
 import { createGroundedSummariser, SUMMARY_PROMPT_VERSION } from "./grounded-summariser.js";
 import { requestBytes } from "./model-request.js";
 import type { Transcript } from "./pipeline.js";
@@ -6,7 +7,7 @@ import type { TextModel, TextRequest } from "./language-model.js";
 
 interface Piece { id: string; ref: number; part: number; speaker: string; text: string }
 interface Fact { id: number; speaker: string; text: string; kind: string; sourceIds: string[]; covers?: number[] }
-interface Payload { requiredCoverage?: Record<string, number[]>; primary?: Piece[]; sources?: Piece[]; candidates?: Fact[]; totalFacts?: number; otherFactsRetained?: number }
+interface Payload { requiredCoverage?: Record<string, number[]>; primary?: OriginalSentence[]; sources?: Piece[]; candidates?: Fact[]; totalFacts?: number; otherFactsRetained?: number }
 const data = (request: TextRequest): Payload => (JSON.parse(request.messages.at(-1)!.content) as { data: Payload }).data;
 const prefix = (text: string) => text.split(" | ")[0]!;
 function original(text: string) { return `${text} | ` + "The surrounding discussion is original evidence and remains available without being shortened. ".repeat(9); }
@@ -20,9 +21,10 @@ function adapter(reduce: (facts: Fact[], sources: Piece[], request: TextRequest)
     const input = data(request);
     let output: unknown;
     if ("revisions" in (request.schema as { properties: object }).properties) output = { revisions: Object.fromEntries(input.candidates!.map(fact => [String(fact.id), "unchanged"])) };
-    else if (input.primary) output = { facts: input.primary.filter(piece => piece.part === 0).map(piece => ({
-      speaker: piece.speaker, text: prefix(piece.text), kind: /propose|suggest/i.test(piece.text) ? "proposal" : /final decision/i.test(piece.text) ? "decision" : "commitment", sourceIds: [piece.id],
-    })) };
+    else if (input.primary) output = { classifications: Object.fromEntries(input.primary.map(piece => [piece.id,
+      piece.sourceId.endsWith(":0") && piece.id.endsWith(":0")
+        ? /propose|suggest/i.test(piece.text) ? "proposal" : /final decision/i.test(piece.text) ? "decision" : "commitment" : "procedure",
+    ])) };
     else if (input.candidates && !("candidateIds" in (request.schema as { properties: object }).properties)) output = Object.fromEntries(reduce(input.candidates, input.sources!, request).flatMap(fact => (fact.covers ?? []).map(id => [String(id), Math.min(...fact.covers!)])));
     else output = { candidateIds: input.candidates!.slice(0, 3).map(fact => fact.id) };
     return { text: JSON.stringify(output), metadata: { model: "coverage:test", elapsedMs: 1 } };
@@ -318,7 +320,7 @@ describe("complete long Summary coverage", () => {
   it("does not reuse assignments for the same candidates when comparison context changes", async () => {
     const transcript: Transcript = { segments: Array.from({ length: 48 }, (_, index) => ({
       start: index, end: index + 1, speaker: index % 3 ? "Speaker 1" : "You",
-      text: `Topic_${Math.floor(index / 12)} claim_${index}. | ` + "original supporting discussion ".repeat(6),
+      text: `Topic_${Math.floor(index / 12)} claim_${index}. | ` + "Original supporting discussion. ".repeat(6),
     })) };
     const contextsByCandidates = new Map<string, Set<string>>();
     const { model, requests } = assignmentAdapter((facts, request) => {
@@ -353,7 +355,8 @@ describe("complete long Summary coverage", () => {
 
   it("seeds outcomes and uncertainty while prioritizing distinct commitments over repetitive review decisions", async () => {
     const transcript: Transcript = { segments: Array.from({ length: 20 }, (_, ref) => ({
-      start: ref * 20, end: ref * 20 + 15, speaker: "You", text: `Original substantive source ${ref}: ` + "supporting passage ".repeat(5),
+      start: ref * 20, end: ref * 20 + 15, speaker: "You", text: (ref === 19 ? "Packaging has no owner." : ref === 18 ? "Will retest offline on Thursday."
+        : ref === 17 ? "Will update the guide on Wednesday." : `Distinct earlier outcome ${ref}.`) + " Supporting passage. ".repeat(5),
     })) };
     const inner = adapter();
     const requests: TextRequest[] = [];
@@ -361,11 +364,10 @@ describe("complete long Summary coverage", () => {
       requests.push(request);
       const primary = data(request).primary;
       if (!primary) return inner.model.complete(request);
-      return { text: JSON.stringify({ facts: primary.map(piece => ({ speaker: piece.speaker, sourceIds: [piece.id],
-        kind: piece.ref === 19 ? "unresolved" : piece.ref === 17 || piece.ref === 18 ? "commitment" : "decision",
-        text: piece.ref === 19 ? "Packaging has no owner." : piece.ref === 18 ? "Will retest offline on Thursday."
-          : piece.ref === 17 ? "Will update the guide on Wednesday." : `Distinct earlier outcome ${piece.ref}.`,
-      })) }), metadata: { model: "priority:test", elapsedMs: 1 } };
+      return { text: JSON.stringify({ classifications: Object.fromEntries(primary.map(piece => [piece.id,
+        !piece.sourceId.endsWith(":0") || !piece.id.endsWith(":0") ? "procedure" : Number(piece.sourceId.split(":")[0]) === 19 ? "unresolved"
+          : [17, 18].includes(Number(piece.sourceId.split(":")[0])) ? "commitment" : "decision",
+      ])) }), metadata: { model: "priority:test", elapsedMs: 1 } };
     } };
     await createGroundedSummariser({ model })(transcript);
     const final = data(requests.at(-1)!);
@@ -492,16 +494,16 @@ describe("complete long Summary coverage", () => {
   });
 
   it("accepts correction evidence in a later fragment of the same original segment", async () => {
-    const transcript: Transcript = { segments: [{ start: 0, end: 60, speaker: "You", text: "Monday launch proposal. " + "background discussion ".repeat(50) + "Friday replaces Monday. " + "Later discussion. ".repeat(400) }] };
+    const transcript: Transcript = { segments: [{ start: 0, end: 60, speaker: "You", text: "Monday launch proposal. " + "Background discussion. ".repeat(50) + "Friday replaces Monday. " + "Later discussion. ".repeat(400) }] };
     const inner = adapter();
     let sameOrdinalCorrection = false;
     const model: TextModel = { async complete(request) {
       const input = data(request);
-      if (input.primary) return { text: JSON.stringify({ facts: input.primary.map(piece => ({ speaker: piece.speaker,
-        text: piece.part === 0 ? "Proposed Monday." : `Later original claim ${piece.part}.`, sourceIds: [piece.id], kind: piece.part === 0 ? "proposal" : "update",
-      })) }), metadata: { model: "fragment:test", elapsedMs: 1 } };
+      if (input.primary) return { text: JSON.stringify({ classifications: Object.fromEntries(input.primary.map(piece => [piece.id,
+        piece.text === "Monday launch proposal." ? "proposal" : "update",
+      ])) }), metadata: { model: "fragment:test", elapsedMs: 1 } };
       if (!("revisions" in (request.schema as { properties: object }).properties)) return inner.model.complete(request);
-      const proposal = input.candidates!.find(fact => fact.text === "Proposed Monday.");
+      const proposal = input.candidates!.find(fact => fact.text === "Monday launch proposal.");
       const correction = input.sources!.find(source => source.part > 0 && source.text.includes("replaces Monday"));
       const revisions = Object.fromEntries(input.candidates!.map(fact => [String(fact.id), proposal && correction && fact.id === proposal.id ? correction.id : "unchanged"]));
       sameOrdinalCorrection ||= !!proposal && !!correction;
@@ -509,7 +511,7 @@ describe("complete long Summary coverage", () => {
     } };
     const result = await createGroundedSummariser({ model })(transcript);
     expect(sameOrdinalCorrection).toBe(true);
-    expect(result.participants[0]!.said).toContain("Earlier proposal: Proposed Monday.");
+    expect(result.participants[0]!.said).toContain("Earlier proposal: Monday launch proposal.");
     expect(result.evidence!.participants[0]!.said[0]).toEqual([0]);
   });
 
