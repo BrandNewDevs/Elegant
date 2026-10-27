@@ -193,6 +193,7 @@ describe("complete long Summary coverage", () => {
     ["currency", "Budget is $500.", "Budget is €500."],
     ["comparison operator", "Latency must be < 60 ms.", "Latency must be > 60 ms."],
     ["signed value", "The balance is -500.", "The balance is +500."],
+    ["quoted title deadline", 'By Monday I will review "Friday Plan".', 'I will review "Friday Plan by Monday".'],
     ["negation", "I will test the permission flow by Thursday.", "By Thursday, I will not test permission flow."],
     ["modality", "I will test the permission flow by Thursday.", "By Thursday, I might test permission flow."],
     ["question", "I will test the permission flow by Thursday.", "By Thursday, I will test permission flow?"],

@@ -8,7 +8,7 @@ import { factsSchema, groundedSchema, refinementSchema, reductionSchema, tldrSch
   type GroundedOutput, type SourcePiece, type SupportedFact, type SupportedPoint } from "./grounded-format.js";
 
 export interface GroundedSummariserOptions { model: TextModel; attempts?: number; maxCalls?: number; deadlineMs?: number }
-export const SUMMARY_PROMPT_VERSION = "grounded-summary-v17";
+export const SUMMARY_PROMPT_VERSION = "grounded-summary-v18";
 const RETRY = " The previous output failed validation: ";
 const RETRY_REASON_LIMIT = 160;
 // Validation diagnostics contain rules and local ID/speaker metadata, never Transcript prose. Reserve exact ASCII bytes.
@@ -242,7 +242,7 @@ function equivalentDetails(fact: SupportedFact): string {
   const weekdays = /\b(?:by|due(?:\s+(?:on|by))?)\s+((?:(?:this|next)\s+)?(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))\b/gi;
   const times = [...text.matchAll(weekdays)];
   // Do not move a deadline across conjunctions or multiple sentences/tasks.
-  if (times.length === 1 && !/\b(?:and|or)\b|;/i.test(text) && (text.match(/[.!?](?:\s|$)/g) ?? []).length <= 1) {
+  if (times.length === 1 && !/["“”'‘’`]/.test(text) && !/\b(?:and|or)\b|;/i.test(text) && (text.match(/[.!?](?:\s|$)/g) ?? []).length <= 1) {
     const time = times[0]!;
     deadline = time[1]!.toLowerCase();
     text = text.slice(0, time.index) + text.slice(time.index! + time[0].length);
