@@ -336,7 +336,7 @@ describe("extractive Meeting chat", () => {
           : { sentenceIds: [], sufficient: false };
       }
       const selected = payload.sources!.filter(source => source.ref === 4);
-      return { sourceIds: (selected.length ? selected : payload.sources!.slice(0, 1)).map(source => source.id), sufficient: true };
+      return { sourceIds: (selected.length ? selected : payload.sources!.slice(0, 1)).map(source => source.id) };
     });
     const stages: string[] = [];
     const result = await createMeetingChat({ store: scoped, model })({ ...input(id, expectedRevision), question: "Who will write the launch guide?", onStage: stage => stages.push(stage) });
@@ -351,7 +351,7 @@ describe("extractive Meeting chat", () => {
   it("reports incomplete evidence rather than dropping speech to satisfy a budget", async () => {
     const { store, id, expectedRevision } = setup(long());
     const model = fake(request => contents(request).instruction.startsWith("Rewrite") ? { query: "launch permissions" }
-      : { sourceIds: contents(request).data.sources!.map(source => source.id), sufficient: true });
+      : { sourceIds: contents(request).data.sources!.map(source => source.id) });
     const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "Summarize all decisions" });
     expect(result.answer).toEqual({ text: CHAT_INCOMPLETE, refs: [], sufficient: false });
     expect(result.generation.exhaustive).toBe(false);

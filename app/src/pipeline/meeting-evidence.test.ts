@@ -36,7 +36,7 @@ const byCount = (max: number) => (sources: SourceFragment[]) => sources.length <
 function selection(request: TextRequest) {
   if (instruction(request).startsWith("Rewrite")) return { query: "launch permissions" };
   const sources = data(request).sources!;
-  return { sourceIds: instruction(request).startsWith("Consolidate") ? sources.map(source => source.id) : [sources.at(-1)!.id], sufficient: true };
+  return { sourceIds: instruction(request).startsWith("Consolidate") ? sources.map(source => source.id) : [sources.at(-1)!.id] };
 }
 function fixedHits(store: Store, passages: EvidencePassage[]) {
   return { getMeeting: store.getMeeting, listPassages: store.listPassages, searchPassages: () => passages };
@@ -52,28 +52,36 @@ describe("Meeting-specific evidence retrieval", () => {
     expect(local.requests).toHaveLength(0);
   });
 
-  it("does not claim an exhaustive absence after an unverified empty-positive selection", async () => {
+  it("rejects extra sufficiency flags rather than accepting an internally contradictory selection", async () => {
     const { store, id } = meeting(long());
     const local = model(request => instruction(request).startsWith("Rewrite")
       ? { query: "unrecorded budget" } : { sourceIds: [], sufficient: true });
-    const result = await createMeetingEvidence({ store, model: local })({
-      meetingId: id, question: "What budget was approved?", forceScan: true, fits: byCount(2),
-    });
-    expect(result).toMatchObject({ mode: "scan", exhaustive: false, sufficient: false, sources: [] });
-    expect(result.reason).toContain("did not verify");
-    expect(local.requests.length).toBeGreaterThan(1);
-    expect(local.requests.every(request => !instruction(request).includes("Previous output was invalid"))).toBe(true);
+    await expect(createMeetingEvidence({ store, model: local })({
+      meetingId: id, question: "What budget was approved?", forceScan: true, fits: byCount(2), skipRewrite: true,
+    })).rejects.toThrow("sourceIds only");
+    expect(local.requests).toHaveLength(3);
+    expect(local.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
-  it("distinguishes a completed negative selection from an unverifiable selection", async () => {
-    const { store, id } = meeting(long());
-    const local = model(request => instruction(request).startsWith("Rewrite")
-      ? { query: "unrecorded budget" } : { sourceIds: [], sufficient: false });
+  it("establishes an exhaustive empty selection only after every original batch completes with valid empty IDs", async () => {
+    const { store, id, passages } = meeting(long());
+    const local = model(() => ({ sourceIds: [] }));
     const result = await createMeetingEvidence({ store, model: local })({
-      meetingId: id, question: "What budget was approved?", forceScan: true, fits: byCount(2),
+      meetingId: id, question: "What budget was approved?", forceScan: true, fits: byCount(2), skipRewrite: true,
     });
     expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: false, sources: [] });
     expect(result.reason).toContain("complete Transcript");
+    const visited = new Set(local.requests.flatMap(request => data(request).sources!.map(source => source.id)));
+    expect(visited).toEqual(new Set(passages.flatMap(passage => passage.sources.map(source => source.id))));
+  });
+
+  it("does not turn nonempty evidence lost during reduction into an exhaustive absence", async () => {
+    const { store, id } = meeting(long());
+    const local = model(request => ({ sourceIds: instruction(request).startsWith("Select")
+      ? [data(request).sources!.at(-1)!.id] : [] }));
+    const result = await createMeetingEvidence({ store, model: local })({ meetingId: id, question: "List all commitments", fits: byCount(2), skipRewrite: true });
+    expect(result).toMatchObject({ mode: "scan", exhaustive: false, sufficient: false, sources: [] });
+    expect(result.reason).toContain("lost during consolidation");
   });
 
   it("includes FTS hits, neighbors and a later correction even before the last passage", async () => {
@@ -162,6 +170,7 @@ describe("Meeting-specific evidence retrieval", () => {
     expect(local.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
     for (const request of local.requests) {
       const schema = request.schema as { properties: { sourceIds: { items: { enum: string[] } } } };
+      expect(Object.keys(schema.properties)).toEqual(["sourceIds"]);
       expect(new Set(schema.properties.sourceIds.items.enum)).toEqual(new Set(data(request).sources!.map(source => source.id)));
     }
     expect(result.sources.map(source => source.ref)).toEqual([...result.sources.map(source => source.ref)].sort((a, b) => a - b));
@@ -169,7 +178,7 @@ describe("Meeting-specific evidence retrieval", () => {
 
   it("honors forceScan for a targeted question and reports a completed absence distinctly", async () => {
     const { store, id, passages } = meeting(long());
-    const local = model(() => ({ sourceIds: [], sufficient: false }));
+    const local = model(() => ({ sourceIds: [] }));
     const result = await createMeetingEvidence({ store: fixedHits(store, [passages[0]!]), model: local })({ meetingId: id, question: "Which password was chosen?", forceScan: true, fits: byCount(2) });
     expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: false, sources: [] });
     expect(result.reason).toContain("complete Transcript");
@@ -184,24 +193,16 @@ describe("Meeting-specific evidence retrieval", () => {
     }
   });
 
-  it("falls back to a whole-Meeting scan when initial retrieval cannot establish usable support", async () => {
+  it("falls back to a whole-Meeting scan when targeted selection returns no usable IDs", async () => {
     const { store, id, passages } = meeting(long());
     let scanning = false;
-    const local = model(request => ({ ...selection(request), sufficient: scanning }));
-    const result = await createMeetingEvidence({ store: fixedHits(store, [passages[0]!]), model: local })({
+    const local = model(request => scanning ? selection(request) : { sourceIds: [] });
+    const result = await createMeetingEvidence({ store: fixedHits(store, [passages[0]!, passages[3]!]), model: local })({
       meetingId: id, question: "Which launch permissions?", fits: byCount(3),
       onStage: stage => { if (stage === "scanning") scanning = true; },
     });
-    // Force a budget smaller than the lexical candidate pool, so semantic selection can report insufficient support.
-    const second = model(request => ({ ...selection(request), sufficient: scanning }));
-    scanning = false;
-    const checked = await createMeetingEvidence({ store: fixedHits(store, [passages[0]!, passages[3]!]), model: second })({
-      meetingId: id, question: "Which launch permissions?", fits: byCount(3),
-      onStage: stage => { if (stage === "scanning") scanning = true; },
-    });
-    expect(checked).toMatchObject({ mode: "scan", exhaustive: true, sufficient: true });
-    expect(second.requests.some(request => instruction(request).startsWith("Select"))).toBe(true);
-    expect(result.exhaustive).toBe(false);
+    expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: true });
+    expect(local.requests.some(request => instruction(request).startsWith("Select"))).toBe(true);
   });
 
   it("never mixes another Meeting or an old revision into model evidence", async () => {
@@ -224,7 +225,7 @@ describe("Meeting-specific evidence retrieval", () => {
 
   it("rejects model-selected unknown IDs after three bounded validation attempts", async () => {
     const { store, id, passages } = meeting(long());
-    const local = model(() => ({ sourceIds: ["unknown:0"], sufficient: true }));
+    const local = model(() => ({ sourceIds: ["unknown:0"] }));
     await expect(createMeetingEvidence({ store: fixedHits(store, [passages[0]!]), model: local })({ meetingId: id, question: "Summarize all decisions", fits: byCount(2) })).rejects.toThrow("three attempts");
     expect(local.requests).toHaveLength(3);
     expect(instruction(local.requests[1]!)).toContain("Use only sourceIds");
@@ -243,18 +244,18 @@ describe("Meeting-specific evidence retrieval", () => {
     const capped = await createMeetingEvidence({ store: fixedHits(store, [passages[0]!]), model: local, maxCalls: 1 })({ meetingId: id, question: "Summarize all decisions", fits: byCount(1) });
     expect(capped).toMatchObject({ exhaustive: false, sufficient: false, calls: 1, sources: [] });
     expect(capped.reason).toContain("model-call limit");
-    const keepsEverything = model(request => ({ sourceIds: data(request).sources!.map(source => source.id), sufficient: true }));
+    const keepsEverything = model(request => ({ sourceIds: data(request).sources!.map(source => source.id) }));
     const stuck = await createMeetingEvidence({ store: fixedHits(store, [passages[0]!]), model: keepsEverything })({ meetingId: id, question: "Summarize all decisions", fits: byCount(1) });
     expect(stuck).toMatchObject({ exhaustive: false, sufficient: false, sources: [] });
     expect(stuck.reason).toContain("without losing support");
   });
 
-  it("allows a complete combined assessment to establish support after individually insufficient batches", async () => {
+  it("compares partial original selections together without asking for a semantic sufficiency flag", async () => {
     const { store, id, passages } = meeting(long());
     const local = model(request => {
       const sources = data(request).sources!;
       const combined = instruction(request).startsWith("Consolidate");
-      return { sourceIds: combined ? sources.map(source => source.id) : [sources.at(-1)!.id], sufficient: combined };
+      return { sourceIds: combined ? sources.map(source => source.id) : [sources.at(-1)!.id] };
     });
     const result = await createMeetingEvidence({ store: fixedHits(store, [passages[0]!]), model: local })({
       meetingId: id, question: "Summarize all decisions", fits: byCount(3),
@@ -308,7 +309,7 @@ describe("focused lexical evidence selection", () => {
     } };
     const local = model(request => {
       const direct = data(request).sources!.filter(source => source.ref === 181);
-      return { sourceIds: direct.map(source => source.id), sufficient: direct.length > 0 };
+      return { sourceIds: direct.map(source => source.id) };
     });
     const result = await createMeetingEvidence({ store: scopedStore, model: local })({
       meetingId: id, question, fits: byCount(1),
@@ -360,7 +361,7 @@ describe("focused lexical evidence selection", () => {
     const { store, id } = meeting(long());
     const queries: string[] = [];
     const scopedStore = { ...store, searchPassages: (_meeting: number, _revision: string, query: string) => { queries.push(query); return []; } };
-    const local = model(request => instruction(request).startsWith("Rewrite") ? { query: "the and" } : { sourceIds: [], sufficient: false });
+    const local = model(request => instruction(request).startsWith("Rewrite") ? { query: "the and" } : { sourceIds: [] });
     const result = await createMeetingEvidence({ store: scopedStore, model: local })({ meetingId: id, question: "Who will the?", fits: byCount(1) });
     expect(queries).toEqual([]);
     expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: false });
@@ -384,9 +385,9 @@ describe("bounded late comparison context", () => {
     const local = model(request => {
       const sources = data(request).sources!;
       const reducing = instruction(request).startsWith("Consolidate");
-      if (!reducing) return { sourceIds: sources.filter(source => source.ref !== 31).map(source => source.id), sufficient: sources.some(source => source.ref === 30) };
+      if (!reducing) return { sourceIds: sources.filter(source => source.ref !== 31).map(source => source.id) };
       const final = sources.find(source => source.ref === 30);
-      return final ? { sourceIds: [final.id], sufficient: true } : { sourceIds: sources.map(source => source.id), sufficient: false };
+      return final ? { sourceIds: [final.id] } : { sourceIds: sources.map(source => source.id) };
     });
     const result = await createMeetingEvidence({ store, model: local })({ meetingId: id, question: "What is the final launch plan?", fits: byCount(1) });
     expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: true });
@@ -403,7 +404,7 @@ describe("bounded late comparison context", () => {
     const transcript = long();
     transcript.segments.forEach((source, index) => { source.text = `I commit to unique task ${index} on day ${index + 1}. ` + source.text; });
     const { store, id } = meeting(transcript);
-    const local = model(request => ({ sourceIds: data(request).sources!.map(source => source.id), sufficient: true }));
+    const local = model(request => ({ sourceIds: data(request).sources!.map(source => source.id) }));
     const result = await createMeetingEvidence({ store, model: local })({ meetingId: id, question: "List all commitments", fits: byCount(1) });
     expect(result).toMatchObject({ mode: "scan", exhaustive: false, sufficient: false, sources: [] });
     expect(result.reason).toContain("without losing support");
@@ -418,7 +419,7 @@ describe("bounded late comparison context", () => {
     transcript.segments.forEach(source => { source.text = original; });
     const { store, id } = meeting(transcript);
     const local = model(request => instruction(request).startsWith("Rewrite") ? { query: "statements" }
-      : { sourceIds: data(request).sources!.map(source => source.id), sufficient: true });
+      : { sourceIds: data(request).sources!.map(source => source.id) });
     const result = await createMeetingEvidence({ store, model: local })({ meetingId: id, question: "List all statements", fits: byCount(1) });
     expect(result).toMatchObject({ exhaustive: false, sufficient: false, sources: [] });
     const reductions = local.requests.filter(request => instruction(request).startsWith("Consolidate"));
@@ -433,7 +434,7 @@ describe("bounded late comparison context", () => {
     const { store, id } = meeting(transcript);
     const local = model(request => {
       const negative = data(request).sources!.filter(source => source.ref === 6);
-      return { sourceIds: negative.map(source => source.id), sufficient: negative.length > 0 };
+      return { sourceIds: negative.map(source => source.id) };
     });
     const result = await createMeetingEvidence({ store, model: local })({ meetingId: id, question: "Who owns the archive report?", forceScan: true, fits: byCount(1) });
     expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: true });
