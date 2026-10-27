@@ -52,16 +52,28 @@ describe("Meeting-specific evidence retrieval", () => {
     expect(local.requests).toHaveLength(0);
   });
 
-  it("treats an empty selection as unsupported even when the model claims sufficiency", async () => {
+  it("does not claim an exhaustive absence after an unverified empty-positive selection", async () => {
     const { store, id } = meeting(long());
     const local = model(request => instruction(request).startsWith("Rewrite")
       ? { query: "unrecorded budget" } : { sourceIds: [], sufficient: true });
     const result = await createMeetingEvidence({ store, model: local })({
       meetingId: id, question: "What budget was approved?", forceScan: true, fits: byCount(2),
     });
-    expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: false, sources: [] });
+    expect(result).toMatchObject({ mode: "scan", exhaustive: false, sufficient: false, sources: [] });
+    expect(result.reason).toContain("did not verify");
     expect(local.requests.length).toBeGreaterThan(1);
     expect(local.requests.every(request => !instruction(request).includes("Previous output was invalid"))).toBe(true);
+  });
+
+  it("distinguishes a completed negative selection from an unverifiable selection", async () => {
+    const { store, id } = meeting(long());
+    const local = model(request => instruction(request).startsWith("Rewrite")
+      ? { query: "unrecorded budget" } : { sourceIds: [], sufficient: false });
+    const result = await createMeetingEvidence({ store, model: local })({
+      meetingId: id, question: "What budget was approved?", forceScan: true, fits: byCount(2),
+    });
+    expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: false, sources: [] });
+    expect(result.reason).toContain("complete Transcript");
   });
 
   it("includes FTS hits, neighbors and a later correction even before the last passage", async () => {

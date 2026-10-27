@@ -4,7 +4,7 @@ import { buildPassages, type EvidencePassage } from "./passages.js";
 import type { TextModel, TextRequest } from "./language-model.js";
 import { AI_SETTINGS, requestBytes } from "./model-request.js";
 
-export const EVIDENCE_PROMPT_VERSION = "meeting-evidence-v4";
+export const EVIDENCE_PROMPT_VERSION = "meeting-evidence-v5";
 
 type RetrievalStore = Pick<Store, "getMeeting" | "listPassages" | "searchPassages">;
 export type EvidenceStage = "retrieving" | "rewriting" | "scanning" | "consolidating";
@@ -51,7 +51,7 @@ const TASK = {
     + "Select the smallest complete support. If necessary support cannot fit a small answer context, mark sufficient false rather than imply completeness. Return sourceIds and sufficient; no generated facts.",
 };
 type Mode = keyof typeof TASK;
-interface Selection { sourceIds: string[]; sufficient: boolean }
+interface Selection { sourceIds: string[]; sufficient: boolean; unverified?: boolean }
 const unique = (sources: SourceFragment[]) => [...new Map(sources.map(source => [source.id, source])).values()]
   .sort((a, b) => a.ref - b.ref || a.part - b.part);
 const broad = (question: string) => /\b(all|overall|throughout|everything|entire|summari[sz]e|overview|whole meeting|decisions|action items|commitments|unresolved matters|final|latest|eventually|end(?:ed)? up)\b/i.test(question);
@@ -84,7 +84,8 @@ function parseSelection(json: string, sources: SourceFragment[]): Selection {
   const sourceIds = [...new Set(value.sourceIds)] as string[];
   // An empty selection cannot support a fact, regardless of the model's flag.
   // Treat it conservatively as no usable evidence so the caller can scan or abstain.
-  return { sourceIds, sufficient: value.sufficient && sourceIds.length > 0 };
+  return { sourceIds, sufficient: value.sufficient && sourceIds.length > 0,
+    ...(value.sufficient && !sourceIds.length ? { unverified: true } : {}) };
 }
 
 /** Meeting/revision-scoped retrieval; every returned word comes from the current original Transcript. */
@@ -182,13 +183,15 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
     async function select(sources: SourceFragment[], kind: "select" | "reduce", anchors: SourceFragment[] = []) {
       const chosen: SourceFragment[] = [];
       let sufficient = false;
+      let unverified = false;
       const groups = batches(sources, kind, anchors);
       for (const batch of groups) {
         const result = await ask(kind, batch.sources, json => parseSelection(json, batch.sources), batch.comparison);
         chosen.push(...batch.sources.filter(source => result.sourceIds.includes(source.id)));
         sufficient ||= result.sufficient;
+        unverified ||= result.unverified === true;
       }
-      return { sources: unique(chosen), sufficient, batchCount: groups.length };
+      return { sources: unique(chosen), sufficient, unverified, batchCount: groups.length };
     }
     async function consolidate(sources: SourceFragment[]) {
       let chosen = unique(sources);
@@ -200,6 +203,7 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
         if (answerFits(chosen)) return { sources: chosen, sufficient, globallyAssessed };
         stage("consolidating");
         const next = await select(chosen, "reduce", chosen.slice(-2));
+        if (next.unverified) throw new IncompleteEvidence("The local model did not verify its evidence selection; retry or ask a narrower question");
         if (next.sources.length >= chosen.length) throw new IncompleteEvidence("Relevant original evidence cannot fit the answer budget without losing support; ask a narrower question");
         chosen = next.sources;
         sufficient = next.sufficient;
@@ -207,7 +211,8 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
       }
       throw new IncompleteEvidence("Evidence consolidation did not finish within its reduction limit");
     }
-    async function finishSelection(selected: { sources: SourceFragment[]; sufficient: boolean; batchCount: number }) {
+    async function finishSelection(selected: { sources: SourceFragment[]; sufficient: boolean; batchCount: number; unverified?: boolean }) {
+      if (selected.unverified) throw new IncompleteEvidence("The local model did not verify its evidence selection; retry or ask a narrower question");
       const reduced = await consolidate(selected.sources);
       if (!reduced.sources.length) return { sources: [], sufficient: false };
       if (reduced.globallyAssessed) return { sources: reduced.sources, sufficient: reduced.sufficient };
@@ -216,6 +221,7 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
       if (!prepared("reduce", reduced.sources)) throw new IncompleteEvidence("Selected evidence cannot be assessed together within the request budget; ask a narrower question");
       stage("consolidating");
       const final = await ask("reduce", reduced.sources, json => parseSelection(json, reduced.sources));
+      if (final.unverified) throw new IncompleteEvidence("The local model did not verify its evidence selection; retry or ask a narrower question");
       const sources = reduced.sources.filter(source => final.sourceIds.includes(source.id));
       if (!answerFits(sources)) throw new IncompleteEvidence("Selected original evidence exceeds the answer budget; ask a narrower question");
       return { sources, sufficient: final.sufficient && sources.length > 0 };
@@ -275,14 +281,20 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
         for (const hit of hits) for (const index of [hit.index - 1, hit.index, hit.index + 1]) indices.add(index);
         const candidates = unique(passages.filter(passage => indices.has(passage.index)).flatMap(scoped));
         if (answerFits(candidates)) return complete(candidates, false, true);
-        const selected = await select(candidates, "select");
-        const reduced = await finishSelection(selected);
-        if (reduced.sufficient && reduced.sources.length) return complete(reduced.sources, false, true);
+        try {
+          const selected = await select(candidates, "select");
+          const reduced = await finishSelection(selected);
+          if (reduced.sufficient && reduced.sources.length) return complete(reduced.sources, false, true);
+        } catch (error) {
+          if (!(error instanceof IncompleteEvidence)) throw error;
+          // An unverified or over-budget targeted selection still gets one full scan.
+        }
       }
       mode = "scan";
       stage("scanning");
       // Visit every passage, including later corrections, before making any exhaustive result.
       const selected = await select(all, "select");
+      if (selected.unverified) throw new IncompleteEvidence("The local model did not verify its evidence selection; retry or ask a narrower question");
       if (!selected.sources.length) return complete([], true, false, "No supporting passages were selected from the complete Transcript");
       const reduced = await finishSelection(selected);
       return complete(reduced.sources, true, reduced.sufficient,
