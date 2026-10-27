@@ -7,7 +7,7 @@ import type { PipelineContext, PipelineStages, Tracks, Transcript } from "./pipe
 export type PipelineSink = Pick<Store, "saveTranscript" | "saveSummary" | "setMeetingState" | "saveAudio" | "clearAudio">;
 
 /** The engine puts each Recording's tracks in a directory of its own with this prefix; only such a directory is removed. */
-const RECORDING_DIR_PREFIX = "meeting-recorder-";
+const RECORDING_DIR_PREFIX = "elegant-";
 
 /** Runs a Meeting's Recording through the stages in order and records the outcome. */
 export class PipelineRunner {

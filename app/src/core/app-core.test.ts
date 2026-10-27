@@ -403,7 +403,7 @@ describe("the audio of a Recording", () => {
 
   /** Records a Meeting whose two tracks are real files in a directory of their own, as the engine leaves them. */
   async function recordedWithAudio(opts: { pipeline?: Parameters<typeof fakePipeline>[0]; keepAudio?: boolean } = {}) {
-    const dir = mkdtempSync(join(tmpdir(), "meeting-recorder-audio-"));
+    const dir = mkdtempSync(join(tmpdir(), "elegant-audio-"));
     dirs.push(dir);
     const micPath = join(dir, "mic.wav");
     const systemPath = join(dir, "system.wav");
@@ -448,7 +448,7 @@ describe("the audio of a Recording", () => {
   });
 
   it("leaves other files in its directory alone", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "meeting-recorder-audio-"));
+    const dir = mkdtempSync(join(tmpdir(), "elegant-audio-"));
     dirs.push(dir);
     writeFileSync(join(dir, "mic.wav"), "mic");
     writeFileSync(join(dir, "system.wav"), "system");
@@ -824,7 +824,7 @@ describe("the keep-audio setting and deleting a Meeting", () => {
 
   /** Makes the two tracks the engine would leave, in a directory of their own. */
   function tracksOnDisk() {
-    const dir = mkdtempSync(join(tmpdir(), "meeting-recorder-audio-"));
+    const dir = mkdtempSync(join(tmpdir(), "elegant-audio-"));
     dirs.push(dir);
     const micPath = join(dir, "mic.wav");
     const systemPath = join(dir, "system.wav");
@@ -1022,7 +1022,7 @@ describe("persistence", () => {
   });
 
   it("creates the database on first start and keeps meetings across restarts", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "meeting-recorder-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "elegant-test-"));
     dirs.push(dir);
     const dbPath = join(dir, "meetings.db");
 
@@ -1156,7 +1156,7 @@ describe("regenerating a Summary", () => {
   });
 
   it("works after a Participant was renamed, and keeps the name", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "meeting-recorder-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "elegant-test-"));
     dirs.push(dir);
     const dbPath = join(dir, "meetings.db");
     const answer = { current: () => reply("First attempt.") };
@@ -1436,7 +1436,7 @@ describe("the ignored-apps file", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    dir = mkdtempSync(join(tmpdir(), "meeting-recorder-test-"));
+    dir = mkdtempSync(join(tmpdir(), "elegant-test-"));
     path = join(dir, "ignored-apps.json");
   });
   afterEach(() => {

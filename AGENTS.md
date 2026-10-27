@@ -21,4 +21,4 @@ Rules:
 
 - Everything runs locally. No cloud APIs for audio, transcription or summaries.
 - Never commit audio recordings, real Transcripts of real people, or `.env` files.
-- The bundle identifier is `dev.bnd.meetingrecorder` and is permanent.
+- The bundle identifier is `dev.bnd.elegant` and is permanent (changed once from `dev.bnd.meetingrecorder` when the app was named Elegant).

@@ -111,4 +111,4 @@ If a quality or performance gate fails, keep it failed or pending, fix the cause
 | macOS permission denied or revoked | Follow the explanation in Settings, grant the affected permission in macOS settings, check again and restart if macOS requests it. Re-test the actual Meeting app. |
 | Model memory pressure | Close unrelated heavy applications, wait for speech-model release, inspect Ollama residency and retry. Measure again on the M4; a Linux run cannot clear this gate. |
 
-The bundle identifier remains `dev.bnd.meetingrecorder`. Keep packaging/signing and permission identity stable during the demo; rebuilding with a different signing identity can affect permissions independently of AI quality.
+The bundle identifier is `dev.bnd.elegant`. Keep packaging/signing and permission identity stable during the demo; rebuilding with a different signing identity can affect permissions independently of AI quality.
