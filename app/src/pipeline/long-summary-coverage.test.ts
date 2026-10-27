@@ -29,14 +29,14 @@ function adapter(reduce: (facts: Fact[], sources: Piece[], request: TextRequest)
   return { model, requests };
 }
 
-function assignmentAdapter(assign: (facts: Fact[]) => unknown) {
+function assignmentAdapter(assign: (facts: Fact[], request: TextRequest) => unknown) {
   const inner = adapter();
   const requests: TextRequest[] = [];
   const model: TextModel = { async complete(request) {
     requests.push(request);
     const input = data(request);
     if (input.candidates && !("tldr" in (request.schema as { properties: object }).properties)) {
-      return { text: JSON.stringify(assign(input.candidates)), metadata: { model: "assignment:test", elapsedMs: 1 } };
+      return { text: JSON.stringify(assign(input.candidates, request)), metadata: { model: "assignment:test", elapsedMs: 1 } };
     }
     return inner.model.complete(request);
   } };
@@ -98,7 +98,7 @@ describe("complete long Summary coverage", () => {
     expect(result.evidence!.participants.find(participant => participant.speaker === "Speaker 1")!.said).toEqual([[8]]);
   });
 
-  it("scopes mixed-topic comparisons to each of three speakers without losing another speaker's candidates", async () => {
+  it("skips guaranteed singleton assignments even when a topic group contains three speakers' context", async () => {
     const transcript = uniqueCommitments();
     const speakers = ["You", "Speaker 1", "Speaker 2"];
     transcript.segments.forEach((segment, index) => {
@@ -119,10 +119,34 @@ describe("complete long Summary coverage", () => {
       return output.map(fact => ({ ...fact, covers: [fact.id] }));
     });
     const result = await createGroundedSummariser({ model })(transcript);
-    expect(mixedContextCalls).toBeGreaterThan(0);
+    expect(mixedContextCalls).toBe(0);
+    expect(requests.filter(request => data(request).candidates && !("tldr" in (request.schema as { properties: object }).properties))).toHaveLength(0);
     for (const speaker of speakers) {
       expect(result.participants.find(participant => participant.speaker === speaker)!.said)
         .toEqual(transcript.segments.filter(segment => segment.speaker === speaker).map(segment => prefix(segment.text)));
+    }
+    expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it("reuses validated unchanged grouping requests when another topic needs another comparison round", async () => {
+    const transcript: Transcript = { segments: Array.from({ length: 18 }, (_, index) => ({
+      start: index * 20, end: index * 20 + 10, speaker: "You",
+      text: original(`Topic_${Math.floor(index / 6)} distinct obligation_${index}.`),
+    })) };
+    const requestsByTopic = new Map<string, string[]>();
+    const { model, requests } = assignmentAdapter((facts, request) => {
+      const topic = facts[0]!.text.match(/Topic_\d/)![0];
+      requestsByTopic.set(topic, [...(requestsByTopic.get(topic) ?? []), JSON.stringify({ messages: request.messages, schema: request.schema })]);
+      return Object.fromEntries(facts.map(fact => [String(fact.id), topic === "Topic_0" ? 0 : fact.id]));
+    });
+    const result = await createGroundedSummariser({ model })(transcript);
+    expect(result.participants[0]!.said.filter(point => point.includes("Topic_0")).length).toBeLessThan(6);
+    expect(new Set(result.participants[0]!.said.flatMap(point => point.split("\n"))))
+      .toEqual(new Set(transcript.segments.map(segment => prefix(segment.text))));
+    for (const topic of ["Topic_1", "Topic_2"]) {
+      const calls = requestsByTopic.get(topic)!;
+      expect(calls.length).toBeGreaterThan(0);
+      expect(new Set(calls).size).toBe(calls.length);
     }
     expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
@@ -204,4 +228,26 @@ describe("complete long Summary coverage", () => {
     expect(requests.some(request => "tldr" in (request.schema as { properties: object }).properties)).toBe(false);
     expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
+  it("does not reuse assignments for the same candidates when comparison context changes", async () => {
+    const transcript: Transcript = { segments: Array.from({ length: 48 }, (_, index) => ({
+      start: index, end: index + 1, speaker: index % 3 ? "Speaker 1" : "You",
+      text: `Topic_${Math.floor(index / 12)} claim_${index}. | ` + "original supporting discussion ".repeat(6),
+    })) };
+    const contextsByCandidates = new Map<string, Set<string>>();
+    const { model, requests } = assignmentAdapter((facts, request) => {
+      const key = JSON.stringify(facts);
+      const contexts = contextsByCandidates.get(key) ?? new Set<string>();
+      contexts.add(JSON.stringify(data(request).sources));
+      contextsByCandidates.set(key, contexts);
+      return Object.fromEntries(facts.map(fact => [String(fact.id), fact.speaker === "Speaker 1" ? 0 : fact.id]));
+    });
+    const result = await createGroundedSummariser({ model })(transcript);
+    // Other topic groups shrink between rounds. The same owned candidates must
+    // still reach the model again when their original comparison context differs.
+    expect([...contextsByCandidates.values()].some(contexts => contexts.size > 1)).toBe(true);
+    expect(new Set(result.participants.flatMap(participant => participant.said.flatMap(point => point.split("\n")))))
+      .toEqual(new Set(transcript.segments.map(segment => prefix(segment.text))));
+    expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
 });
