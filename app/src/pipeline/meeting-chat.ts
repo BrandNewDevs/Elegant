@@ -16,7 +16,7 @@ export type MeetingChatGenerator = (input: {
   /** Main process only: never expose this authorization directly through renderer IPC. */
   allowSummaryProcessing?: boolean;
 }) => Promise<{ answer: ChatAnswer; generation: ChatGeneration; revision: string }>;
-export const CHAT_PROMPT_VERSION = "meeting-chat-v5";
+export const CHAT_PROMPT_VERSION = "meeting-chat-v6";
 export const CHAT_ABSENT = "Not established in the available Transcript.";
 export const CHAT_UNVERIFIED = "I could not establish a reliable answer from the available evidence.";
 export const CHAT_INCOMPLETE = "I could not review enough of the Transcript to answer reliably. Please ask a narrower question.";
@@ -267,10 +267,9 @@ export function createMeetingChat({ store, model, modelName = AI_SETTINGS.model,
               ...(priorUserQuestion ? { priorUserQuestion } : {}), sources: cited, candidateAnswer: candidateText },
           }) }], schema: { type: "object", properties: {
             checks: { type: "array", items: { type: "object", properties: {
-              speaker: { type: "string", enum: [...new Set(cited.map(source => source.speaker))] },
               sourceId: { type: "string", enum: cited.map(source => source.id) }, quote: { type: "string" },
               relation: { type: "string", enum: ["supports", "contradicts", "irrelevant"] },
-            }, required: ["speaker", "sourceId", "quote", "relation"] } },
+            }, required: ["sourceId", "quote", "relation"] } },
             addressesQuestion: { type: "boolean" }, supported: { type: "boolean" },
           }, required: ["checks", "addressesQuestion", "supported"] },
       };
@@ -294,10 +293,16 @@ export function createMeetingChat({ store, model, modelName = AI_SETTINGS.model,
       for (const raw of audited.checks) {
         if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new InvalidChatAnswer("Every evidence check must quote an original source");
         const check = raw as Record<string, unknown>;
-        const source = typeof check.sourceId === "string" ? originals.get(check.sourceId) : undefined;
-        if (!source || check.speaker !== source.speaker || typeof check.quote !== "string" || !check.quote.trim()
-          || Buffer.byteLength(check.quote, "utf8") > 300 || !source.text.includes(check.quote)) {
-          throw new InvalidChatAnswer("Each evidence check needs an exact quote from its own original speaker and supplied sourceId");
+        let source = typeof check.sourceId === "string" ? originals.get(check.sourceId) : undefined;
+        if (!source || typeof check.quote !== "string" || !check.quote.trim() || Buffer.byteLength(check.quote, "utf8") > 300) {
+          throw new InvalidChatAnswer("Each evidence check needs an exact quote and a supplied sourceId");
+        }
+        if (!source.text.includes(check.quote)) {
+          // Repair redundant model provenance only when the original quote has one possible source.
+          const quote = check.quote;
+          const matches = cited.filter(original => original.text.includes(quote));
+          if (matches.length !== 1) throw new InvalidChatAnswer("The exact quote must resolve to one supplied original source");
+          source = matches[0]!;
         }
         if (!quoteKeepsSentenceContext(source.text, check.quote)) throw new InvalidChatAnswer("Quote the complete source sentence with its qualifiers and negation; do not cherry-pick an affirmative clause");
         if (!["supports", "contradicts", "irrelevant"].includes(check.relation as string)) throw new InvalidChatAnswer("Each quote needs a supports, contradicts or irrelevant relation to the candidate claim");
