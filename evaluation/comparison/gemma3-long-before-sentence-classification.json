@@ -1,0 +1,1207 @@
+{
+  "metadata": {
+    "sourceCommit": "a741f1278ee87489adc679face984c6d1bf4d1c3",
+    "sourceDirty": false,
+    "recordedAt": "2026-10-27T03:37:39.177Z",
+    "implementation": "current",
+    "model": {
+      "name": "gemma3:4b-it-q4_K_M",
+      "model": "gemma3:4b-it-q4_K_M",
+      "modified_at": "2026-10-05T05:47:50.046802317+05:30",
+      "size": 3338801804,
+      "digest": "a2af6cc3eb7fa8be8504abaf9b04e88f17a119ec3f04a3addf55f92841195f5a",
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "gemma3",
+        "families": [
+          "gemma3"
+        ],
+        "parameter_size": "4.3B",
+        "quantization_level": "Q4_K_M"
+      },
+      "capabilities": [
+        "completion"
+      ]
+    },
+    "ollama": {
+      "version": "0.34.0"
+    },
+    "hardware": {
+      "platform": "linux",
+      "release": "7.0.0-38-generic",
+      "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+      "memoryBytes": 15950888960,
+      "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU, 4096 MiB"
+    },
+    "settings": {
+      "numCtx": 8192,
+      "temperature": 0,
+      "maxInputBytes": 5500,
+      "maxOutputTokens": 2048,
+      "think": false
+    },
+    "promptVersion": "grounded-summary-v17",
+    "memoryScope": "Node peak RSS only. Ollama, Swift, peak total memory and swap need external observation.",
+    "runCondition": "uncontrolled",
+    "summaryDeadlineMs": 900000,
+    "evaluationDeadlineOverride": false,
+    "chatPromptVersion": "meeting-chat-v12",
+    "evidencePromptVersion": "meeting-evidence-v6"
+  },
+  "runs": [
+    {
+      "id": "long-discussion",
+      "split": "reserved",
+      "synthetic": true,
+      "summary": {
+        "tldr": "You: The final decision was to launch on Friday with Markdown export. Speaker 1: Speaker 1 agreed to Friday and Markdown as the final plan and will update the demo guide by Wednesday. Speaker 1: Earlier proposal: Speaker 1 proposed Friday instead of Monday, and Markdown instead of PDF.",
+        "participants": [
+          {
+            "speaker": "You",
+            "said": [
+              "Review round 1 covered permissions. Separate explanations were needed for microphone and system audio access, with a button press before a request appearing. This was a review of the existing flow, without new assignments or deadlines.",
+              "Review round 1 covered audio. Keeping audio was an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeated the expected flow, without assigning a new audio retention task.",
+              "Review round 1, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim.",
+              "Review round 2, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims.",
+              "Summary points need supporting Transcript passages so a reader can inspect the source. This is a review observation, not approval of an untested quality claim.",
+              "Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant.",
+              "The permission flow needs separate explanations for microphone and system audio access. A user should press a button before a permission request appears. This review does not assign a new task or deadline.",
+              "Review round 2, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment.\nParticipant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment.",
+              "Review round 6, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful.",
+              "Review round 6, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation.",
+              "Review round 2, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices.\nReview round 8, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices.",
+              "Review round 8, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims.",
+              "Review round 9, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim.",
+              "Review round 12, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source.",
+              "Review round 12, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation.",
+              "Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task.",
+              "Review round 15, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim.",
+              "Review round 18, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. This is a review observation, not approval of an untested quality claim.",
+              "Review round 9, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant.\nReview round 15, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant.\nReview round 18, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant.",
+              "The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears.",
+              "Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting.",
+              "A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim.\nA chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion.",
+              "Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words.",
+              "The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works.",
+              "Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims.",
+              "Summary points need supporting Transcript passages so a reader can inspect the source.",
+              "Passage boundaries need attention because a question may refer to a decision that follows its explanation.",
+              "The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline.",
+              "Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task.",
+              "The final decision was to launch on Friday with Markdown export.",
+              "Earlier proposal: For the initial release plan, Monday and PDF export were provisionally chosen, subject to the final offline review.",
+              "We have no calendar date for Friday and no assigned owner for packaging. Do not infer either from this discussion."
+            ]
+          },
+          {
+            "speaker": "Speaker 1",
+            "said": [
+              "Review round 1 covered transcripts. Participant labels should remain stable in the stored Transcript, while display names could change without altering the spoken words. This was a review observation, not an implementation commitment.",
+              "Review round 1, topic memory. Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result.",
+              "Review round 2, topic summaries. Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim.",
+              "Review round 2, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation.",
+              "Review round 3, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears.",
+              "Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task.",
+              "A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim.",
+              "Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. This statement does not create a new implementation commitment.",
+              "Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims. Repeating this concern does not establish any measured latency or memory result.",
+              "Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim.",
+              "Review round 6, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting.",
+              "Review round 6, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion.",
+              "Review round 8, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation.",
+              "Review round 9, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears.",
+              "Review round 9, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task.",
+              "Review round 9, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim.",
+              "Review round 12, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion.",
+              "Review round 15, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task.",
+              "Review round 15, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim.",
+              "Review round 18, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting. This repeats the expected flow, and it does not assign any person a new audio retention task.",
+              "Review round 18, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion. This is the same grounding requirement discussed earlier, with no new deadline or ownership claim.",
+              "Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words.",
+              "Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims.",
+              "Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful.",
+              "Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation.",
+              "The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears.",
+              "Review round 12, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting.\nKeeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting.",
+              "A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion.",
+              "Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. We are repeating this behavior for the review; this statement does not create a new implementation commitment.",
+              "Review round 1 covered offline. The demo must work without a network once models and tokenizer assets were prepared. A successful download was not proof that the later offline flow worked. The launch choices were still pending the final offline result.\nThe demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. The final offline result is still pending before launch choices are settled.\nThe demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices.",
+              "Earlier proposal: Speaker 1 proposed Friday instead of Monday, and Markdown instead of PDF.",
+              "Earlier commitment: Monday and PDF export were accepted provisionally. The choices will be revisited after the offline review.\nThe demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works.\nThe demo must be able to work without a network once models and tokenizer assets have been prepared.",
+              "Speaker 1 agreed to Friday and Markdown as the final plan and will update the demo guide by Wednesday."
+            ]
+          },
+          {
+            "speaker": "Speaker 2",
+            "said": [
+              "Review round 1 covered summaries. Summary points needed supporting Transcript passages for inspection, but the reference did not prove the generated statement's faithfulness. This was a review observation, not approval of an untested quality claim.",
+              "Review round 1, topic search. Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant.",
+              "Review round 2, topic permissions. The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline.",
+              "Review round 2, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting.",
+              "Review round 2, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion.",
+              "Speech models and the language model should run sequentially to fit the laptop memory budget. Actual target-device measurements are needed before performance claims are made.",
+              "Summary points need supporting Transcript passages so a reader can inspect the source. This is a review observation, not approval of an untested quality claim.",
+              "Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation. This is a review topic rather than an assignment to a named Participant.",
+              "The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears. We are reviewing the existing flow here and are not adding a new assignment or deadline.",
+              "Review round 6, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words.",
+              "Review round 6, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works.",
+              "Review round 8, topic audio. Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting.",
+              "Review round 8, topic chat. A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion.",
+              "Review round 9, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words.",
+              "Review round 12, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words.",
+              "Review round 12, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works.",
+              "Summary points need supporting Transcript passages so a reader can inspect the source.",
+              "Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. This statement does not create a new implementation commitment.\nReview round 15, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. This statement does not create a new implementation commitment.\nReview round 18, topic transcripts. Participant labels should remain stable in the stored Transcript. Display names can change after a rename without changing the original spoken words. This statement does not create a new implementation commitment.",
+              "Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful.",
+              "Search should find the selected Meeting without bringing unrelated Meeting evidence into chat. Passage boundaries need attention because a question may refer to a decision that follows its explanation.",
+              "The permission flow needs separate explanations for microphone access and system audio access. A user should press a button before a permission request appears.",
+              "Keeping audio is an optional setting. The review should cover deletion after successful transcription and deletion of retained audio with the Meeting.",
+              "A chat answer should say when the available Transcript does not establish a fact. The model should not infer an owner or calendar date from a suggestion.",
+              "The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices.\nReview round 9, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices.\nReview round 15, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices.\nReview round 18, topic offline. The demo must be able to work without a network once models and tokenizer assets have been prepared. A successful download is not proof that the later offline flow works. We are still waiting for the final offline result before settling the launch choices.\nA successful download is not proof that the later offline flow works.",
+              "Speech models and the language model should run sequentially to fit the laptop memory budget. We need actual target-device measurements before making performance claims.",
+              "Summary points need supporting Transcript passages so a reader can inspect the source. A reference establishes where to look, but does not itself prove a generated statement is faithful. This is a review observation, not approval of an untested quality claim.",
+              "Speaker 2 will rerun the offline workflow on Thursday."
+            ]
+          }
+        ],
+        "evidence": {
+          "revision": "34b25c3be1c730eaee03eeb5a04d92eaad7c735bf2791018c9a6a1fae05bd6c8",
+          "tldr": [
+            177,
+            179,
+            180,
+            181,
+            182
+          ],
+          "participants": [
+            {
+              "speaker": "You",
+              "said": [
+                [
+                  2
+                ],
+                [
+                  5
+                ],
+                [
+                  8
+                ],
+                [
+                  17
+                ],
+                [
+                  20
+                ],
+                [
+                  23
+                ],
+                [
+                  26
+                ],
+                [
+                  11,
+                  35
+                ],
+                [
+                  44,
+                  45
+                ],
+                [
+                  47,
+                  48
+                ],
+                [
+                  14,
+                  62
+                ],
+                [
+                  65
+                ],
+                [
+                  68
+                ],
+                [
+                  92
+                ],
+                [
+                  95
+                ],
+                [
+                  101
+                ],
+                [
+                  116
+                ],
+                [
+                  140
+                ],
+                [
+                  71,
+                  119,
+                  143
+                ],
+                [
+                  50,
+                  74,
+                  122,
+                  146
+                ],
+                [
+                  53,
+                  77,
+                  125,
+                  149
+                ],
+                [
+                  32,
+                  56,
+                  80,
+                  104,
+                  128,
+                  152
+                ],
+                [
+                  59,
+                  83,
+                  107,
+                  131,
+                  155
+                ],
+                [
+                  38,
+                  86,
+                  110,
+                  134,
+                  158
+                ],
+                [
+                  41,
+                  89,
+                  113,
+                  137,
+                  161
+                ],
+                [
+                  164
+                ],
+                [
+                  167
+                ],
+                [
+                  98,
+                  170
+                ],
+                [
+                  29,
+                  173
+                ],
+                [
+                  180
+                ],
+                [
+                  0,
+                  180
+                ],
+                [
+                  183
+                ]
+              ]
+            },
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                [
+                  3
+                ],
+                [
+                  9
+                ],
+                [
+                  12
+                ],
+                [
+                  15
+                ],
+                [
+                  18
+                ],
+                [
+                  21
+                ],
+                [
+                  24
+                ],
+                [
+                  27
+                ],
+                [
+                  33
+                ],
+                [
+                  36
+                ],
+                [
+                  45,
+                  46
+                ],
+                [
+                  48
+                ],
+                [
+                  63
+                ],
+                [
+                  66
+                ],
+                [
+                  69
+                ],
+                [
+                  72
+                ],
+                [
+                  96
+                ],
+                [
+                  117
+                ],
+                [
+                  120
+                ],
+                [
+                  141
+                ],
+                [
+                  144
+                ],
+                [
+                  51,
+                  75,
+                  99,
+                  123,
+                  147
+                ],
+                [
+                  57,
+                  81,
+                  105,
+                  129,
+                  153
+                ],
+                [
+                  60,
+                  84,
+                  108,
+                  132,
+                  156
+                ],
+                [
+                  39,
+                  87,
+                  111,
+                  135,
+                  159
+                ],
+                [
+                  42,
+                  90,
+                  114,
+                  138,
+                  162
+                ],
+                [
+                  93,
+                  165
+                ],
+                [
+                  168
+                ],
+                [
+                  171
+                ],
+                [
+                  6,
+                  30,
+                  102,
+                  174
+                ],
+                [
+                  177,
+                  179,
+                  180
+                ],
+                [
+                  1,
+                  54,
+                  78,
+                  126,
+                  150,
+                  180
+                ],
+                [
+                  181,
+                  182
+                ]
+              ]
+            },
+            {
+              "speaker": "Speaker 2",
+              "said": [
+                [
+                  4
+                ],
+                [
+                  7
+                ],
+                [
+                  10
+                ],
+                [
+                  13
+                ],
+                [
+                  16
+                ],
+                [
+                  25
+                ],
+                [
+                  28
+                ],
+                [
+                  31
+                ],
+                [
+                  34
+                ],
+                [
+                  43,
+                  44
+                ],
+                [
+                  46,
+                  47
+                ],
+                [
+                  61
+                ],
+                [
+                  64
+                ],
+                [
+                  67,
+                  68
+                ],
+                [
+                  91
+                ],
+                [
+                  94
+                ],
+                [
+                  52,
+                  76,
+                  124
+                ],
+                [
+                  19,
+                  115,
+                  139
+                ],
+                [
+                  100,
+                  148
+                ],
+                [
+                  55,
+                  79,
+                  103,
+                  127,
+                  151
+                ],
+                [
+                  58,
+                  82,
+                  106,
+                  130,
+                  154
+                ],
+                [
+                  37,
+                  85,
+                  109,
+                  133,
+                  157
+                ],
+                [
+                  40,
+                  88,
+                  112,
+                  136,
+                  160
+                ],
+                [
+                  22,
+                  70,
+                  118,
+                  142,
+                  166
+                ],
+                [
+                  49,
+                  73,
+                  97,
+                  121,
+                  145,
+                  169
+                ],
+                [
+                  172
+                ],
+                [
+                  182
+                ]
+              ]
+            }
+          ]
+        },
+        "generation": {
+          "promptVersion": "grounded-summary-v17",
+          "model": "gemma3:4b-it-q4_K_M",
+          "elapsedMs": 673400.850108,
+          "calls": 84,
+          "promptTokens": 80052,
+          "outputTokens": 14850
+        }
+      },
+      "chat": [
+        {
+          "questionId": "final-plan",
+          "skipped": "Chat was not selected for this evaluation"
+        },
+        {
+          "questionId": "guide-owner",
+          "skipped": "Chat was not selected for this evaluation"
+        },
+        {
+          "questionId": "guide-deadline",
+          "skipped": "Chat was not selected for this evaluation"
+        },
+        {
+          "questionId": "retest",
+          "skipped": "Chat was not selected for this evaluation"
+        },
+        {
+          "questionId": "packaging",
+          "skipped": "Chat was not selected for this evaluation"
+        },
+        {
+          "questionId": "peak",
+          "skipped": "Chat was not selected for this evaluation"
+        },
+        {
+          "questionId": "date",
+          "skipped": "Chat was not selected for this evaluation"
+        }
+      ],
+      "summarySkipped": false,
+      "elapsedMs": 673401.174319,
+      "calls": 84,
+      "summaryElapsedMs": 673401.135681,
+      "summaryCalls": 84,
+      "peakRssKiB": 95616
+    }
+  ],
+  "requests": [
+    {
+      "call": 1,
+      "bytes": 4543,
+      "promptTokens": 878,
+      "outputTokens": 551,
+      "elapsedMs": 21203.974708
+    },
+    {
+      "call": 2,
+      "bytes": 4929,
+      "promptTokens": 962,
+      "outputTokens": 576,
+      "elapsedMs": 22280.796288
+    },
+    {
+      "call": 3,
+      "bytes": 4919,
+      "promptTokens": 970,
+      "outputTokens": 569,
+      "elapsedMs": 22453.697628
+    },
+    {
+      "call": 4,
+      "bytes": 4926,
+      "promptTokens": 964,
+      "outputTokens": 504,
+      "elapsedMs": 20064.34083100001
+    },
+    {
+      "call": 5,
+      "bytes": 4908,
+      "promptTokens": 966,
+      "outputTokens": 478,
+      "elapsedMs": 21126.063370000003
+    },
+    {
+      "call": 6,
+      "bytes": 4941,
+      "promptTokens": 970,
+      "outputTokens": 525,
+      "elapsedMs": 20758.092407999997
+    },
+    {
+      "call": 7,
+      "bytes": 4918,
+      "promptTokens": 969,
+      "outputTokens": 431,
+      "elapsedMs": 17191.676257
+    },
+    {
+      "call": 8,
+      "bytes": 4925,
+      "promptTokens": 963,
+      "outputTokens": 517,
+      "elapsedMs": 20648.57880799999
+    },
+    {
+      "call": 9,
+      "bytes": 4915,
+      "promptTokens": 973,
+      "outputTokens": 415,
+      "elapsedMs": 17129.900506000005
+    },
+    {
+      "call": 10,
+      "bytes": 4955,
+      "promptTokens": 984,
+      "outputTokens": 431,
+      "elapsedMs": 17890.667719999998
+    },
+    {
+      "call": 11,
+      "bytes": 4931,
+      "promptTokens": 982,
+      "outputTokens": 494,
+      "elapsedMs": 20320.040760000004
+    },
+    {
+      "call": 12,
+      "bytes": 4939,
+      "promptTokens": 977,
+      "outputTokens": 660,
+      "elapsedMs": 27022.100171
+    },
+    {
+      "call": 13,
+      "bytes": 4928,
+      "promptTokens": 986,
+      "outputTokens": 396,
+      "elapsedMs": 16733.128456000006
+    },
+    {
+      "call": 14,
+      "bytes": 4962,
+      "promptTokens": 991,
+      "outputTokens": 431,
+      "elapsedMs": 17880.61915099999
+    },
+    {
+      "call": 15,
+      "bytes": 4938,
+      "promptTokens": 989,
+      "outputTokens": 432,
+      "elapsedMs": 18561.985729999957
+    },
+    {
+      "call": 16,
+      "bytes": 4947,
+      "promptTokens": 985,
+      "outputTokens": 469,
+      "elapsedMs": 20268.925883000018
+    },
+    {
+      "call": 17,
+      "bytes": 4940,
+      "promptTokens": 995,
+      "outputTokens": 482,
+      "elapsedMs": 20357.159270000004
+    },
+    {
+      "call": 18,
+      "bytes": 4983,
+      "promptTokens": 1005,
+      "outputTokens": 444,
+      "elapsedMs": 18515.512469999958
+    },
+    {
+      "call": 19,
+      "bytes": 4956,
+      "promptTokens": 1000,
+      "outputTokens": 439,
+      "elapsedMs": 18269.265128
+    },
+    {
+      "call": 20,
+      "bytes": 4968,
+      "promptTokens": 999,
+      "outputTokens": 583,
+      "elapsedMs": 24024.80449499999
+    },
+    {
+      "call": 21,
+      "bytes": 4952,
+      "promptTokens": 1003,
+      "outputTokens": 403,
+      "elapsedMs": 17000.744614000025
+    },
+    {
+      "call": 22,
+      "bytes": 4983,
+      "promptTokens": 1005,
+      "outputTokens": 444,
+      "elapsedMs": 18616.230745999957
+    },
+    {
+      "call": 23,
+      "bytes": 4953,
+      "promptTokens": 997,
+      "outputTokens": 437,
+      "elapsedMs": 18211.50965000002
+    },
+    {
+      "call": 24,
+      "bytes": 4971,
+      "promptTokens": 1002,
+      "outputTokens": 570,
+      "elapsedMs": 23467.87481499999
+    },
+    {
+      "call": 25,
+      "bytes": 4952,
+      "promptTokens": 1003,
+      "outputTokens": 440,
+      "elapsedMs": 18587.672636000032
+    },
+    {
+      "call": 26,
+      "bytes": 4983,
+      "promptTokens": 1005,
+      "outputTokens": 520,
+      "elapsedMs": 21886.824102000042
+    },
+    {
+      "call": 27,
+      "bytes": 4953,
+      "promptTokens": 997,
+      "outputTokens": 437,
+      "elapsedMs": 18237.739857000008
+    },
+    {
+      "call": 28,
+      "bytes": 4974,
+      "promptTokens": 1005,
+      "outputTokens": 323,
+      "elapsedMs": 13731.073310000007
+    },
+    {
+      "call": 29,
+      "bytes": 4952,
+      "promptTokens": 1003,
+      "outputTokens": 518,
+      "elapsedMs": 21515.003758999985
+    },
+    {
+      "call": 30,
+      "bytes": 5209,
+      "promptTokens": 1124,
+      "outputTokens": 250,
+      "elapsedMs": 11208.393419999979
+    },
+    {
+      "call": 31,
+      "bytes": 5104,
+      "promptTokens": 1145,
+      "outputTokens": 35,
+      "elapsedMs": 2802.920115999994
+    },
+    {
+      "call": 32,
+      "bytes": 3912,
+      "promptTokens": 807,
+      "outputTokens": 13,
+      "elapsedMs": 1548.6245179999387
+    },
+    {
+      "call": 33,
+      "bytes": 3885,
+      "promptTokens": 804,
+      "outputTokens": 10,
+      "elapsedMs": 1382.3748469999991
+    },
+    {
+      "call": 34,
+      "bytes": 4010,
+      "promptTokens": 818,
+      "outputTokens": 10,
+      "elapsedMs": 1366.7174660000019
+    },
+    {
+      "call": 35,
+      "bytes": 4423,
+      "promptTokens": 895,
+      "outputTokens": 14,
+      "elapsedMs": 1537.7896519999485
+    },
+    {
+      "call": 36,
+      "bytes": 4358,
+      "promptTokens": 906,
+      "outputTokens": 14,
+      "elapsedMs": 1612.2585589999799
+    },
+    {
+      "call": 37,
+      "bytes": 4763,
+      "promptTokens": 1006,
+      "outputTokens": 25,
+      "elapsedMs": 2043.605646000011
+    },
+    {
+      "call": 38,
+      "bytes": 4824,
+      "promptTokens": 1010,
+      "outputTokens": 18,
+      "elapsedMs": 1853.623484000098
+    },
+    {
+      "call": 39,
+      "bytes": 4705,
+      "promptTokens": 960,
+      "outputTokens": 18,
+      "elapsedMs": 1780.1072159999749
+    },
+    {
+      "call": 40,
+      "bytes": 4805,
+      "promptTokens": 1023,
+      "outputTokens": 25,
+      "elapsedMs": 2116.2247180000413
+    },
+    {
+      "call": 41,
+      "bytes": 4007,
+      "promptTokens": 818,
+      "outputTokens": 10,
+      "elapsedMs": 1406.8488389999839
+    },
+    {
+      "call": 42,
+      "bytes": 3858,
+      "promptTokens": 795,
+      "outputTokens": 19,
+      "elapsedMs": 1742.3585840000305
+    },
+    {
+      "call": 43,
+      "bytes": 4087,
+      "promptTokens": 834,
+      "outputTokens": 10,
+      "elapsedMs": 1399.4903349999804
+    },
+    {
+      "call": 44,
+      "bytes": 4218,
+      "promptTokens": 911,
+      "outputTokens": 10,
+      "elapsedMs": 1471.3390649999492
+    },
+    {
+      "call": 45,
+      "bytes": 4521,
+      "promptTokens": 969,
+      "outputTokens": 14,
+      "elapsedMs": 1660.759888999979
+    },
+    {
+      "call": 46,
+      "bytes": 4084,
+      "promptTokens": 878,
+      "outputTokens": 10,
+      "elapsedMs": 1510.1204240000807
+    },
+    {
+      "call": 47,
+      "bytes": 4316,
+      "promptTokens": 927,
+      "outputTokens": 14,
+      "elapsedMs": 1588.5637509999797
+    },
+    {
+      "call": 48,
+      "bytes": 4247,
+      "promptTokens": 900,
+      "outputTokens": 10,
+      "elapsedMs": 1448.2695710000116
+    },
+    {
+      "call": 49,
+      "bytes": 4239,
+      "promptTokens": 900,
+      "outputTokens": 10,
+      "elapsedMs": 1482.0441009999486
+    },
+    {
+      "call": 50,
+      "bytes": 3864,
+      "promptTokens": 844,
+      "outputTokens": 10,
+      "elapsedMs": 1441.3383430000395
+    },
+    {
+      "call": 51,
+      "bytes": 4232,
+      "promptTokens": 911,
+      "outputTokens": 19,
+      "elapsedMs": 1849.1350009999005
+    },
+    {
+      "call": 52,
+      "bytes": 3883,
+      "promptTokens": 824,
+      "outputTokens": 10,
+      "elapsedMs": 1427.3718850000296
+    },
+    {
+      "call": 53,
+      "bytes": 3963,
+      "promptTokens": 839,
+      "outputTokens": 10,
+      "elapsedMs": 1457.515625
+    },
+    {
+      "call": 54,
+      "bytes": 3939,
+      "promptTokens": 808,
+      "outputTokens": 10,
+      "elapsedMs": 1453.6185040000128
+    },
+    {
+      "call": 55,
+      "bytes": 4060,
+      "promptTokens": 840,
+      "outputTokens": 10,
+      "elapsedMs": 1395.2908010000829
+    },
+    {
+      "call": 56,
+      "bytes": 4678,
+      "promptTokens": 1050,
+      "outputTokens": 10,
+      "elapsedMs": 1903.2909960000543
+    },
+    {
+      "call": 57,
+      "bytes": 4403,
+      "promptTokens": 932,
+      "outputTokens": 14,
+      "elapsedMs": 1695.216325999936
+    },
+    {
+      "call": 58,
+      "bytes": 4000,
+      "promptTokens": 845,
+      "outputTokens": 13,
+      "elapsedMs": 1516.8102690000087
+    },
+    {
+      "call": 59,
+      "bytes": 4654,
+      "promptTokens": 1030,
+      "outputTokens": 10,
+      "elapsedMs": 1626.277403999935
+    },
+    {
+      "call": 60,
+      "bytes": 3901,
+      "promptTokens": 825,
+      "outputTokens": 10,
+      "elapsedMs": 1420.696444000001
+    },
+    {
+      "call": 61,
+      "bytes": 4073,
+      "promptTokens": 861,
+      "outputTokens": 10,
+      "elapsedMs": 1434.5296300000045
+    },
+    {
+      "call": 62,
+      "bytes": 4402,
+      "promptTokens": 984,
+      "outputTokens": 14,
+      "elapsedMs": 1645.238204000052
+    },
+    {
+      "call": 63,
+      "bytes": 4986,
+      "promptTokens": 1117,
+      "outputTokens": 10,
+      "elapsedMs": 1801.4558970000362
+    },
+    {
+      "call": 64,
+      "bytes": 4701,
+      "promptTokens": 1068,
+      "outputTokens": 10,
+      "elapsedMs": 1916.4479940000456
+    },
+    {
+      "call": 65,
+      "bytes": 4753,
+      "promptTokens": 967,
+      "outputTokens": 10,
+      "elapsedMs": 1468.1017129999818
+    },
+    {
+      "call": 66,
+      "bytes": 4391,
+      "promptTokens": 948,
+      "outputTokens": 10,
+      "elapsedMs": 1508.2375849999953
+    },
+    {
+      "call": 67,
+      "bytes": 4036,
+      "promptTokens": 828,
+      "outputTokens": 13,
+      "elapsedMs": 1224.5103220000165
+    },
+    {
+      "call": 68,
+      "bytes": 4070,
+      "promptTokens": 833,
+      "outputTokens": 10,
+      "elapsedMs": 1356.7862719999393
+    },
+    {
+      "call": 69,
+      "bytes": 4897,
+      "promptTokens": 1046,
+      "outputTokens": 14,
+      "elapsedMs": 1971.7082749999827
+    },
+    {
+      "call": 70,
+      "bytes": 4977,
+      "promptTokens": 1069,
+      "outputTokens": 10,
+      "elapsedMs": 1724.9496979999822
+    },
+    {
+      "call": 71,
+      "bytes": 4705,
+      "promptTokens": 977,
+      "outputTokens": 14,
+      "elapsedMs": 1673.0047379999887
+    },
+    {
+      "call": 72,
+      "bytes": 4445,
+      "promptTokens": 931,
+      "outputTokens": 10,
+      "elapsedMs": 1431.9568590000272
+    },
+    {
+      "call": 73,
+      "bytes": 4329,
+      "promptTokens": 947,
+      "outputTokens": 14,
+      "elapsedMs": 1598.7135850000195
+    },
+    {
+      "call": 74,
+      "bytes": 4266,
+      "promptTokens": 926,
+      "outputTokens": 10,
+      "elapsedMs": 1484.2296939999796
+    },
+    {
+      "call": 75,
+      "bytes": 3914,
+      "promptTokens": 826,
+      "outputTokens": 10,
+      "elapsedMs": 1437.145235999953
+    },
+    {
+      "call": 76,
+      "bytes": 4775,
+      "promptTokens": 1094,
+      "outputTokens": 10,
+      "elapsedMs": 1743.726124000037
+    },
+    {
+      "call": 77,
+      "bytes": 4714,
+      "promptTokens": 1072,
+      "outputTokens": 10,
+      "elapsedMs": 1768.4519409999484
+    },
+    {
+      "call": 78,
+      "bytes": 4717,
+      "promptTokens": 1028,
+      "outputTokens": 10,
+      "elapsedMs": 1740.5759120000293
+    },
+    {
+      "call": 79,
+      "bytes": 4344,
+      "promptTokens": 950,
+      "outputTokens": 14,
+      "elapsedMs": 1688.1064400000032
+    },
+    {
+      "call": 80,
+      "bytes": 3896,
+      "promptTokens": 820,
+      "outputTokens": 10,
+      "elapsedMs": 1123.8346789999632
+    },
+    {
+      "call": 81,
+      "bytes": 4066,
+      "promptTokens": 854,
+      "outputTokens": 10,
+      "elapsedMs": 1540.1990689999657
+    },
+    {
+      "call": 82,
+      "bytes": 4721,
+      "promptTokens": 1075,
+      "outputTokens": 10,
+      "elapsedMs": 1826.6362289999379
+    },
+    {
+      "call": 83,
+      "bytes": 4673,
+      "promptTokens": 1025,
+      "outputTokens": 10,
+      "elapsedMs": 1627.4965280001052
+    },
+    {
+      "call": 84,
+      "bytes": 4774,
+      "promptTokens": 1100,
+      "outputTokens": 13,
+      "elapsedMs": 1895.2809610000113
+    }
+  ],
+  "observation": "Completed in the normal production deadline but fails source-reviewed coverage: final offline PDF/Markdown result and lack of M4 peak measurement omitted during extraction. Not a quality pass."
+}

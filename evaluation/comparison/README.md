@@ -63,13 +63,34 @@ The TL;DR now selects whole existing claims and derives references rather than g
 
 Resource reports omit full time-series samples but retain their counts. The sampled Ollama process-tree RSS peak was 5.28 GiB in both runs; sampling includes previous model residency and is not an isolated physical-memory measurement. NVIDIA peaks were 2,874 / 3,082 MiB. System swap peaked at 2.84 / 4.00 GiB respectively, including other applications and previous workload. Do not sum these figures or treat them as target-M4 observations.
 
+## Current controlled short runs
+
+These `*-current-*-v18.json` runs use the same four-segment `straightforward` fixture and source `e34a7d1`. Each model was verified unloaded before cold and resident before its immediate warm repeat. OS caches and background applications were not controlled. All four runs completed in one call; source inspection found no transferred search-test deadline in the selected whole-claim TL;DR. Short-path production logic is unchanged by the later long-extraction work.
+
+| Model | Cold | Warm |
+| --- | ---: | ---: |
+| Gemma 3 | 16.74 s | 8.65 s |
+| Gemma 4 e2b | 11.61 s | 1.65 s |
+
+These successful short observations do not promote the candidate or establish long-Meeting/M4 gates. Per-run JSON records digests, quantization, settings, output and resource limitations.
+
 ## Chat verification
 
-`gemma3-short-chat-before-fragment-context.json` records an actual chat-v12 run: all 30 short-fixture questions completed without hard errors in 40 model calls. Source inspection found that the reviewer answer selected the negative writing sentence while omitting the affirmative review commitment immediately before it. It is retained as a failed quality observation, not a passed chat gate.
+`gemma3-short-chat-v14.json` and `gemma3-long-chat-v14.json` are clean source `efd032f` production runs: 30 short questions and seven long questions, with no hard errors. Agent review against the tuned synthetic sources found all **25/25 answerable questions**, including **24/24 critical answerable questions**, answered with correct support. The other 12 questions produced nine explicit negative original quotations and three verification abstentions. No critical unsupported claim or cross-Meeting reference was observed. All 34 published quotation answers matched their cited original passages and speakers. This is source inspection, not a blind human acceptance gate.
 
-Chat now publishes the whole original fragment containing a selected canonical sentence, with its actual speaker and derived citations. This preserves neighboring commitments and qualifiers. The active question follows the evidence in the model request. A failed follow-up rewrite retains the original two user questions as intent context instead of guessing a subject. A second model self-audit was removed because actual runs showed it rejected explicit negative evidence and rubber-stamped wrong passages. Canonical wording establishes provenance, not semantic relevance; final source review remains necessary.
+Short answers took a median 1.41 seconds, with all seven declared follow-ups answered. Five long targeted lookups took 4.28–5.98 seconds; the broad final-plan scan completed in 74.47 seconds with the final decision at reference 180. Calendar-date fallback abstained after 72.87 seconds with incomplete/unverified review; it is not a completed broad answer. Maximum serialized requests were 2,516 / 5,260 bytes, below 5,500. These are laptop observations, not M4 measurements.
 
-The latest whole-fragment chat run and full synthetic long Summary are pending. Earlier failed runs remain versioned above. No incomplete result, cached replay or small development slice is a real 60-minute or successful production-latency measurement.
+Some answers include unnecessary or repeated context: deletion discussion before the privacy-list deadline, a quoted malicious test before its test-owner answer, or guide-writing and review commitments together. Actual speaker labels and original qualifiers keep these facts separate, but the answers can be less direct. Source identity alone does not prove relevance.
+
+`gemma3-short-chat-before-fragment-context.json` retains the earlier reviewer omission. Whole-fragment context fixes that omission. The active question follows evidence; one full-history intent rewrite can resolve a follow-up, then only user questions enter source selection, preventing earlier assistant detours from becoming evidence. The second model self-audit was removed after it rejected explicit negative evidence and accepted wrong passages. Passage selection now returns validated IDs only; malformed/unknown IDs remain failures, and incomplete consolidation cannot establish absence.
+
+## Full long Summary verification
+
+`gemma3-long-before-sentence-classification.json` completed within the normal production deadline: **673.40 seconds, 84 calls**, clean source `a741f12`. It nevertheless failed quality review: only **6/8 important points and 6/7 critical points** were represented. Extraction omitted the final PDF-failed/Markdown-passed result and the lack of an M4 peak measurement. The retained critical facts had correct attribution; long output remained verbose. This completed run is explicitly a failed quality observation.
+
+Its sampled Ollama RSS peak was 9.64 GiB and NVIDIA usage peaked at 2,874 MiB. System swap began at 3.65 GiB, peaked at 3.86 GiB and ended at 3.62 GiB. These are sampled process-tree/system observations with shared mappings and other applications, not unique physical-memory totals or M4 performance.
+
+Long extraction now requires a kind for **every original sentence**. Missing IDs fail validation; code owns unchanged wording, actual speakers and references. Only explicitly classified procedural material can be omitted. Topic grouping preserves all distinct original clauses, deduplicates conservative equivalent subsets and uses two bounded organizing rounds. A smaller development reproduction retained the two missing facts. `gemma3-long-before-shared-schema.json` records the next complete attempt: 520.22 seconds and the 128-call cap, with 90 classification calls, one revision call and 37 grouping calls before failure. No partial Summary was published. The schema repeated the same category enum per sentence, forcing small batches. The current implementation shares that enum through `$defs` and serializes compact sentence records without removing original text or required IDs. The full updated run remains pending; neither the development slice nor these failed runs clears the long quality gate.
 
 ## Release status
 

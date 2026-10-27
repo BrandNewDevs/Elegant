@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "status": "completed",
+  "returnCode": 0,
+  "error": null,
+  "runLabel": "unspecified",
+  "executable": "sh",
+  "hardware": {
+    "system": "Linux",
+    "release": "7.0.0-38-generic",
+    "machine": "x86_64",
+    "logicalCpus": 16
+  },
+  "elapsedMs": 673541.6,
+  "requestedSampleIntervalSeconds": 0.5,
+  "observations": {
+    "peakProcessTreeRssKiB": 98092,
+    "peakOllamaRssKiB": 10112420,
+    "peakNvidiaUsedMiBByDevice": {
+      "0": 2874.0
+    },
+    "initialSystemSwapUsedKiB": 3826148,
+    "peakSystemSwapUsedKiB": 4043232,
+    "lastSystemSwapUsedKiB": 3799748
+  },
+  "scope": [
+    "RSS sums can double count shared pages; they are not unique physical memory or a total device peak.",
+    "Existing model servers are outside the command process tree; optional Ollama measurements are separate and may overlap it.",
+    "System swap and GPU usage include other applications. Sampling can miss short-lived peaks.",
+    "Process-group cleanup cannot control a command that deliberately detaches into a new session.",
+    "The run label is operator supplied; the wrapper does not unload models or establish a cold/warm state.",
+    "Command output and arguments are not captured. These observations do not establish quality or M4 acceptance."
+  ],
+  "warnings": [],
+  "sampleCount": 1156,
+  "samplesOmitted": true
+}

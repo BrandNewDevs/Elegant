@@ -1,0 +1,995 @@
+{
+  "metadata": {
+    "sourceCommit": "c6be2da5522cf0acb31b4880d8457b857d858819",
+    "sourceDirty": false,
+    "recordedAt": "2026-10-27T04:12:13.448Z",
+    "implementation": "current",
+    "model": {
+      "name": "gemma3:4b-it-q4_K_M",
+      "model": "gemma3:4b-it-q4_K_M",
+      "modified_at": "2026-10-05T05:47:50.046802317+05:30",
+      "size": 3338801804,
+      "digest": "a2af6cc3eb7fa8be8504abaf9b04e88f17a119ec3f04a3addf55f92841195f5a",
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "gemma3",
+        "families": [
+          "gemma3"
+        ],
+        "parameter_size": "4.3B",
+        "quantization_level": "Q4_K_M"
+      },
+      "capabilities": [
+        "completion"
+      ]
+    },
+    "ollama": {
+      "version": "0.34.0"
+    },
+    "hardware": {
+      "platform": "linux",
+      "release": "7.0.0-38-generic",
+      "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+      "memoryBytes": 15950888960,
+      "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU, 4096 MiB"
+    },
+    "settings": {
+      "numCtx": 8192,
+      "temperature": 0,
+      "maxInputBytes": 5500,
+      "maxOutputTokens": 2048,
+      "think": false
+    },
+    "promptVersion": "grounded-summary-v20",
+    "memoryScope": "Node peak RSS only. Ollama, Swift, peak total memory and swap need external observation.",
+    "runCondition": "uncontrolled",
+    "summaryDeadlineMs": 900000,
+    "evaluationDeadlineOverride": false,
+    "chatPromptVersion": "meeting-chat-v14",
+    "evidencePromptVersion": "meeting-evidence-v8"
+  },
+  "runs": [
+    {
+      "id": "long-discussion",
+      "split": "reserved",
+      "synthetic": true,
+      "error": "Summary incomplete: the model-call limit was reached",
+      "chat": [
+        {
+          "questionId": "final-plan",
+          "skipped": "Chat was not selected for this evaluation"
+        },
+        {
+          "questionId": "guide-owner",
+          "skipped": "Chat was not selected for this evaluation"
+        },
+        {
+          "questionId": "guide-deadline",
+          "skipped": "Chat was not selected for this evaluation"
+        },
+        {
+          "questionId": "retest",
+          "skipped": "Chat was not selected for this evaluation"
+        },
+        {
+          "questionId": "packaging",
+          "skipped": "Chat was not selected for this evaluation"
+        },
+        {
+          "questionId": "peak",
+          "skipped": "Chat was not selected for this evaluation"
+        },
+        {
+          "questionId": "date",
+          "skipped": "Chat was not selected for this evaluation"
+        }
+      ],
+      "summarySkipped": false,
+      "elapsedMs": 520220.73874199996,
+      "calls": 128,
+      "summaryElapsedMs": 520220.69816599996,
+      "summaryCalls": 128,
+      "peakRssKiB": 112480
+    }
+  ],
+  "requests": [
+    {
+      "call": 1,
+      "bytes": 3922,
+      "promptTokens": 570,
+      "outputTokens": 96,
+      "elapsedMs": 4106.2685870000005
+    },
+    {
+      "call": 2,
+      "bytes": 4185,
+      "promptTokens": 629,
+      "outputTokens": 98,
+      "elapsedMs": 4222.586697000001
+    },
+    {
+      "call": 3,
+      "bytes": 4124,
+      "promptTokens": 621,
+      "outputTokens": 112,
+      "elapsedMs": 4548.896862
+    },
+    {
+      "call": 4,
+      "bytes": 4161,
+      "promptTokens": 624,
+      "outputTokens": 101,
+      "elapsedMs": 4276.932281000001
+    },
+    {
+      "call": 5,
+      "bytes": 4188,
+      "promptTokens": 632,
+      "outputTokens": 94,
+      "elapsedMs": 4062.5922869999995
+    },
+    {
+      "call": 6,
+      "bytes": 4201,
+      "promptTokens": 641,
+      "outputTokens": 96,
+      "elapsedMs": 4040.4652179999975
+    },
+    {
+      "call": 7,
+      "bytes": 4158,
+      "promptTokens": 639,
+      "outputTokens": 98,
+      "elapsedMs": 3989.6258960000014
+    },
+    {
+      "call": 8,
+      "bytes": 4213,
+      "promptTokens": 648,
+      "outputTokens": 108,
+      "elapsedMs": 4462.969978000001
+    },
+    {
+      "call": 9,
+      "bytes": 4188,
+      "promptTokens": 636,
+      "outputTokens": 120,
+      "elapsedMs": 4768.977738000001
+    },
+    {
+      "call": 10,
+      "bytes": 4201,
+      "promptTokens": 641,
+      "outputTokens": 99,
+      "elapsedMs": 4009.9428749999934
+    },
+    {
+      "call": 11,
+      "bytes": 4176,
+      "promptTokens": 645,
+      "outputTokens": 106,
+      "elapsedMs": 4436.736047999999
+    },
+    {
+      "call": 12,
+      "bytes": 4195,
+      "promptTokens": 642,
+      "outputTokens": 108,
+      "elapsedMs": 4516.7640390000015
+    },
+    {
+      "call": 13,
+      "bytes": 4188,
+      "promptTokens": 636,
+      "outputTokens": 106,
+      "elapsedMs": 4402.605603999997
+    },
+    {
+      "call": 14,
+      "bytes": 4219,
+      "promptTokens": 647,
+      "outputTokens": 121,
+      "elapsedMs": 4922.532727999998
+    },
+    {
+      "call": 15,
+      "bytes": 4158,
+      "promptTokens": 639,
+      "outputTokens": 98,
+      "elapsedMs": 4001.7521469999992
+    },
+    {
+      "call": 16,
+      "bytes": 4195,
+      "promptTokens": 642,
+      "outputTokens": 109,
+      "elapsedMs": 4615.700034000001
+    },
+    {
+      "call": 17,
+      "bytes": 4206,
+      "promptTokens": 642,
+      "outputTokens": 120,
+      "elapsedMs": 4863.105846000006
+    },
+    {
+      "call": 18,
+      "bytes": 4201,
+      "promptTokens": 641,
+      "outputTokens": 99,
+      "elapsedMs": 4030.3176029999886
+    },
+    {
+      "call": 19,
+      "bytes": 4158,
+      "promptTokens": 639,
+      "outputTokens": 107,
+      "elapsedMs": 4292.149737
+    },
+    {
+      "call": 20,
+      "bytes": 4213,
+      "promptTokens": 648,
+      "outputTokens": 109,
+      "elapsedMs": 4521.087613000011
+    },
+    {
+      "call": 21,
+      "bytes": 4188,
+      "promptTokens": 636,
+      "outputTokens": 120,
+      "elapsedMs": 4797.1169780000055
+    },
+    {
+      "call": 22,
+      "bytes": 4201,
+      "promptTokens": 641,
+      "outputTokens": 107,
+      "elapsedMs": 4338.7864259999915
+    },
+    {
+      "call": 23,
+      "bytes": 4176,
+      "promptTokens": 645,
+      "outputTokens": 107,
+      "elapsedMs": 4309.690667999996
+    },
+    {
+      "call": 24,
+      "bytes": 4195,
+      "promptTokens": 642,
+      "outputTokens": 109,
+      "elapsedMs": 4399.955863999989
+    },
+    {
+      "call": 25,
+      "bytes": 4188,
+      "promptTokens": 636,
+      "outputTokens": 120,
+      "elapsedMs": 4870.375862000001
+    },
+    {
+      "call": 26,
+      "bytes": 4219,
+      "promptTokens": 647,
+      "outputTokens": 99,
+      "elapsedMs": 4353.772736999992
+    },
+    {
+      "call": 27,
+      "bytes": 4158,
+      "promptTokens": 639,
+      "outputTokens": 106,
+      "elapsedMs": 4310.269220999995
+    },
+    {
+      "call": 28,
+      "bytes": 4195,
+      "promptTokens": 642,
+      "outputTokens": 108,
+      "elapsedMs": 4436.096860000005
+    },
+    {
+      "call": 29,
+      "bytes": 4206,
+      "promptTokens": 642,
+      "outputTokens": 98,
+      "elapsedMs": 4010.0519820000045
+    },
+    {
+      "call": 30,
+      "bytes": 4201,
+      "promptTokens": 641,
+      "outputTokens": 97,
+      "elapsedMs": 4023.777958999999
+    },
+    {
+      "call": 31,
+      "bytes": 4158,
+      "promptTokens": 639,
+      "outputTokens": 98,
+      "elapsedMs": 4058.042399999991
+    },
+    {
+      "call": 32,
+      "bytes": 4213,
+      "promptTokens": 648,
+      "outputTokens": 108,
+      "elapsedMs": 4490.573510999995
+    },
+    {
+      "call": 33,
+      "bytes": 4188,
+      "promptTokens": 636,
+      "outputTokens": 120,
+      "elapsedMs": 4834.414929999999
+    },
+    {
+      "call": 34,
+      "bytes": 4201,
+      "promptTokens": 641,
+      "outputTokens": 107,
+      "elapsedMs": 4421.734759999992
+    },
+    {
+      "call": 35,
+      "bytes": 4176,
+      "promptTokens": 645,
+      "outputTokens": 120,
+      "elapsedMs": 4966.7517340000195
+    },
+    {
+      "call": 36,
+      "bytes": 4195,
+      "promptTokens": 642,
+      "outputTokens": 109,
+      "elapsedMs": 4958.067358999979
+    },
+    {
+      "call": 37,
+      "bytes": 4189,
+      "promptTokens": 637,
+      "outputTokens": 106,
+      "elapsedMs": 4516.492551000003
+    },
+    {
+      "call": 38,
+      "bytes": 4221,
+      "promptTokens": 649,
+      "outputTokens": 99,
+      "elapsedMs": 4404.498057999997
+    },
+    {
+      "call": 39,
+      "bytes": 4160,
+      "promptTokens": 641,
+      "outputTokens": 120,
+      "elapsedMs": 5139.626247000007
+    },
+    {
+      "call": 40,
+      "bytes": 4197,
+      "promptTokens": 644,
+      "outputTokens": 101,
+      "elapsedMs": 4338.262117000006
+    },
+    {
+      "call": 41,
+      "bytes": 4208,
+      "promptTokens": 644,
+      "outputTokens": 120,
+      "elapsedMs": 5204.565505000006
+    },
+    {
+      "call": 42,
+      "bytes": 4203,
+      "promptTokens": 643,
+      "outputTokens": 107,
+      "elapsedMs": 4579.783075999992
+    },
+    {
+      "call": 43,
+      "bytes": 4160,
+      "promptTokens": 641,
+      "outputTokens": 120,
+      "elapsedMs": 5193.734985000017
+    },
+    {
+      "call": 44,
+      "bytes": 4215,
+      "promptTokens": 650,
+      "outputTokens": 108,
+      "elapsedMs": 4765.200600000011
+    },
+    {
+      "call": 45,
+      "bytes": 4190,
+      "promptTokens": 638,
+      "outputTokens": 98,
+      "elapsedMs": 4261.723558000027
+    },
+    {
+      "call": 46,
+      "bytes": 4203,
+      "promptTokens": 643,
+      "outputTokens": 121,
+      "elapsedMs": 5316.744116999995
+    },
+    {
+      "call": 47,
+      "bytes": 4178,
+      "promptTokens": 647,
+      "outputTokens": 106,
+      "elapsedMs": 4612.25589499998
+    },
+    {
+      "call": 48,
+      "bytes": 4197,
+      "promptTokens": 644,
+      "outputTokens": 108,
+      "elapsedMs": 4591.932431999972
+    },
+    {
+      "call": 49,
+      "bytes": 4190,
+      "promptTokens": 638,
+      "outputTokens": 106,
+      "elapsedMs": 4503.453630999982
+    },
+    {
+      "call": 50,
+      "bytes": 4237,
+      "promptTokens": 657,
+      "outputTokens": 124,
+      "elapsedMs": 5507.872558000003
+    },
+    {
+      "call": 51,
+      "bytes": 4194,
+      "promptTokens": 659,
+      "outputTokens": 109,
+      "elapsedMs": 4879.291629000014
+    },
+    {
+      "call": 52,
+      "bytes": 4231,
+      "promptTokens": 662,
+      "outputTokens": 130,
+      "elapsedMs": 5590.475983000011
+    },
+    {
+      "call": 53,
+      "bytes": 4242,
+      "promptTokens": 662,
+      "outputTokens": 106,
+      "elapsedMs": 4618.768313000008
+    },
+    {
+      "call": 54,
+      "bytes": 4237,
+      "promptTokens": 661,
+      "outputTokens": 115,
+      "elapsedMs": 4920.688815000001
+    },
+    {
+      "call": 55,
+      "bytes": 4194,
+      "promptTokens": 659,
+      "outputTokens": 128,
+      "elapsedMs": 5415.410842999991
+    },
+    {
+      "call": 56,
+      "bytes": 4249,
+      "promptTokens": 668,
+      "outputTokens": 129,
+      "elapsedMs": 5594.237492999993
+    },
+    {
+      "call": 57,
+      "bytes": 4224,
+      "promptTokens": 656,
+      "outputTokens": 106,
+      "elapsedMs": 4543.214939000027
+    },
+    {
+      "call": 58,
+      "bytes": 4237,
+      "promptTokens": 661,
+      "outputTokens": 115,
+      "elapsedMs": 4880.15839300002
+    },
+    {
+      "call": 59,
+      "bytes": 4212,
+      "promptTokens": 665,
+      "outputTokens": 128,
+      "elapsedMs": 5415.589717000024
+    },
+    {
+      "call": 60,
+      "bytes": 4231,
+      "promptTokens": 662,
+      "outputTokens": 115,
+      "elapsedMs": 4897.217172999983
+    },
+    {
+      "call": 61,
+      "bytes": 4224,
+      "promptTokens": 656,
+      "outputTokens": 114,
+      "elapsedMs": 4821.160577000002
+    },
+    {
+      "call": 62,
+      "bytes": 4255,
+      "promptTokens": 667,
+      "outputTokens": 129,
+      "elapsedMs": 5538.630883000034
+    },
+    {
+      "call": 63,
+      "bytes": 4194,
+      "promptTokens": 659,
+      "outputTokens": 114,
+      "elapsedMs": 4835.690510000044
+    },
+    {
+      "call": 64,
+      "bytes": 4231,
+      "promptTokens": 662,
+      "outputTokens": 115,
+      "elapsedMs": 4966.233918999962
+    },
+    {
+      "call": 65,
+      "bytes": 4242,
+      "promptTokens": 662,
+      "outputTokens": 114,
+      "elapsedMs": 4878.012960000022
+    },
+    {
+      "call": 66,
+      "bytes": 4237,
+      "promptTokens": 661,
+      "outputTokens": 115,
+      "elapsedMs": 4999.330570999999
+    },
+    {
+      "call": 67,
+      "bytes": 4194,
+      "promptTokens": 659,
+      "outputTokens": 129,
+      "elapsedMs": 5456.858030000003
+    },
+    {
+      "call": 68,
+      "bytes": 4249,
+      "promptTokens": 668,
+      "outputTokens": 107,
+      "elapsedMs": 4702.9120380000095
+    },
+    {
+      "call": 69,
+      "bytes": 4224,
+      "promptTokens": 656,
+      "outputTokens": 106,
+      "elapsedMs": 4540.76337499998
+    },
+    {
+      "call": 70,
+      "bytes": 4237,
+      "promptTokens": 661,
+      "outputTokens": 114,
+      "elapsedMs": 4835.851769000001
+    },
+    {
+      "call": 71,
+      "bytes": 4212,
+      "promptTokens": 665,
+      "outputTokens": 129,
+      "elapsedMs": 5431.73205000005
+    },
+    {
+      "call": 72,
+      "bytes": 4231,
+      "promptTokens": 662,
+      "outputTokens": 115,
+      "elapsedMs": 4904.848728000012
+    },
+    {
+      "call": 73,
+      "bytes": 4224,
+      "promptTokens": 656,
+      "outputTokens": 106,
+      "elapsedMs": 4519.550334000029
+    },
+    {
+      "call": 74,
+      "bytes": 4255,
+      "promptTokens": 667,
+      "outputTokens": 129,
+      "elapsedMs": 5772.5595840000315
+    },
+    {
+      "call": 75,
+      "bytes": 4194,
+      "promptTokens": 659,
+      "outputTokens": 114,
+      "elapsedMs": 5080.720002999995
+    },
+    {
+      "call": 76,
+      "bytes": 4231,
+      "promptTokens": 662,
+      "outputTokens": 130,
+      "elapsedMs": 5598.816248999967
+    },
+    {
+      "call": 77,
+      "bytes": 4242,
+      "promptTokens": 662,
+      "outputTokens": 128,
+      "elapsedMs": 5427.460292999982
+    },
+    {
+      "call": 78,
+      "bytes": 4237,
+      "promptTokens": 661,
+      "outputTokens": 115,
+      "elapsedMs": 4981.471784000052
+    },
+    {
+      "call": 79,
+      "bytes": 4194,
+      "promptTokens": 659,
+      "outputTokens": 107,
+      "elapsedMs": 4618.820689999964
+    },
+    {
+      "call": 80,
+      "bytes": 4249,
+      "promptTokens": 668,
+      "outputTokens": 130,
+      "elapsedMs": 5707.508919999993
+    },
+    {
+      "call": 81,
+      "bytes": 4224,
+      "promptTokens": 656,
+      "outputTokens": 114,
+      "elapsedMs": 4907.843163000012
+    },
+    {
+      "call": 82,
+      "bytes": 4237,
+      "promptTokens": 661,
+      "outputTokens": 128,
+      "elapsedMs": 5863.142062999948
+    },
+    {
+      "call": 83,
+      "bytes": 4212,
+      "promptTokens": 665,
+      "outputTokens": 107,
+      "elapsedMs": 4764.0840459999745
+    },
+    {
+      "call": 84,
+      "bytes": 4231,
+      "promptTokens": 662,
+      "outputTokens": 116,
+      "elapsedMs": 4967.078529999999
+    },
+    {
+      "call": 85,
+      "bytes": 4224,
+      "promptTokens": 656,
+      "outputTokens": 114,
+      "elapsedMs": 4792.757724999974
+    },
+    {
+      "call": 86,
+      "bytes": 4255,
+      "promptTokens": 667,
+      "outputTokens": 129,
+      "elapsedMs": 5637.827588999993
+    },
+    {
+      "call": 87,
+      "bytes": 4194,
+      "promptTokens": 659,
+      "outputTokens": 114,
+      "elapsedMs": 4880.309594999999
+    },
+    {
+      "call": 88,
+      "bytes": 4231,
+      "promptTokens": 662,
+      "outputTokens": 108,
+      "elapsedMs": 4875.655365000013
+    },
+    {
+      "call": 89,
+      "bytes": 4468,
+      "promptTokens": 693,
+      "outputTokens": 127,
+      "elapsedMs": 5797.933990000049
+    },
+    {
+      "call": 90,
+      "bytes": 4458,
+      "promptTokens": 684,
+      "outputTokens": 158,
+      "elapsedMs": 7086.165350999974
+    },
+    {
+      "call": 91,
+      "bytes": 5242,
+      "promptTokens": 1171,
+      "outputTokens": 44,
+      "elapsedMs": 4689.522574000002
+    },
+    {
+      "call": 92,
+      "bytes": 5017,
+      "promptTokens": 1156,
+      "outputTokens": 10,
+      "elapsedMs": 1842.677647000004
+    },
+    {
+      "call": 93,
+      "bytes": 3953,
+      "promptTokens": 903,
+      "outputTokens": 22,
+      "elapsedMs": 1896.5157120000222
+    },
+    {
+      "call": 94,
+      "bytes": 3261,
+      "promptTokens": 762,
+      "outputTokens": 10,
+      "elapsedMs": 1325.1902220000047
+    },
+    {
+      "call": 95,
+      "bytes": 3685,
+      "promptTokens": 839,
+      "outputTokens": 18,
+      "elapsedMs": 1631.213115999999
+    },
+    {
+      "call": 96,
+      "bytes": 5198,
+      "promptTokens": 1162,
+      "outputTokens": 14,
+      "elapsedMs": 1864.7163290000171
+    },
+    {
+      "call": 97,
+      "bytes": 5192,
+      "promptTokens": 1146,
+      "outputTokens": 18,
+      "elapsedMs": 2044.319428000017
+    },
+    {
+      "call": 98,
+      "bytes": 5034,
+      "promptTokens": 1054,
+      "outputTokens": 30,
+      "elapsedMs": 2290.262897000008
+    },
+    {
+      "call": 99,
+      "bytes": 5007,
+      "promptTokens": 1081,
+      "outputTokens": 30,
+      "elapsedMs": 2299.893051000021
+    },
+    {
+      "call": 100,
+      "bytes": 5092,
+      "promptTokens": 1120,
+      "outputTokens": 30,
+      "elapsedMs": 2564.729993999994
+    },
+    {
+      "call": 101,
+      "bytes": 5245,
+      "promptTokens": 1148,
+      "outputTokens": 34,
+      "elapsedMs": 2667.0671819999698
+    },
+    {
+      "call": 102,
+      "bytes": 5052,
+      "promptTokens": 1069,
+      "outputTokens": 30,
+      "elapsedMs": 2333.170502999972
+    },
+    {
+      "call": 103,
+      "bytes": 5135,
+      "promptTokens": 1142,
+      "outputTokens": 30,
+      "elapsedMs": 2559.3622379999724
+    },
+    {
+      "call": 104,
+      "bytes": 5239,
+      "promptTokens": 1137,
+      "outputTokens": 30,
+      "elapsedMs": 2489.0864059999585
+    },
+    {
+      "call": 105,
+      "bytes": 5180,
+      "promptTokens": 1140,
+      "outputTokens": 14,
+      "elapsedMs": 1961.0660519999801
+    },
+    {
+      "call": 106,
+      "bytes": 5091,
+      "promptTokens": 1088,
+      "outputTokens": 30,
+      "elapsedMs": 2446.1290229999577
+    },
+    {
+      "call": 107,
+      "bytes": 5234,
+      "promptTokens": 1127,
+      "outputTokens": 34,
+      "elapsedMs": 2817.211945999996
+    },
+    {
+      "call": 108,
+      "bytes": 5185,
+      "promptTokens": 1153,
+      "outputTokens": 30,
+      "elapsedMs": 2481.408679999993
+    },
+    {
+      "call": 109,
+      "bytes": 5214,
+      "promptTokens": 1150,
+      "outputTokens": 30,
+      "elapsedMs": 2477.589513999992
+    },
+    {
+      "call": 110,
+      "bytes": 5063,
+      "promptTokens": 1076,
+      "outputTokens": 30,
+      "elapsedMs": 2299.256807000027
+    },
+    {
+      "call": 111,
+      "bytes": 5223,
+      "promptTokens": 1170,
+      "outputTokens": 30,
+      "elapsedMs": 2547.059127000044
+    },
+    {
+      "call": 112,
+      "bytes": 5144,
+      "promptTokens": 1102,
+      "outputTokens": 30,
+      "elapsedMs": 2604.4528179999907
+    },
+    {
+      "call": 113,
+      "bytes": 5037,
+      "promptTokens": 1057,
+      "outputTokens": 30,
+      "elapsedMs": 2357.635224000027
+    },
+    {
+      "call": 114,
+      "bytes": 5248,
+      "promptTokens": 1136,
+      "outputTokens": 30,
+      "elapsedMs": 2492.6455379999825
+    },
+    {
+      "call": 115,
+      "bytes": 5178,
+      "promptTokens": 1146,
+      "outputTokens": 30,
+      "elapsedMs": 2623.1084549999796
+    },
+    {
+      "call": 116,
+      "bytes": 5231,
+      "promptTokens": 1137,
+      "outputTokens": 34,
+      "elapsedMs": 2710.694527000014
+    },
+    {
+      "call": 117,
+      "bytes": 5223,
+      "promptTokens": 1100,
+      "outputTokens": 34,
+      "elapsedMs": 2760.005405999953
+    },
+    {
+      "call": 118,
+      "bytes": 5228,
+      "promptTokens": 1173,
+      "outputTokens": 30,
+      "elapsedMs": 2588.35857500002
+    },
+    {
+      "call": 119,
+      "bytes": 5240,
+      "promptTokens": 1138,
+      "outputTokens": 30,
+      "elapsedMs": 2558.9163180000032
+    },
+    {
+      "call": 120,
+      "bytes": 4422,
+      "promptTokens": 982,
+      "outputTokens": 14,
+      "elapsedMs": 1646.1360350000323
+    },
+    {
+      "call": 121,
+      "bytes": 4600,
+      "promptTokens": 1014,
+      "outputTokens": 18,
+      "elapsedMs": 1789.0516739999875
+    },
+    {
+      "call": 122,
+      "bytes": 4908,
+      "promptTokens": 1077,
+      "outputTokens": 14,
+      "elapsedMs": 1678.750961999991
+    },
+    {
+      "call": 123,
+      "bytes": 5004,
+      "promptTokens": 1131,
+      "outputTokens": 10,
+      "elapsedMs": 1762.595432000002
+    },
+    {
+      "call": 124,
+      "bytes": 5105,
+      "promptTokens": 1135,
+      "outputTokens": 14,
+      "elapsedMs": 1889.727659999975
+    },
+    {
+      "call": 125,
+      "bytes": 5220,
+      "promptTokens": 1144,
+      "outputTokens": 18,
+      "elapsedMs": 2075.7632350000204
+    },
+    {
+      "call": 126,
+      "bytes": 5071,
+      "promptTokens": 1125,
+      "outputTokens": 18,
+      "elapsedMs": 2069.500837999978
+    },
+    {
+      "call": 127,
+      "bytes": 5073,
+      "promptTokens": 1097,
+      "outputTokens": 18,
+      "elapsedMs": 2104.351747000008
+    },
+    {
+      "call": 128,
+      "bytes": 4916,
+      "promptTokens": 1088,
+      "outputTokens": 10,
+      "elapsedMs": 1677.8540369999828
+    }
+  ],
+  "observation": "Mandatory sentence coverage retained the missing development-case facts, but this full run hit the unchanged 128-call cap during organizing. No partial Summary published."
+}
