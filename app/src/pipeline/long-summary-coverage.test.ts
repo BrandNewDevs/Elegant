@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { OriginalSentence } from "./sentence-claims.js";
+import { SENTENCE_KINDS, type OriginalSentence } from "./sentence-claims.js";
 import { createGroundedSummariser, SUMMARY_PROMPT_VERSION } from "./grounded-summariser.js";
 import { requestBytes } from "./model-request.js";
 import type { Transcript } from "./pipeline.js";
 import type { TextModel, TextRequest } from "./language-model.js";
 
+const kindCode = (kind: string) => SENTENCE_KINDS.findIndex(candidate => candidate === kind);
 type WireSentence = Omit<OriginalSentence, "sourceId">;
 const sourceId = (sentence: WireSentence) => sentence.id.slice(0, sentence.id.lastIndexOf(":"));
 interface Piece { id: string; ref: number; part: number; speaker: string; text: string }
@@ -24,8 +25,8 @@ function adapter(reduce: (facts: Fact[], sources: Piece[], request: TextRequest)
     let output: unknown;
     if ("revisions" in (request.schema as { properties: object }).properties) output = { revisions: Object.fromEntries(input.candidates!.map(fact => [String(fact.id), "unchanged"])) };
     else if (input.primary) output = { classifications: input.primary.map(piece =>
-      sourceId(piece).endsWith(":0") && piece.id.endsWith(":0")
-        ? /propose|suggest/i.test(piece.text) ? "proposal" : /final decision/i.test(piece.text) ? "decision" : "commitment" : "procedure") };
+      kindCode(sourceId(piece).endsWith(":0") && piece.id.endsWith(":0")
+        ? /propose|suggest/i.test(piece.text) ? "proposal" : /final decision/i.test(piece.text) ? "decision" : "commitment" : "procedure")) };
     else if (input.candidates && !("candidateIds" in (request.schema as { properties: object }).properties)) output = Object.fromEntries(reduce(input.candidates, input.sources!, request).flatMap(fact => (fact.covers ?? []).map(id => [String(id), Math.min(...fact.covers!)])));
     else output = { candidateIds: input.candidates!.slice(0, 3).map(fact => fact.id) };
     return { text: JSON.stringify(output), metadata: { model: "coverage:test", elapsedMs: 1 } };
@@ -394,8 +395,8 @@ describe("complete long Summary coverage", () => {
       const primary = data(request).primary;
       if (!primary) return inner.model.complete(request);
       return { text: JSON.stringify({ classifications: primary.map(piece =>
-        !sourceId(piece).endsWith(":0") || !piece.id.endsWith(":0") ? "procedure" : Number(sourceId(piece).split(":")[0]) === 19 ? "unresolved"
-          : [17, 18].includes(Number(sourceId(piece).split(":")[0])) ? "commitment" : "decision") }), metadata: { model: "priority:test", elapsedMs: 1 } };
+        kindCode(!sourceId(piece).endsWith(":0") || !piece.id.endsWith(":0") ? "procedure" : Number(sourceId(piece).split(":")[0]) === 19 ? "unresolved"
+          : [17, 18].includes(Number(sourceId(piece).split(":")[0])) ? "commitment" : "decision")) }), metadata: { model: "priority:test", elapsedMs: 1 } };
     } };
     await createGroundedSummariser({ model })(transcript);
     const final = data(requests.at(-1)!);
@@ -528,7 +529,7 @@ describe("complete long Summary coverage", () => {
     const model: TextModel = { async complete(request) {
       const input = data(request);
       if (input.primary) return { text: JSON.stringify({ classifications: input.primary.map(piece =>
-        piece.text === "Monday launch proposal." ? "proposal" : "update") }), metadata: { model: "fragment:test", elapsedMs: 1 } };
+        kindCode(piece.text === "Monday launch proposal." ? "proposal" : "update")) }), metadata: { model: "fragment:test", elapsedMs: 1 } };
       if (!("revisions" in (request.schema as { properties: object }).properties)) return inner.model.complete(request);
       const proposal = input.candidates!.find(fact => fact.text === "Monday launch proposal.");
       const correction = input.sources!.find(source => source.part > 0 && source.text.includes("replaces Monday"));

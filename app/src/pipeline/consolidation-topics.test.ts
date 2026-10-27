@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { OriginalSentence } from "./sentence-claims.js";
+import { SENTENCE_KINDS, type OriginalSentence } from "./sentence-claims.js";
 import type { TextModel, TextRequest } from "./language-model.js";
 import type { Transcript } from "./pipeline.js";
 import { createGroundedSummariser } from "./grounded-summariser.js";
 import { requestBytes } from "./model-request.js";
 
+const kindCode = (kind: string) => SENTENCE_KINDS.findIndex(candidate => candidate === kind);
 type WireSentence = Omit<OriginalSentence, "sourceId">;
 const sourceId = (sentence: WireSentence) => sentence.id.slice(0, sentence.id.lastIndexOf(":"));
 interface Piece { id: string; ref: number; part: number; speaker: string; text: string }
@@ -30,7 +31,7 @@ function topicModel(nameFor: (text: string) => string = topic) {
     if ("revisions" in (request.schema as { properties: object }).properties) { output = { revisions: Object.fromEntries(payload.candidates!.map(fact => [String(fact.id), "unchanged"])) }; }
     else if (payload.primary) {
       output = { classifications: payload.primary.map(piece =>
-        sourceId(piece).endsWith(":0") && piece.id.endsWith(":0") ? "update" : "procedure") };
+        kindCode(sourceId(piece).endsWith(":0") && piece.id.endsWith(":0") ? "update" : "procedure")) };
     } else if (payload.candidates && !("candidateIds" in (request.schema as { properties: object }).properties)) {
       const facts = payload.candidates!;
       const original = new Map(payload.sources!.map(piece => [piece.id, piece]));

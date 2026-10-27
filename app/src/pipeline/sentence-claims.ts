@@ -1,8 +1,10 @@
 import { InvalidSummaryError } from "./validate-summary.js";
-import type { FactKind, SourcePiece, SupportedFact } from "./grounded-format.js";
+import type { SourcePiece, SupportedFact } from "./grounded-format.js";
 
 export interface OriginalSentence { id: string; sourceId: string; speaker: string; text: string }
-const KINDS = ["proposal", "decision", "commitment", "disagreement", "unresolved", "update", "procedure"] as const;
+// Wire codes are positions in this frozen vocabulary; prompts and decoding share it.
+export const SENTENCE_KINDS = Object.freeze(["proposal", "decision", "commitment", "disagreement", "unresolved", "update", "procedure"] as const);
+const KIND_CODES = Object.freeze(SENTENCE_KINDS.map((_, code) => code));
 
 /** Application-owned IDs, text and attribution; the model classifies but cannot rewrite them. */
 export function originalSentences(sources: SourcePiece[]): OriginalSentence[] {
@@ -14,7 +16,7 @@ export function originalSentences(sources: SourcePiece[]): OriginalSentence[] {
 }
 
 export function sentenceClassificationSchema(primary: OriginalSentence[]) {
-  return { type: "object", properties: { classifications: { type: "array", items: { type: "string", enum: KINDS },
+  return { type: "object", properties: { classifications: { type: "array", items: { type: "integer", enum: KIND_CODES },
     minItems: primary.length, maxItems: primary.length } }, required: ["classifications"], additionalProperties: false };
 }
 
@@ -32,11 +34,14 @@ export function parseSentenceClassifications(json: string, primary: OriginalSent
   if (classifications.length !== primary.length) return invalid("Classify every primary sentence exactly once in input order; array length must match primary length");
   const facts: SupportedFact[] = [];
   for (const [index, sentence] of primary.entries()) {
-    const kind = classifications[index];
-    if (typeof kind !== "string" || !KINDS.some(allowed => allowed === kind)) return invalid("Use a supplied sentence kind or procedure for every primary position");
+    const code = classifications[index];
+    if (typeof code !== "number" || !Number.isInteger(code) || code < 0 || code >= SENTENCE_KINDS.length) {
+      return invalid("Use a supplied integer sentence kind code from 0 to 6 for every primary position");
+    }
+    const kind = SENTENCE_KINDS[code]!;
     const source = sources.get(sentence.sourceId);
     if (!source || source.speaker !== sentence.speaker || !source.text.includes(sentence.text)) throw new Error("Original sentence identity changed during Summary extraction");
-    if (kind !== "procedure") facts.push({ speaker: source.speaker, text: sentence.text, kind: kind as FactKind,
+    if (kind !== "procedure") facts.push({ speaker: source.speaker, text: sentence.text, kind,
       refs: [source.ref], sources: [source] });
   }
   return facts;
