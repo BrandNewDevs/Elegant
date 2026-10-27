@@ -163,6 +163,10 @@ app.whenReady().then(() => {
     console.error(`[recording] ${message}`);
     new Notification({ title: `${DISPLAY_NAME} could not record`, body: message }).show();
   });
+  core.onEngineProblem((message) => {
+    console.error(`[engine] ${message}`);
+    new Notification({ title: `${DISPLAY_NAME} has an audio problem`, body: message }).show();
+  });
   core.onStopNudge((callApp) => {
     // A reminder only: the Recording keeps running until Stop is pressed in the menu bar.
     new Notification({

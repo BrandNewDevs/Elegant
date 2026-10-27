@@ -1,6 +1,5 @@
 import { ChatPanel } from "./ChatPanel";
-import { JobStatus } from "./JobStatus";
-import { AlertCircle, FileDown, FileText, Loader2, MessageSquare, Radio, RefreshCw, Sparkles, Trash2, Users, type LucideIcon } from "lucide-react";
+import { AlertCircle, FileDown, FileText, MessageSquare, Radio, RefreshCw, Sparkles, Trash2, Users, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Meeting } from "../../store/store";
 import type { MeetingsViewState } from "../../shared/meetings-view-state";
@@ -23,8 +22,8 @@ function Heading({ children, icon: Icon }: { children: ReactNode; icon: LucideIc
   return <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><Icon className="size-3.5" aria-hidden />{children}</h2>;
 }
 
-export function MeetingDetail({ meeting, chat, jobs, isCurrent }: {
-  meeting: Meeting; chat: MeetingsViewState["chat"]; jobs: MeetingsViewState["jobs"]; isCurrent: () => boolean;
+export function MeetingDetail({ meeting, chat, isCurrent }: {
+  meeting: Meeting; chat: MeetingsViewState["chat"]; isCurrent: () => boolean;
 }) {
   const [view, setView] = useState<View>("summary");
   const [error, setError] = useState("");
@@ -63,11 +62,9 @@ export function MeetingDetail({ meeting, chat, jobs, isCurrent }: {
         <Button type="button" variant="destructive" size="sm" onClick={() => void action(() => window.electron.meetings.delete(meeting.id))}><Trash2 aria-hidden />Delete Meeting</Button>
       </div>}
     </header>
-    <JobStatus jobs={jobs ?? []} meetingId={meeting.id} onCancel={jobId => void action(() => window.electron.meetings.cancelJob({ meetingId: meeting.id, jobId }))} />
     <Separator />
     {error && <Alert variant="destructive" role="alert"><AlertCircle className="size-4" aria-hidden /><AlertDescription>{error}</AlertDescription></Alert>}
     {meeting.state === "recording" && <Alert variant="warning"><Radio className="size-4" aria-hidden /><AlertDescription>This Meeting is being recorded.</AlertDescription></Alert>}
-    {meeting.state === "processing" && <Alert variant="warning"><Loader2 className="size-4 animate-spin" aria-hidden /><AlertDescription>Processing this Meeting. Completed Transcript passages remain available below.</AlertDescription></Alert>}
     {meeting.state === "failed" && <Alert variant="destructive"><AlertCircle className="size-4" aria-hidden /><AlertDescription>Processing failed: {meeting.error ?? "unknown error"}. A completed Transcript can still be used for chat.</AlertDescription></Alert>}
     {meeting.state === "done" && !meeting.transcript.segments.length && <p className="text-sm text-muted-foreground">No speech was detected in this Recording.</p>}
     {meeting.participants.length > 0 && <section aria-label="Participants">

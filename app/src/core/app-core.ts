@@ -72,6 +72,7 @@ export class AppCore {
   private _recording: ActiveRecording | undefined;
   private recordingListeners: ((recording: ActiveRecording | undefined) => void)[] = [];
   private recordingFailedListeners: ((message: string) => void)[] = [];
+  private engineProblemListeners: ((message: string) => void)[] = [];
   private stopNudgeListeners: ((app: string) => void)[] = [];
   private showInDockListeners: ((show: boolean) => void)[] = [];
   private recordingSettledWaiters: (() => void)[] = [];
@@ -143,6 +144,9 @@ export class AppCore {
           }
           break;
         }
+        case "error":
+          for (const l of this.engineProblemListeners) l(event.message);
+          break;
         case "recording_failed":
           this.abandonRecording(event.message);
           for (const l of this.recordingFailedListeners) l(event.message);
@@ -220,6 +224,11 @@ export class AppCore {
   /** Called with the reason when a Recording cannot start or cannot finish. */
   onRecordingFailed(listener: (message: string) => void): void {
     this.recordingFailedListeners.push(listener);
+  }
+
+  /** Called with the message when the engine reports trouble that does not end a Recording, such as audio it could not capture. */
+  onEngineProblem(listener: (message: string) => void): void {
+    this.engineProblemListeners.push(listener);
   }
 
   /**

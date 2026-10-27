@@ -32,11 +32,18 @@ var recorder: Recorder?
 let isoFormatter = ISO8601DateFormatter()
 isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
+/// A Recorder whose problems reach the app as `error` events.
+func makeRecorder() throws -> Recorder {
+    let made = try Recorder()
+    made.onProblem = { send(["type": "error", "message": $0]) }
+    return made
+}
+
 /// Detection: start holding the last few minutes in memory. Nothing is written until `start_recording`.
 func startBuffer() {
     guard recorder == nil else { return } // already holding audio, or recording
     do {
-        recorder = try Recorder()
+        recorder = try makeRecorder()
     } catch {
         // Not fatal: `start_recording` tries again and reports its own failure.
         send(["type": "error", "message": "cannot hold audio before recording: \(error)"])
@@ -57,7 +64,7 @@ func startRecording(app: String) {
     }
     do {
         // Keeps what `start_buffer` has held; without one, the Recording simply starts now.
-        let held = try recorder ?? Recorder()
+        let held = try recorder ?? makeRecorder()
         recorder = held
         try held.beginRecording()
         send(["type": "recording_started", "app": app, "startedAt": isoFormatter.string(from: Date())])

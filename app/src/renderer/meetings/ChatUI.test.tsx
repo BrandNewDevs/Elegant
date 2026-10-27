@@ -127,12 +127,34 @@ it("allows chat after Summary failure, disables it without a ready Transcript an
   expect(screen.getByText(/Chat becomes available/)).toBeTruthy();
 });
 
-it("shows local and selected work, with cancellation for text generation and queued work only", () => {
+it("shows queued and running work as toasts, with cancellation for text generation and queued work only", async () => {
   const { api } = setup({ jobs: [
     { id: "native", owner: "meeting:4", kind: "transcription-and-summary", status: "running" },
     { id: "text", owner: "meeting:4", kind: "summary", status: "queued" },
   ] });
-  expect(screen.getByLabelText("Local AI queue")).toBeTruthy(); expect(screen.getByLabelText("Meeting AI work")).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Cancel Transcribing Meeting" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Cancel Writing Summary" })); expect(api.cancelJob).toHaveBeenCalledWith({ meetingId: 4, jobId: "text" });
+  expect(await screen.findByText("Transcribing Meeting")).toBeTruthy();
+  expect(await screen.findByText("Writing Summary (queued)")).toBeTruthy();
+  expect(screen.queryByLabelText("Local AI queue")).toBeNull(); // no loader panel on the page
+  expect(screen.getAllByRole("button", { name: "Cancel" })).toHaveLength(1); // the running transcription cannot be interrupted
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" })); expect(api.cancelJob).toHaveBeenCalledWith({ meetingId: 4, jobId: "text" });
+});
+
+it("turns a job's toast into its outcome once the Meeting settles", async () => {
+  const running = { ...meeting, state: "processing" as const };
+  const { update } = setup({ meetings: [running], selected: running, jobs: [{ id: "job-1", owner: "meeting:4", kind: "summary", status: "running" }] });
+  expect(await screen.findByText("Writing Summary")).toBeTruthy();
+  update({ jobs: [] }); // the queue lets go before the Meeting is marked done
+  expect(screen.queryByText("Summary ready")).toBeNull();
+  update({ meetings: [meeting], selected: meeting });
+  expect(await screen.findByText("Summary ready")).toBeTruthy();
+  expect(screen.queryByText("Writing Summary")).toBeNull();
+});
+
+it("reports a failed job in its toast", async () => {
+  const running = { ...meeting, state: "processing" as const };
+  const failed = { ...meeting, state: "failed" as const, error: "Ollama is offline" };
+  const { update } = setup({ meetings: [running], selected: running, jobs: [{ id: "job-2", owner: "meeting:4", kind: "transcription-and-summary", status: "running" }] });
+  await screen.findByText("Transcribing Meeting");
+  update({ jobs: [], meetings: [failed], selected: failed });
+  expect(await screen.findByText("Transcribing Meeting failed")).toBeTruthy();
 });
