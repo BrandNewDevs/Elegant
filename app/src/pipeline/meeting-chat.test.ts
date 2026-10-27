@@ -242,19 +242,17 @@ describe("grounded Meeting chat", () => {
     expect(result.generation.calls).toBe(2);
   });
 
-  it("never accepts empty, unknown or mismatched quoted checks from a positive audit", async () => {
+  it("never accepts empty, unknown or invented quoted checks from a positive audit", async () => {
     const { store, id, expectedRevision } = setup();
     const validCheck = { speaker: "You", sourceId: "0:0", quote: transcript.segments[0]!.text, relation: "supports" };
     const invalid = [
       { supported: true, addressesQuestion: true, checks: [] },
       { supported: true, addressesQuestion: true, checks: [{ ...validCheck, sourceId: "unknown:0" }] },
-      { supported: true, addressesQuestion: true, checks: [{ ...validCheck, sourceId: "1:0" }] },
       { supported: true },
       { supported: true, addressesQuestion: true, checks: null },
       { supported: true, addressesQuestion: true, checks: "0:0" },
       { supported: true, addressesQuestion: true, checks: [0] },
       { supported: true, addressesQuestion: true, checks: [{ ...validCheck, quote: "A made-up deadline on Friday." }] },
-      { supported: true, addressesQuestion: true, checks: [{ ...validCheck, speaker: "Speaker 1" }] },
       { supported: true, addressesQuestion: true, checks: [{ ...validCheck, relation: "agrees" }] },
       { supported: true, addressesQuestion: true, checks: [{ ...validCheck, quote: "" }] },
     ];
@@ -267,6 +265,60 @@ describe("grounded Meeting chat", () => {
       expect(model.requests.filter(isAnswer)).toHaveLength(3);
       expect(model.requests).toHaveLength(6);
     }
+  });
+
+  it("repairs a known wrong source ID using a unique original quote and derives its speaker", async () => {
+    const source: Transcript = { segments: [
+      { start: 0, end: 5, speaker: "You", text: "The list is still a proposal." },
+      { start: 5, end: 10, speaker: "Speaker 2", text: "I can review the list." },
+      { start: 10, end: 15, speaker: "Speaker 1", text: "We also discussed local exports." },
+      { start: 15, end: 20, speaker: "You", text: "Markdown is agreed for local export." },
+      { start: 20, end: 25, speaker: "Speaker 2", text: "I will prepare a list by Tuesday." },
+    ] };
+    const { store, id, expectedRevision } = setup(source);
+    const model = fake(() => ({ text: "Speaker 2 will prepare a list by Tuesday.", sourceIds: ["1:0"], sufficient: true }), {
+      audit: request => {
+        const schema = request.schema as { properties: { checks: { items: { properties: object; required: string[] } } } };
+        expect(schema.properties.checks.items.properties).not.toHaveProperty("speaker");
+        expect(schema.properties.checks.items.required).not.toContain("speaker");
+        return { checks: [
+          { sourceId: "1:0", quote: source.segments[4]!.text, relation: "supports" },
+          // Old or extra generated labels are never a source of speaker identity.
+          { speaker: "You", sourceId: "4:0", quote: source.segments[4]!.text, relation: "supports" },
+        ], addressesQuestion: true, supported: true };
+      },
+    });
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "Who will prepare the list?" });
+    expect(result.answer).toEqual({ text: "Speaker 2 will prepare a list by Tuesday.", refs: [4], sufficient: true });
+    expect(model.requests).toHaveLength(2);
+  });
+
+  it("rejects mismatched IDs when the original quote has multiple possible sources", async () => {
+    const source: Transcript = { segments: [
+      { start: 0, end: 5, speaker: "You", text: "I will prepare the list." },
+      { start: 5, end: 10, speaker: "Speaker 1", text: "The list will be reviewed later." },
+      { start: 10, end: 15, speaker: "Speaker 2", text: "I will prepare the list." },
+    ] };
+    const { store, id, expectedRevision } = setup(source);
+    const model = fake(() => ({ text: "You will prepare the list.", sourceIds: ["0:0"], sufficient: true }), {
+      audit: () => ({ checks: [{ sourceId: "1:0", quote: source.segments[0]!.text, relation: "supports" }], addressesQuestion: true, supported: true }),
+    });
+    await expect(createMeetingChat({ store, model })(input(id, expectedRevision))).rejects.toThrow("three attempts");
+    expect(model.requests).toHaveLength(6);
+  });
+
+  it("cannot manufacture opposing-speaker support by relabeling a retention quote", async () => {
+    const source: Transcript = { segments: [
+      { start: 0, end: 5, speaker: "Speaker 1", text: "I prefer retaining audio." },
+      { start: 5, end: 10, speaker: "Speaker 2", text: "I prefer deleting audio." },
+    ] };
+    const { store, id, expectedRevision } = setup(source);
+    const model = fake(() => ({ text: "Speaker 1 and Speaker 2 prefer retaining audio.", sourceIds: ["0:0", "1:0"], sufficient: true }), {
+      audit: () => ({ checks: [{ speaker: "Speaker 2", sourceId: "1:0", quote: source.segments[0]!.text, relation: "supports" }], addressesQuestion: true, supported: true }),
+    });
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "Who preferred retaining audio?" });
+    expect(result.answer).toEqual({ text: CHAT_UNVERIFIED, refs: [], sufficient: false });
+    expect(model.requests).toHaveLength(6);
   });
 
   it("rejects a pooled stance when a named speaker's exact words contradict it, even if the audit boolean says true", async () => {
