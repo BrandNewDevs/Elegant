@@ -195,7 +195,7 @@ function SettingsContent({ showInDock }: { showInDock: boolean }) {
 export function SettingsDialog({
   open,
   onOpenChange,
-  showInDock = false,
+  showInDock = true,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;

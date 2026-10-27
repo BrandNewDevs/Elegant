@@ -64,7 +64,7 @@ function MeetingListRow({ meeting, selected, onSelect }: { meeting: MeetingListI
 
 export function MeetingsApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [showInDock, setShowInDock] = useState(false);
+  const [showInDock, setShowInDock] = useState(true);
   // Profile is a page of its own in the main area; picking a Meeting brings the Meetings back.
   const [page, setPage] = useState<"meetings" | "profile">("meetings");
   const [query, setQuery] = useState("");

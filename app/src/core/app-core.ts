@@ -306,9 +306,9 @@ export class AppCore {
     this.deps.store.setSetting(KEEP_AUDIO_SETTING, String(keep));
   }
 
-  /** Whether the app shows in the Dock as well as the menu bar. Off by default: it is a menu-bar app. */
+  /** Whether the app shows in the Dock as well as the menu bar. On unless the user turned it off. */
   get showInDock(): boolean {
-    return this.deps.store.getSetting(SHOW_IN_DOCK_SETTING) === "true";
+    return this.deps.store.getSetting(SHOW_IN_DOCK_SETTING) !== "false";
   }
 
   /** Remembers the choice and tells the listeners, which show or hide the Dock icon at once. */

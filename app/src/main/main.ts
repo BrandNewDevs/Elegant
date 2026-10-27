@@ -14,6 +14,7 @@ import { Setup } from "../setup/setup.js";
 import { openStore } from "../store/store.js";
 import { DISPLAY_NAME, SPEECH_MODEL } from "../config.js";
 import { showPrompt } from "./prompt-window.js";
+import { Launch } from "./launch.js";
 import { MeetingsWindow } from "./meetings-window.js";
 import { OnboardingWindow } from "./onboarding-window.js";
 import { SetupBridge } from "./setup-bridge.js";
@@ -30,6 +31,7 @@ let tray: Tray | undefined;
 let core: AppCore | undefined;
 let prompt: { close(): void } | undefined;
 let meetingsWindow: MeetingsWindow | undefined;
+let launch: Launch | undefined;
 
 let ignoredAppsPath = "";
 
@@ -59,7 +61,7 @@ function render(): void {
         : []),
       { label: text, enabled: false },
       { type: "separator" },
-      { label: `Open ${DISPLAY_NAME}`, click: () => meetingsWindow?.show() },
+      { label: `Open ${DISPLAY_NAME}`, click: () => launch?.open() },
       { label: "Settings…", accelerator: "Command+,", click: () => meetingsWindow?.show({ settings: true }) },
       {
         label: "Keep audio after transcription",
@@ -97,8 +99,8 @@ function render(): void {
 // One instance owns the engine, the store and the microphone watch. Launching again just brings its window forward.
 const isFirstInstance = app.requestSingleInstanceLock();
 if (!isFirstInstance) app.quit();
-app.on("second-instance", () => meetingsWindow?.show());
-app.on("activate", () => meetingsWindow?.show());
+app.on("second-instance", () => launch?.open());
+app.on("activate", () => launch?.activate());
 
 app.whenReady().then(() => {
   if (!isFirstInstance) return; // quitting; must not start a second engine
@@ -132,8 +134,9 @@ app.whenReady().then(() => {
   });
   meetingsWindow = new MeetingsWindow(core, setup, setupBridge);
   const onboardingWindow = new OnboardingWindow(setupBridge);
+  launch = new Launch(setup, meetingsWindow, onboardingWindow, app.getLoginItemSettings().wasOpenedAtLogin);
 
-  // A menu-bar app by default; the "Show in Dock" setting adds a Dock icon, whose click opens the main window ("activate").
+  // A menu-bar app at start (LSUIElement); the "Show in Dock" setting, on unless turned off, adds a Dock icon, whose click opens the main window ("activate").
   applyShowInDock(core.showInDock);
   core.onShowInDockChange((show) => {
     applyShowInDock(show);
@@ -190,13 +193,9 @@ app.whenReady().then(() => {
     if (status === "not-registered" || status === "not-found") app.setLoginItemSettings({ openAtLogin: true });
     console.log(`[login item] ${app.getLoginItemSettings().status}`);
   }
-  // Opened by hand, the app shows its window, since the menu-bar item alone is easy to miss. Opened at login it stays quiet.
-  if (!app.getLoginItemSettings().wasOpenedAtLogin) meetingsWindow.show();
   // Permissions that were granted before are checked silently once the engine is up. Onboarding opens only when one is
-  // missing, even at login, because nothing can be recorded without them.
-  setup.onPermissionsChecked(() => {
-    if (!setup.permissionsGranted) onboardingWindow.show();
-  });
+  // missing, even at login, and on a first launch it opens before the Meetings window does.
+  launch.start();
 
   let quitting = false;
   app.on("before-quit", (event) => {
