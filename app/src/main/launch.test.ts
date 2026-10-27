@@ -69,6 +69,18 @@ describe("a first launch", () => {
     expect(t.opened).toEqual(["onboarding", "meetings", "meetings"]);
   });
 
+  it("ignores the activation macOS sends at launch until the permissions are reported", () => {
+    const t = launch();
+    t.l.activate();
+    expect(t.opened).toEqual([]);
+    t.engineReady({ microphone: false });
+    t.l.activate();
+    expect(t.opened).toEqual(["onboarding"]);
+    t.closeOnboarding();
+    t.l.activate();
+    expect(t.opened).toEqual(["onboarding", "meetings", "meetings"]);
+  });
+
   it("does not wait forever if the engine stops before it can report", () => {
     const t = launch();
     t.engine.emit({ type: "ready", version: "1" });

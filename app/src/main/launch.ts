@@ -20,6 +20,9 @@ export interface LaunchOnboarding {
  * only thing a login launch opens.
  */
 export class Launch {
+  /** True from a possible first launch until macOS has reported the permissions, while no window may open. */
+  private deciding = false;
+
   constructor(
     private readonly setup: Setup,
     private readonly meetings: LaunchMeetings,
@@ -40,12 +43,22 @@ export class Launch {
       return;
     }
     // Possibly the first launch. Which windows open depends on what macOS says, so nothing shows until it has said.
+    this.deciding = true;
     this.setup.onPermissionsChecked(() => {
+      this.deciding = false;
       if (!this.showOnboardingIfNeeded() && !this.wasOpenedAtLogin) this.meetings.show();
     });
   }
 
-  /** The Meetings window for a request to open the app (the Dock icon, the menu bar item, a second launch), unless onboarding is still open. */
+  /**
+   * macOS activates the app as it launches, and again when the Dock icon is clicked. While the first window is still being
+   * decided that activation is ignored, or it would open the Meetings window ahead of onboarding.
+   */
+  activate(): void {
+    if (!this.deciding) this.open();
+  }
+
+  /** The Meetings window for a request to open the app (the menu bar item, a second launch), unless onboarding is still open. */
   open(): void {
     if (this.onboarding.isOpen) this.onboarding.show();
     else this.meetings.show();

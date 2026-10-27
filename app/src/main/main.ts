@@ -100,7 +100,7 @@ function render(): void {
 const isFirstInstance = app.requestSingleInstanceLock();
 if (!isFirstInstance) app.quit();
 app.on("second-instance", () => launch?.open());
-app.on("activate", () => launch?.open());
+app.on("activate", () => launch?.activate());
 
 app.whenReady().then(() => {
   if (!isFirstInstance) return; // quitting; must not start a second engine
