@@ -18,6 +18,7 @@ export const nothingDone: SetupViewState = {
 export function pushSetupState(view: SetupViewState) {
   const act = vi.fn();
   const setUserName = vi.fn();
+  const setShowInDock = vi.fn();
   window.electron = {
     setup: {
       ready: vi.fn(),
@@ -28,10 +29,10 @@ export function pushSetupState(view: SetupViewState) {
       act,
       setUserName,
     },
-    meetings: createMeetingsApi(),
+    meetings: createMeetingsApi({ setShowInDock }),
     prompt: {} as Window["electron"]["prompt"],
   };
-  return Object.assign(act, { setUserName });
+  return Object.assign(act, { setUserName, setShowInDock });
 }
 
 export function withState(patch: Partial<SetupViewState["state"]>, permissionsGranted = false): SetupViewState {
@@ -44,7 +45,7 @@ export function createMeetingsApi(overrides: Partial<MeetingsApi> = {}) {
   const api = {
     ready: vi.fn(),
     onState: vi.fn((_callback: Parameters<MeetingsApi["onState"]>[0]) => () => {}),
-    settings: vi.fn(), select: vi.fn(), search: vi.fn(), rename: vi.fn(), export: vi.fn(),
+    settings: vi.fn(), setShowInDock: vi.fn(), select: vi.fn(), search: vi.fn(), rename: vi.fn(), export: vi.fn(),
     regenerate: vi.fn(async () => {}), delete: vi.fn(async () => {}),
     sendQuestion: vi.fn(async (_payload: Parameters<MeetingsApi["sendQuestion"]>[0]) => {}),
     cancelQuestion: vi.fn(async (_payload: Parameters<MeetingsApi["cancelQuestion"]>[0]) => {}),

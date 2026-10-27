@@ -35,6 +35,13 @@ let ignoredAppsPath = "";
 
 let elapsedTimer: ReturnType<typeof setInterval> | undefined;
 
+// The packaged Info.plist sets LSUIElement, so the app starts with no Dock icon; showing it switches the running app to
+// a regular one, and hiding it switches it back, with no restart.
+function applyShowInDock(show: boolean): void {
+  if (show) void app.dock?.show();
+  else app.dock?.hide();
+}
+
 function render(): void {
   if (!tray || !core) return;
   const { symbol, text } = STATUS_LABEL[core.status];
@@ -63,6 +70,12 @@ function render(): void {
           render();
         },
       },
+      {
+        label: "Show in Dock",
+        type: "checkbox",
+        checked: core.showInDock,
+        click: (item) => core?.setShowInDock(item.checked),
+      },
       { label: "Ignored apps…", click: () => void shell.openPath(ignoredAppsPath) },
       {
         label: "Never prompt for",
@@ -89,7 +102,6 @@ app.on("activate", () => meetingsWindow?.show());
 
 app.whenReady().then(() => {
   if (!isFirstInstance) return; // quitting; must not start a second engine
-  app.dock?.hide(); // a menu-bar app has no dock icon
   const dataDir = app.getPath("userData");
   mkdirSync(dataDir, { recursive: true });
 
@@ -120,6 +132,13 @@ app.whenReady().then(() => {
   });
   meetingsWindow = new MeetingsWindow(core, setup, setupBridge);
   const onboardingWindow = new OnboardingWindow(setupBridge);
+
+  // A menu-bar app by default; the "Show in Dock" setting adds a Dock icon, whose click opens the main window ("activate").
+  applyShowInDock(core.showInDock);
+  core.onShowInDockChange((show) => {
+    applyShowInDock(show);
+    render();
+  });
 
   tray = new Tray(nativeImage.createEmpty());
   core.onDetectedMeetingChange((meeting) => {
