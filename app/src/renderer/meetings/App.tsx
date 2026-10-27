@@ -1,13 +1,14 @@
-import { JobStatus } from "./JobStatus";
+import { useJobToasts } from "./job-toasts";
 import type { MeetingsViewState } from "../../shared/meetings-view-state";
 import { MeetingDetail } from "./MeetingDetail";
-import { AlertCircle, CheckCircle2, Inbox, Loader2, MessagesSquare, Radio, Search, Settings, type LucideIcon } from "lucide-react";
+import { AlertCircle, CheckCircle2, Hourglass, Inbox, MessagesSquare, Radio, Search, Settings, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Meeting, MeetingListItem, MeetingState } from "../../store/store";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Toaster } from "@/components/ui/sonner";
 import { formatWhen } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { SettingsDialog } from "../settings/SettingsDialog";
@@ -19,18 +20,19 @@ const STATE_LABEL: Record<MeetingState, string> = {
   failed: "Failed",
 };
 
-const STATE_BADGE: Record<MeetingState, { variant: "warning" | "destructive" | "success"; icon: LucideIcon; spin?: boolean }> = {
+// Work in progress is shown as toasts (see job-toasts.tsx), so nothing in the list spins.
+const STATE_BADGE: Record<MeetingState, { variant: "warning" | "destructive" | "success"; icon: LucideIcon }> = {
   recording: { variant: "warning", icon: Radio },
-  processing: { variant: "warning", icon: Loader2, spin: true },
+  processing: { variant: "warning", icon: Hourglass },
   done: { variant: "success", icon: CheckCircle2 },
   failed: { variant: "destructive", icon: AlertCircle },
 };
 
 function StateBadge({ state }: { state: MeetingState }) {
-  const { variant, icon: Icon, spin } = STATE_BADGE[state];
+  const { variant, icon: Icon } = STATE_BADGE[state];
   return (
     <Badge variant={variant}>
-      <Icon className={cn("size-3", spin && "animate-spin")} aria-hidden />
+      <Icon className="size-3" aria-hidden />
       {STATE_LABEL[state]}
     </Badge>
   );
@@ -65,6 +67,7 @@ export function MeetingsApp() {
   const [jobs, setJobs] = useState<MeetingsViewState["jobs"]>();
   const [chat, setChat] = useState<MeetingsViewState["chat"]>();
   const selection = useRef<{ id?: number; revision?: string }>({});
+  useJobToasts(jobs, meetings);
 
   useEffect(() => {
     const unsubscribe = window.electron.meetings.onState((state) => {
@@ -111,7 +114,6 @@ export function MeetingsApp() {
             meetings.map((m) => <MeetingListRow key={m.id} meeting={m} selected={selected?.id === m.id} />)
           )}
         </ScrollArea>
-        {jobs?.length ? <div className="p-2"><JobStatus jobs={jobs} /></div> : null}
         <div className="border-t p-2">
           <Button type="button" variant="ghost" size="sm" className="w-full justify-start" onClick={() => window.electron.meetings.settings(true)}>
             <Settings aria-hidden />
@@ -122,7 +124,7 @@ export function MeetingsApp() {
       <ScrollArea className="min-h-0 min-w-0 flex-1">
         <main className="min-w-0 p-4 sm:p-6">
           {selected ? (
-            <MeetingDetail key={`${selected.id}:${chat?.revision ?? "legacy"}`} meeting={selected} chat={chat} jobs={jobs} isCurrent={() => selection.current.id === selected.id && selection.current.revision === chat?.revision} />
+            <MeetingDetail key={`${selected.id}:${chat?.revision ?? "legacy"}`} meeting={selected} chat={chat} isCurrent={() => selection.current.id === selected.id && selection.current.revision === chat?.revision} />
           ) : (
             <div className="flex flex-col items-center gap-2 pt-24 text-muted-foreground">
               <MessagesSquare className="size-8" aria-hidden />
@@ -131,6 +133,7 @@ export function MeetingsApp() {
           )}
         </main>
       </ScrollArea>
+      <Toaster position="bottom-right" />
       <SettingsDialog open={settingsOpen} showInDock={showInDock} onOpenChange={(open) => window.electron.meetings.settings(open)} />
     </div>
   );
