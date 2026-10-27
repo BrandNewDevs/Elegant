@@ -32,7 +32,7 @@ function hierarchicalReply(request: TextRequest): unknown {
   const input = payload(request);
   if (input.primary) return { facts: input.primary.map(source => ({ speaker: source.speaker, text: `Important point from ${source.id}.`,
     sourceIds: [source.id], kind: "update" })) };
-  if ("facts" in (request.schema as { properties: object }).properties) return { facts: input.candidates!.map(fact => ({ ...fact, covers: [fact.id] })) };
+  if (input.candidates && !("tldr" in (request.schema as { properties: object }).properties)) return Object.fromEntries(input.candidates.map(fact => [String(fact.id), fact.id]));
   const source = input.sources!.at(-1)!;
   return { tldr: "The final supported point is retained.", sourceIds: [source.id] };
 }
@@ -310,7 +310,7 @@ describe("evidence-backed Summary generation", () => {
     const source = longTranscript();
     const model = fake(hierarchicalReply);
     const result = await createGroundedSummariser({ model })(source);
-    const reductions = model.requests.filter(request => payload(request).candidates && "facts" in (request.schema as { properties: object }).properties);
+    const reductions = model.requests.filter(request => payload(request).candidates && !("tldr" in (request.schema as { properties: object }).properties));
     expect(reductions.length).toBeGreaterThan(2);
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
     for (const request of reductions) {
@@ -371,7 +371,9 @@ describe("evidence-backed Summary generation", () => {
         expect(properties).not.toHaveProperty("refs");
         expect(new Set(properties.sourceIds!.items!.enum)).toEqual(new Set(sources.map(source => source.id)));
         expect(new Set(properties.speaker!.enum)).toEqual(new Set((input.candidates ?? input.primary ?? sources).map(source => source.speaker)));
-        if (input.candidates) expect(properties.covers!.items!.enum).toEqual(input.candidates.map((_, index) => index));
+
+      } else if (input.candidates && !("tldr" in schema.properties)) {
+        expect(Object.keys(schema.properties)).toEqual(input.candidates.map(fact => String(fact.id)));
       } else if (schema.properties.sourceIds) {
         expect(new Set(schema.properties.sourceIds.items!.enum)).toEqual(new Set(sources.map(source => source.id)));
       } else {

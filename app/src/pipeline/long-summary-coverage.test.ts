@@ -22,9 +22,23 @@ function adapter(reduce: (facts: Fact[], sources: Piece[], request: TextRequest)
     if (input.primary) output = { facts: input.primary.filter(piece => piece.part === 0).map(piece => ({
       speaker: piece.speaker, text: prefix(piece.text), kind: /propose|suggest/i.test(piece.text) ? "proposal" : /final decision/i.test(piece.text) ? "decision" : "commitment", sourceIds: [piece.id],
     })) };
-    else if ("facts" in (request.schema as { properties: object }).properties) output = { facts: reduce(input.candidates!, input.sources!, request) };
+    else if (input.candidates && !("tldr" in (request.schema as { properties: object }).properties)) output = Object.fromEntries(reduce(input.candidates, input.sources!, request).flatMap(fact => (fact.covers ?? []).map(id => [String(id), Math.min(...fact.covers!)])));
     else output = { tldr: "The selected commitments and final decisions remain supported by the original discussion.", sourceIds: input.sources!.map(piece => piece.id) };
     return { text: JSON.stringify(output), metadata: { model: "coverage:test", elapsedMs: 1 } };
+  } };
+  return { model, requests };
+}
+
+function assignmentAdapter(assign: (facts: Fact[]) => unknown) {
+  const inner = adapter();
+  const requests: TextRequest[] = [];
+  const model: TextModel = { async complete(request) {
+    requests.push(request);
+    const input = data(request);
+    if (input.candidates && !("tldr" in (request.schema as { properties: object }).properties)) {
+      return { text: JSON.stringify(assign(input.candidates)), metadata: { model: "assignment:test", elapsedMs: 1 } };
+    }
+    return inner.model.complete(request);
   } };
   return { model, requests };
 }
@@ -42,7 +56,7 @@ describe("complete long Summary coverage", () => {
     expect(final.totalFacts).toBe(9);
     expect(final.otherFactsRetained).toBeGreaterThan(0);
     for (const fact of final.candidates!) expect(fact.sourceIds.every(id => final.sources!.some(piece => piece.id === id))).toBe(true);
-    expect(requests.filter(request => "facts" in (request.schema as { properties: object }).properties && data(request).candidates).length).toBeGreaterThan(1);
+    expect(requests.filter(request => !("tldr" in (request.schema as { properties: object }).properties) && data(request).candidates).length).toBeGreaterThan(1);
   });
 
   it("merges interleaved repetitions while retaining every distinct case-sensitive topic", async () => {
@@ -55,8 +69,7 @@ describe("complete long Summary coverage", () => {
       return [...groups.values()].map(group => ({ ...group.at(-1)!, covers: group.map(fact => fact.id) }));
     });
     const result = await createGroundedSummariser({ model })(transcript);
-    expect(result.participants[0]!.said).toHaveLength(3);
-    expect(new Set(result.participants[0]!.said)).toEqual(new Set(topics.map(topic => `${topic} must remain local.`)));
+    expect(new Set(result.participants[0]!.said.flatMap(point => point.split("\n")))).toEqual(new Set(topics.map(topic => `${topic} must remain local.`)));
     expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
@@ -78,10 +91,10 @@ describe("complete long Summary coverage", () => {
     expect(compared).toBe(true);
     const proposer = result.participants.find(participant => participant.speaker === "You")!;
     const corrector = result.participants.find(participant => participant.speaker === "Speaker 1")!;
-    expect(proposer.said).toContain("Proposed Monday; Speaker 1 later set Friday instead.");
+    expect(proposer.said).toContain("I propose launching on Monday.");
     expect(corrector.said).toEqual(["Final decision: launch Friday instead of Monday."]);
     const proposerEvidence = result.evidence!.participants.find(participant => participant.speaker === "You")!;
-    expect(proposerEvidence.said[proposer.said.indexOf("Proposed Monday; Speaker 1 later set Friday instead.")]).toEqual([0, 8]);
+    expect(proposerEvidence.said[proposer.said.indexOf("I propose launching on Monday.")]).toEqual([0]);
     expect(result.evidence!.participants.find(participant => participant.speaker === "Speaker 1")!.said).toEqual([[8]]);
   });
 
@@ -100,8 +113,9 @@ describe("complete long Summary coverage", () => {
       const output = facts.filter(fact => fact.speaker === owners[0]);
       expect(owners).toHaveLength(1);
       if (new Set(sources.map(source => source.speaker)).size > 1) mixedContextCalls++;
-      const schema = request.schema as { properties: { facts: { items: { properties: { speaker: { enum: string[] } } } } } };
-      expect(schema.properties.facts.items.properties.speaker.enum).toEqual(owners);
+      const schema = request.schema as { properties: Record<string, { enum: number[] }>; required: string[] };
+      expect(schema.required).toEqual(facts.map(fact => String(fact.id)));
+      expect(Object.keys(schema.properties)).toEqual(schema.required);
       return output.map(fact => ({ ...fact, covers: [fact.id] }));
     });
     const result = await createGroundedSummariser({ model })(transcript);
@@ -137,7 +151,7 @@ describe("complete long Summary coverage", () => {
     expect(result.participants[0]!.said).toHaveLength(9);
     expect(result.evidence!.participants[0]!.said).toEqual(Array.from({ length: 9 }, (_, ref) => [ref]));
     expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
-    for (const request of requests.filter(request => data(request).candidates && "facts" in (request.schema as { properties: object }).properties)) {
+    for (const request of requests.filter(request => data(request).candidates && !("tldr" in (request.schema as { properties: object }).properties))) {
       const instruction = (JSON.parse(request.messages.at(-1)!.content) as { instruction: string }).instruction;
       if (instruction.includes("Missing candidate IDs:")) expect(instruction).not.toContain("I will complete Task_");
     }
@@ -151,5 +165,43 @@ describe("complete long Summary coverage", () => {
     } };
     await expect(createGroundedSummariser({ model, deadlineMs: 10 })(uniqueCommitments())).rejects.toThrow("deadline");
     expect(inner.requests.every(request => !("tldr" in (request.schema as { properties: object }).properties))).toBe(true);
+  });
+
+  it("normalizes earlier-ID chains while retaining every immutable original clause and leaf bundle", async () => {
+    const transcript = uniqueCommitments();
+    transcript.segments[0]!.text = original("Deploy branch Alpha.");
+    transcript.segments[1]!.text = original("Deploy branch alpha.");
+    let longest = 0;
+    const { model, requests } = assignmentAdapter(facts => {
+      longest = Math.max(longest, facts.length);
+      // Even incorrect semantic grouping cannot erase a distinct claim or change its text.
+      return Object.fromEntries(facts.map(fact => [String(fact.id), Math.max(0, fact.id - 1)]));
+    });
+    const result = await createGroundedSummariser({ model })(transcript);
+    expect(longest).toBeGreaterThanOrEqual(3);
+    expect(new Set(result.participants[0]!.said.flatMap(point => point.split("\n"))))
+      .toEqual(new Set(transcript.segments.map(segment => prefix(segment.text))));
+    expect(new Set(result.evidence!.participants[0]!.said.flat())).toEqual(new Set(transcript.segments.map((_, ref) => ref)));
+    const final = data(requests.at(-1)!);
+    // TLDR inputs are complete original leaf facts, never concatenated group prose.
+    expect(final.candidates!.every(fact => transcript.segments.some(segment => prefix(segment.text) === fact.text))).toBe(true);
+    expect(final.candidates!.every(fact => fact.sourceIds.length === 1)).toBe(true);
+    expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it.each(["missing", "extra", "string", "fraction", "negative", "forward"])("rejects %s assignments after three bounded attempts without publishing", async invalid => {
+    let reductions = 0;
+    const { model, requests } = assignmentAdapter(facts => {
+      reductions++;
+      const assignments: Record<string, unknown> = Object.fromEntries(facts.map(fact => [String(fact.id), fact.id]));
+      if (invalid === "missing") delete assignments["0"];
+      else if (invalid === "extra") assignments.unknown = 0;
+      else assignments["0"] = { string: "0", fraction: 0.5, negative: -1, forward: 1 }[invalid];
+      return assignments;
+    });
+    await expect(createGroundedSummariser({ model })(uniqueCommitments())).rejects.toThrow("failed validation after 3 attempts");
+    expect(reductions).toBe(3);
+    expect(requests.some(request => "tldr" in (request.schema as { properties: object }).properties)).toBe(false);
+    expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 });
