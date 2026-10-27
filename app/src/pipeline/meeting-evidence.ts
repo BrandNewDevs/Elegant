@@ -4,7 +4,7 @@ import { buildPassages, type EvidencePassage } from "./passages.js";
 import type { TextModel, TextRequest } from "./language-model.js";
 import { AI_SETTINGS, requestBytes } from "./model-request.js";
 
-export const EVIDENCE_PROMPT_VERSION = "meeting-evidence-v2";
+export const EVIDENCE_PROMPT_VERSION = "meeting-evidence-v3";
 
 type RetrievalStore = Pick<Store, "getMeeting" | "listPassages" | "searchPassages">;
 export type EvidenceStage = "retrieving" | "rewriting" | "scanning" | "consolidating";
@@ -41,11 +41,13 @@ const TASK = {
   select: "Select ONLY original sourceIds that directly establish the EXACT requested fact, or necessary partial evidence, correction, disagreement or explicit uncertainty about that SAME task or person. "
     + "A shared topic is not support. Generic requirements, review observations and warnings not to guess owners or dates do NOT answer who owns a specific task or when it is due. Ignore other tasks' owners and deadlines. "
     + "If this batch contains no evidence bearing on the requested fact, return sourceIds [] and sufficient false; never keep merely topical text. Keep genuinely needed partial facts for broad or multipart questions even when this batch alone is insufficient. "
-    + "For a current/final answer, a later explicit decision supersedes an earlier proposal, but preserve needed dissent and corrections; retain both versions when the question asks what changed. Explicitly unassigned, undecided or rejected statements can establish a negative answer. "
+    + "For a current/final answer, a later explicit decision supersedes an earlier proposal, but preserve needed dissent and corrections; retain both versions when the question asks what changed. An explicit statement such as 'the report has no assigned owner' or 'no date was agreed' IS direct usable evidence: select it and set sufficient true, supporting an unassigned or undecided answer without guessing a positive value. A generic warning not to guess is not that statement. "
     + "Select the minimum complete support. sufficient is true only when these selected passages establish the requested answer. Return sourceIds and sufficient; no generated facts.",
   reduce: "Consolidate ONLY direct evidence for the EXACT requested task, person and fact. Discard merely topical requirements and generic review text, even if an earlier selector kept them. "
     + "Keep sourceIds only when they establish the requested answer, needed partial facts, necessary correction, disagreement or explicit uncertainty. If this batch has none, return sourceIds [] and sufficient false. "
     + "For a current/final answer, retain the latest explicit decision and necessary correction context rather than a superseded proposal; preserve both versions for a change comparison. Never discard needed dissent or distinct requested facts from a broad or multipart question just to fit. "
+    + "comparisonSourceIds identify later original context supplied to compare earlier claims. Use a later statement to supersede an earlier proposal ONLY when it explicitly changes the SAME fact. A newer unrelated task must not erase any other necessary fact. "
+    + "Explicit no-owner, no-date, rejection or undecided statements about the requested subject ARE sufficient usable evidence for a negative answer; preserve those sources instead of returning an empty selection. "
     + "Select the smallest complete support. If necessary support cannot fit a small answer context, mark sufficient false rather than imply completeness. Return sourceIds and sufficient; no generated facts.",
 };
 type Mode = keyof typeof TASK;
@@ -116,29 +118,30 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
       check();
       return { revision, sources: unique(sources), exhaustive, sufficient, mode, calls, ...(reason ? { reason } : {}) };
     };
-    function request(mode: Mode, sources: SourceFragment[], context: typeof history, reason?: string): Pick<TextRequest, "messages" | "schema"> {
+    function request(mode: Mode, sources: SourceFragment[], context: typeof history, reason?: string, comparison: SourceFragment[] = []): Pick<TextRequest, "messages" | "schema"> {
       const schema = mode === "rewrite" ? { type: "object", properties: { query: { type: "string", maxLength: 300 } }, required: ["query"] }
         : { type: "object", properties: {
           sourceIds: { type: "array", uniqueItems: true, items: { type: "string", enum: sources.map(source => source.id) } }, sufficient: { type: "boolean" },
         }, required: ["sourceIds", "sufficient"] };
       return { messages: [{ role: "system", content: SYSTEM }, { role: "user", content: JSON.stringify({
         instruction: TASK[mode] + (reason ? ` Previous output was invalid: ${reason}. Correct it.` : ""),
-        data: { question: input.question, history: context, ...(mode === "rewrite" ? {} : { sources }) },
+        data: { question: input.question, history: context, ...(mode === "rewrite" ? {} : { sources }),
+          ...(comparison.length ? { comparisonSourceIds: comparison.map(source => source.id) } : {}) },
       }) }], schema };
     }
-    function prepared(mode: Mode, sources: SourceFragment[], reason?: string) {
+    function prepared(mode: Mode, sources: SourceFragment[], reason?: string, comparison: SourceFragment[] = []) {
       const context = [...history];
       // Reserve all retry feedback first; only whole oldest exchanges may be omitted.
-      while (requestBytes(request(mode, sources, context, "x".repeat(160))) > AI_SETTINGS.maxInputBytes && context.length) context.shift();
-      if (requestBytes(request(mode, sources, context, "x".repeat(160))) > AI_SETTINGS.maxInputBytes) return undefined;
-      return request(mode, sources, context, reason);
+      while (requestBytes(request(mode, sources, context, "x".repeat(160), comparison)) > AI_SETTINGS.maxInputBytes && context.length) context.shift();
+      if (requestBytes(request(mode, sources, context, "x".repeat(160), comparison)) > AI_SETTINGS.maxInputBytes) return undefined;
+      return request(mode, sources, context, reason, comparison);
     }
-    async function ask<T>(kind: Mode, sources: SourceFragment[], parse: (json: string) => T): Promise<T> {
+    async function ask<T>(kind: Mode, sources: SourceFragment[], parse: (json: string) => T, comparison: SourceFragment[] = []): Promise<T> {
       let reason: string | undefined;
       for (let attempt = 0; attempt < 3; attempt++) {
         check();
         if (calls >= maxCalls) throw new IncompleteEvidence("Evidence retrieval reached its model-call limit before completion");
-        const request = prepared(kind, sources, reason);
+        const request = prepared(kind, sources, reason, comparison);
         if (!request) throw new IncompleteEvidence("The question and original evidence cannot fit the model request budget; ask a narrower question");
         calls++;
         let response;
@@ -154,24 +157,34 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
       }
       throw new InvalidSelection(`The local model could not select valid evidence after three attempts: ${reason}`);
     }
-    function batches(sources: SourceFragment[], kind: "select" | "reduce"): SourceFragment[][] {
-      const result: SourceFragment[][] = [];
-      let batch: SourceFragment[] = [];
+    function batches(sources: SourceFragment[], kind: "select" | "reduce", anchors: SourceFragment[]) {
+      const result: { sources: SourceFragment[]; comparison: SourceFragment[] }[] = [];
+      let primary: SourceFragment[] = [], comparison: SourceFragment[] = [];
+      const fits = (pieces: SourceFragment[], context: SourceFragment[]) => prepared(kind, unique([...pieces, ...context]), undefined, context) !== undefined;
+      const flush = () => {
+        if (primary.length) result.push({ sources: unique([...primary, ...comparison]), comparison });
+        primary = []; comparison = [];
+      };
       for (const source of sources) {
-        if (!prepared(kind, [source])) throw new IncompleteEvidence("A source passage and the question exceed the request budget; ask a narrower question");
-        if (batch.length && !prepared(kind, [...batch, source])) { result.push(batch); batch = []; }
-        batch.push(source);
+        if (primary.length && !fits([...primary, source], comparison)) flush();
+        if (!primary.length) {
+          comparison = [...anchors];
+          // Prefer both latest fragments, then the latest one. Never trim a source to make context fit.
+          while (comparison.length && !fits([source], comparison)) comparison.shift();
+          if (!fits([source], comparison)) throw new IncompleteEvidence("A source passage and the question exceed the request budget; ask a narrower question");
+        }
+        primary.push(source);
       }
-      if (batch.length) result.push(batch);
+      flush();
       return result;
     }
-    async function select(sources: SourceFragment[], kind: "select" | "reduce") {
+    async function select(sources: SourceFragment[], kind: "select" | "reduce", anchors: SourceFragment[] = []) {
       const chosen: SourceFragment[] = [];
       let sufficient = false;
-      const groups = batches(sources, kind);
+      const groups = batches(sources, kind, anchors);
       for (const batch of groups) {
-        const result = await ask(kind, batch, json => parseSelection(json, batch));
-        chosen.push(...batch.filter(source => result.sourceIds.includes(source.id)));
+        const result = await ask(kind, batch.sources, json => parseSelection(json, batch.sources), batch.comparison);
+        chosen.push(...batch.sources.filter(source => result.sourceIds.includes(source.id)));
         sufficient ||= result.sufficient;
       }
       return { sources: unique(chosen), sufficient, batchCount: groups.length };
@@ -185,7 +198,7 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
         if (!chosen.length) return { sources: chosen, sufficient: false, globallyAssessed };
         if (answerFits(chosen)) return { sources: chosen, sufficient, globallyAssessed };
         stage("consolidating");
-        const next = await select(chosen, "reduce");
+        const next = await select(chosen, "reduce", chosen.slice(-2));
         if (next.sources.length >= chosen.length) throw new IncompleteEvidence("Relevant original evidence cannot fit the answer budget without losing support; ask a narrower question");
         chosen = next.sources;
         sufficient = next.sufficient;
