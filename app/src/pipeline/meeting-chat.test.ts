@@ -262,14 +262,51 @@ describe("extractive Meeting chat", () => {
     expect(model.requests.filter(isRewrite).length).toBeLessThanOrEqual(1);
   });
 
-  it("passes only the latest four exchanges, dropping whole oldest history before evidence", async () => {
+  it("uses the latest four user questions for selection while keeping assistant facts out", async () => {
     const { store, id, expectedRevision } = setup();
     const history = Array.from({ length: 6 }, (_, i) => ({ question: `Old question ${i}`, answer: `Old answer ${i}` }));
-    const model = fake(request => { expect(contents(request).data.history).toEqual(history.slice(-4)); return positive; });
+    const model = fake(request => { expect(contents(request).data.history).toEqual(history.slice(-4).map(({ question }) => ({ question }))); return positive; });
     await createMeetingChat({ store, model })({ ...input(id, expectedRevision), history });
-    const huge = fake(request => { expect(contents(request).data.history).toEqual([]); return positive; });
+    const huge = fake(request => { expect(contents(request).data.history).toEqual(history.slice(-4).map(({ question }) => ({ question })));
+      expect(JSON.stringify(request)).not.toContain("Large answer"); return positive; });
     await createMeetingChat({ store, model: huge })({ ...input(id, expectedRevision), history: history.map(pair => ({ ...pair, answer: "Large answer ".repeat(1000) })) });
     expect(huge.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it("drops whole oldest user-question context when the complete selection request would exceed its budget", async () => {
+    const { store, id, expectedRevision } = setup();
+    const history = Array.from({ length: 4 }, (_, index) => ({ question: `PRIOR_${index} ` + "context ".repeat(240), answer: "A stored answer" }));
+    const model = fake(request => {
+      const retained = contents(request).data.history!;
+      expect(retained.length).toBeLessThan(4);
+      expect(retained.length).toBeGreaterThan(0);
+      expect(retained).toEqual(history.slice(-retained.length).map(({ question }) => ({ question })));
+      expect(contents(request).data.sources!.map(source => source.text)).toEqual(transcript.segments.map(source => source.text));
+      return positive;
+    });
+    expect((await createMeetingChat({ store, model })({ ...input(id, expectedRevision), history })).answer.text).toBe(quote);
+    expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it("uses full exchanges for one intent rewrite, then excludes assistant detours from source selection", async () => {
+    const { store, id, expectedRevision } = setup();
+    const history = [{ question: "Who will write the permission guide?", answer: "PRIVATE DETOUR about deleting audio on Friday" }];
+    const model = fake(request => {
+      const payload = contents(request).data;
+      expect(payload.question).toBe("When will You finish the permission guide?");
+      expect(payload.history).toEqual([{ question: history[0]!.question }]);
+      expect(JSON.stringify(request)).not.toContain("PRIVATE DETOUR");
+      expect(payload.priorUserQuestion).toBe(history[0]!.question);
+      return positive;
+    }, { resolve: request => {
+      expect(contents(request).data.history).toEqual(history);
+      expect(JSON.stringify(request)).toContain("PRIVATE DETOUR");
+      return { question: "When will You finish the permission guide?" };
+    } });
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "When is that due?", history });
+    expect(result.answer.text).toBe(quote);
+    expect(model.requests.filter(isRewrite)).toHaveLength(1);
+    expect(model.requests.filter(isAnswer)).toHaveLength(1);
   });
 
   it("keeps unrelated history out of follow-up intent and never uses a Summary as factual evidence", async () => {
@@ -279,7 +316,8 @@ describe("extractive Meeting chat", () => {
     const history = [{ question: "Unrelated prior question ".repeat(80), answer: "PRIVATE PRIOR ANSWER" }];
     const model = fake(request => {
       expect(contents(request).data).not.toHaveProperty("priorUserQuestion");
-      expect(contents(request).data.history).toEqual(history);
+      expect(contents(request).data.history).toEqual(history.map(({ question }) => ({ question })));
+      expect(JSON.stringify(request)).not.toContain("PRIVATE PRIOR ANSWER");
       expect(JSON.stringify(request)).not.toContain("PRIVATE WRONG SUMMARY");
       return positive;
     });

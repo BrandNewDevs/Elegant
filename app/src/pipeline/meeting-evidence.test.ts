@@ -132,6 +132,25 @@ describe("Meeting-specific evidence retrieval", () => {
     expect(huge.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
+  it("uses complete exchanges for a query rewrite but only user questions while selecting original evidence", async () => {
+    const { store, id } = meeting(long());
+    const history = [{ question: "Who will prepare the launch guide?", answer: "PRIVATE ASSISTANT DETOUR about audio deletion" }];
+    const local = model(request => {
+      if (instruction(request).startsWith("Rewrite")) {
+        expect(data(request).history).toEqual(history);
+        return { query: "launch guide" };
+      }
+      expect(data(request).history).toEqual([{ question: history[0]!.question }]);
+      expect(JSON.stringify(request)).not.toContain("PRIVATE ASSISTANT DETOUR");
+      return { sourceIds: [] };
+    });
+    const result = await createMeetingEvidence({ store, model: local })({ meetingId: id, question: "When is that due?", history,
+      forceScan: true, fits: byCount(2) });
+    expect(local.requests.filter(request => instruction(request).startsWith("Rewrite"))).toHaveLength(1);
+    expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: false });
+    expect(local.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
   it("resolves a possessive follow-up and excludes the pronoun from lexical terms", async () => {
     const { store, id, passages } = meeting(long());
     const queries: string[] = [];

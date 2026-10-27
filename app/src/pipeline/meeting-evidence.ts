@@ -4,7 +4,7 @@ import { buildPassages, type EvidencePassage } from "./passages.js";
 import type { TextModel, TextRequest } from "./language-model.js";
 import { AI_SETTINGS, requestBytes } from "./model-request.js";
 
-export const EVIDENCE_PROMPT_VERSION = "meeting-evidence-v7";
+export const EVIDENCE_PROMPT_VERSION = "meeting-evidence-v8";
 
 type RetrievalStore = Pick<Store, "getMeeting" | "listPassages" | "searchPassages">;
 export type EvidenceStage = "retrieving" | "rewriting" | "scanning" | "consolidating";
@@ -112,13 +112,15 @@ export function createMeetingEvidence({ store, model, maxCalls = 128, deadlineMs
       return { revision, sources: unique(sources), exhaustive, sufficient, mode, calls, ...(reason ? { reason } : {}) };
     };
     function request(mode: Mode, sources: SourceFragment[], context: typeof history, reason?: string, comparison: SourceFragment[] = []): Pick<TextRequest, "messages" | "schema"> {
+      // Only the intent rewrite needs previous answers; passage selection reads original speech.
       const schema = mode === "rewrite" ? { type: "object", properties: { query: { type: "string", maxLength: 300 } }, required: ["query"] }
         : { type: "object", properties: {
           sourceIds: { type: "array", uniqueItems: true, items: { type: "string", enum: sources.map(source => source.id) } },
         }, required: ["sourceIds"], additionalProperties: false };
       return { messages: [{ role: "system", content: SYSTEM }, { role: "user", content: JSON.stringify({
         instruction: TASK[mode] + (reason ? ` Previous output was invalid: ${reason}. Correct it.` : ""),
-        data: { ...(mode === "rewrite" ? {} : { sources }), history: context,
+        data: { ...(mode === "rewrite" ? {} : { sources }),
+          history: mode === "rewrite" ? context : context.map(({ question }) => ({ question })),
           ...(comparison.length ? { comparisonSourceIds: comparison.map(source => source.id) } : {}), question: input.question },
       }) }], schema };
     }

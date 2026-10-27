@@ -16,7 +16,7 @@ export type MeetingChatGenerator = (input: {
   /** Main process only: never expose this authorization directly through renderer IPC. */
   allowSummaryProcessing?: boolean;
 }) => Promise<{ answer: ChatAnswer; generation: ChatGeneration; revision: string }>;
-export const CHAT_PROMPT_VERSION = "meeting-chat-v13";
+export const CHAT_PROMPT_VERSION = "meeting-chat-v14";
 export const CHAT_ABSENT = "Not established in the available Transcript.";
 export const CHAT_UNVERIFIED = "I could not establish a reliable answer from the available evidence.";
 export const CHAT_INCOMPLETE = "I could not review enough of the Transcript to answer reliably. Please ask a narrower question.";
@@ -179,10 +179,11 @@ export function createMeetingChat({ store, model, modelName = AI_SETTINGS.model,
       return response;
     } };
     function request(sources: SourceFragment[], exhaustive: boolean, context: typeof history, reason?: string): Pick<TextRequest, "messages" | "schema"> {
+      // Full exchanges resolve intent separately; past assistant answers must not prime source selection.
       const sentences = sourceSentences(sources);
       return { messages: [{ role: "system", content: SYSTEM }, { role: "user", content: JSON.stringify({
         instruction: TASK + (reason ? ` Previous answer was invalid: ${reason}. Correct it.` : ""),
-        data: { sources: sentences.map(({ id, speaker, text }) => ({ id, speaker, text })), history: context, exhaustive,
+        data: { sources: sentences.map(({ id, speaker, text }) => ({ id, speaker, text })), history: context.map(({ question }) => ({ question })), exhaustive,
           ...(resolvedQuestion !== input.question ? { originalQuestion: input.question } : {}),
           ...(priorUserQuestion ? { priorUserQuestion } : {}), question: resolvedQuestion },
       }) }], schema: { type: "object", properties: {
