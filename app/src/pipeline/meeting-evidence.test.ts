@@ -21,7 +21,7 @@ function meeting(transcript: Transcript) {
 const short: Transcript = { segments: [{ start: 0, end: 5, speaker: "You", text: "Friday is only a proposal." }] };
 const long = (): Transcript => ({ segments: Array.from({ length: 8 }, (_, index) => ({ start: index * 30, end: index * 30 + 25,
   speaker: index % 2 ? "Speaker 1" : "You", text: `Topic ${index} launch permissions. ` + "The local app must retain the original words and source references. ".repeat(12) })) });
-interface Data { question: string; history: { question: string; answer: string }[]; sources?: SourceFragment[] }
+interface Data { question: string; history: { question: string; answer: string }[]; sources?: SourceFragment[]; comparisonSourceIds?: string[] }
 const data = (request: TextRequest) => (JSON.parse(request.messages.at(-1)!.content) as { data: Data }).data;
 const instruction = (request: TextRequest) => (JSON.parse(request.messages.at(-1)!.content) as { instruction: string }).instruction;
 function model(reply: (request: TextRequest, call: number) => unknown): TextModel & { requests: TextRequest[] } {
@@ -212,25 +212,20 @@ describe("Meeting-specific evidence retrieval", () => {
 
   it("allows a complete combined assessment to establish support after individually insufficient batches", async () => {
     const { store, id, passages } = meeting(long());
-    let level = 0;
-    const reductions: { level: number; sufficient: boolean; sourceIds: string[] }[] = [];
     const local = model(request => {
-      const reducing = instruction(request).startsWith("Consolidate");
-      const sufficient = level >= 2;
-      if (reducing) reductions.push({ level, sufficient, sourceIds: data(request).sources!.map(source => source.id) });
-      return { sourceIds: reducing ? [data(request).sources!.at(-1)!.id] : data(request).sources!.map(source => source.id), sufficient };
+      const sources = data(request).sources!;
+      const combined = instruction(request).startsWith("Consolidate");
+      return { sourceIds: combined ? sources.map(source => source.id) : [sources.at(-1)!.id], sufficient: combined };
     });
     const result = await createMeetingEvidence({ store: fixedHits(store, [passages[0]!]), model: local })({
-      meetingId: id, question: "Summarize all decisions", fits: byCount(1),
-      onStage: stage => { if (stage === "consolidating") level++; },
+      meetingId: id, question: "Summarize all decisions", fits: byCount(3),
     });
-    const partial = reductions.filter(request => request.level === 1);
-    const combined = reductions.filter(request => request.level === 2);
+    const partial = local.requests.filter(request => instruction(request).startsWith("Select"));
+    const combined = local.requests.filter(request => instruction(request).startsWith("Consolidate"));
     expect(partial.length).toBeGreaterThan(1);
-    expect(partial.every(request => !request.sufficient)).toBe(true);
     expect(combined).toHaveLength(1);
-    expect(combined[0]!.sufficient).toBe(true);
-    expect(combined[0]!.sourceIds).toHaveLength(partial.length);
+    expect(new Set(data(combined[0]!).sources!.map(source => source.id)))
+      .toEqual(new Set(partial.map(request => data(request).sources!.at(-1)!.id)));
     expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: true });
   });
 
@@ -333,4 +328,78 @@ describe("focused lexical evidence selection", () => {
     const visited = new Set(local.requests.flatMap(request => data(request).sources ?? []).map(source => source.id));
     expect(visited.size).toBe(long().segments.length);
   });
+});
+
+
+describe("bounded late comparison context", () => {
+  it("brings distant final corrections into each older reduction batch without skipping source passages", async () => {
+    const transcript: Transcript = { segments: Array.from({ length: 32 }, (_, ref) => ({
+      start: ref * 10, end: ref * 10 + 8, speaker: ref % 2 ? "Speaker 1" : "You",
+      text: ref === 0 ? "Monday is a provisional launch proposal. " :
+        ref === 29 ? "The earlier Monday proposal is withdrawn after the offline review. " :
+        ref === 30 ? "Final launch decision: Friday replaces Monday. " :
+        ref === 31 ? "Unrelated task: I will review packaging on Tuesday. " :
+        "Review existing launch requirements without assigning a new task. ".repeat(6),
+    })) };
+    const { store, id } = meeting(transcript);
+    const local = model(request => {
+      const sources = data(request).sources!;
+      const reducing = instruction(request).startsWith("Consolidate");
+      if (!reducing) return { sourceIds: sources.filter(source => source.ref !== 31).map(source => source.id), sufficient: sources.some(source => source.ref === 30) };
+      const final = sources.find(source => source.ref === 30);
+      return final ? { sourceIds: [final.id], sufficient: true } : { sourceIds: sources.map(source => source.id), sufficient: false };
+    });
+    const result = await createMeetingEvidence({ store, model: local })({ meetingId: id, question: "What is the final launch plan?", fits: byCount(1) });
+    expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: true });
+    expect(result.sources.map(source => source.ref)).toEqual([30]);
+    const selection = local.requests.filter(request => instruction(request).startsWith("Select"));
+    expect(new Set(selection.flatMap(request => data(request).sources!.map(source => source.ref)))).toEqual(new Set(transcript.segments.map((_, ref) => ref)));
+    const reductions = local.requests.filter(request => instruction(request).startsWith("Consolidate"));
+    expect(reductions.length).toBeGreaterThan(1);
+    expect(reductions.every(request => data(request).sources!.some(source => source.ref === 30))).toBe(true);
+    expect(local.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it("does not discard distinct commitments merely because the latest context concerns another task", async () => {
+    const transcript = long();
+    transcript.segments.forEach((source, index) => { source.text = `I commit to unique task ${index} on day ${index + 1}. ` + source.text; });
+    const { store, id } = meeting(transcript);
+    const local = model(request => ({ sourceIds: data(request).sources!.map(source => source.id), sufficient: true }));
+    const result = await createMeetingEvidence({ store, model: local })({ meetingId: id, question: "List all commitments", fits: byCount(1) });
+    expect(result).toMatchObject({ mode: "scan", exhaustive: false, sufficient: false, sources: [] });
+    expect(result.reason).toContain("without losing support");
+    const visited = local.requests.filter(request => instruction(request).startsWith("Select")).flatMap(request => data(request).sources!.map(source => source.ref));
+    expect(new Set(visited)).toEqual(new Set(transcript.segments.map((_, ref) => ref)));
+    expect(local.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it("reduces comparison context instead of trimming an escaped original fragment to fit", async () => {
+    const transcript = long();
+    const original = '"'.repeat(740);
+    transcript.segments.forEach(source => { source.text = original; });
+    const { store, id } = meeting(transcript);
+    const local = model(request => instruction(request).startsWith("Rewrite") ? { query: "statements" }
+      : { sourceIds: data(request).sources!.map(source => source.id), sufficient: true });
+    const result = await createMeetingEvidence({ store, model: local })({ meetingId: id, question: "List all statements", fits: byCount(1) });
+    expect(result).toMatchObject({ exhaustive: false, sufficient: false, sources: [] });
+    const reductions = local.requests.filter(request => instruction(request).startsWith("Consolidate"));
+    expect(reductions.some(request => (data(request).comparisonSourceIds?.length ?? 0) < 2)).toBe(true);
+    expect(local.requests.flatMap(request => data(request).sources ?? []).every(source => source.text === original)).toBe(true);
+    expect(local.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it("retains explicit unassigned evidence as usable negative context after a complete scan", async () => {
+    const transcript = long();
+    transcript.segments[6]!.text = "The archive report has no assigned owner. No deadline was agreed for the archive report.";
+    const { store, id } = meeting(transcript);
+    const local = model(request => {
+      const negative = data(request).sources!.filter(source => source.ref === 6);
+      return { sourceIds: negative.map(source => source.id), sufficient: negative.length > 0 };
+    });
+    const result = await createMeetingEvidence({ store, model: local })({ meetingId: id, question: "Who owns the archive report?", forceScan: true, fits: byCount(1) });
+    expect(result).toMatchObject({ mode: "scan", exhaustive: true, sufficient: true });
+    expect(result.sources.map(source => source.ref)).toEqual([6]);
+    expect(result.sources[0]!.text).toContain("no assigned owner");
+  });
+
 });
