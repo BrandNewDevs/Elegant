@@ -24,7 +24,8 @@ function topicModel(nameFor: (text: string) => string = topic) {
     requests.push(request);
     const payload = input(request);
     let output: unknown;
-    if (payload.primary) {
+    if ("updates" in (request.schema as { properties: object }).properties) { output = { updates: [] }; }
+    else if (payload.primary) {
       output = { facts: payload.primary.filter(piece => piece.part === 0).map(piece => {
         const round = Number(piece.text.match(/review round (\d+)/)?.[1]);
         const name = nameFor(piece.text);

@@ -19,7 +19,8 @@ function adapter(reduce: (facts: Fact[], sources: Piece[], request: TextRequest)
     requests.push(request);
     const input = data(request);
     let output: unknown;
-    if (input.primary) output = { facts: input.primary.filter(piece => piece.part === 0).map(piece => ({
+    if ("updates" in (request.schema as { properties: object }).properties) output = { updates: [] };
+    else if (input.primary) output = { facts: input.primary.filter(piece => piece.part === 0).map(piece => ({
       speaker: piece.speaker, text: prefix(piece.text), kind: /propose|suggest/i.test(piece.text) ? "proposal" : /final decision/i.test(piece.text) ? "decision" : "commitment", sourceIds: [piece.id],
     })) };
     else if (input.candidates && !("tldr" in (request.schema as { properties: object }).properties)) output = Object.fromEntries(reduce(input.candidates, input.sources!, request).flatMap(fact => (fact.covers ?? []).map(id => [String(id), Math.min(...fact.covers!)])));
@@ -35,7 +36,7 @@ function assignmentAdapter(assign: (facts: Fact[], request: TextRequest) => unkn
   const model: TextModel = { async complete(request) {
     requests.push(request);
     const input = data(request);
-    if (input.candidates && !("tldr" in (request.schema as { properties: object }).properties)) {
+    if (input.candidates && !("updates" in (request.schema as { properties: object }).properties) && !("tldr" in (request.schema as { properties: object }).properties)) {
       return { text: JSON.stringify(assign(input.candidates, request)), metadata: { model: "assignment:test", elapsedMs: 1 } };
     }
     return inner.model.complete(request);
@@ -120,7 +121,7 @@ describe("complete long Summary coverage", () => {
     });
     const result = await createGroundedSummariser({ model })(transcript);
     expect(mixedContextCalls).toBe(0);
-    expect(requests.filter(request => data(request).candidates && !("tldr" in (request.schema as { properties: object }).properties))).toHaveLength(0);
+    expect(requests.filter(request => data(request).candidates && !("updates" in (request.schema as { properties: object }).properties) && !("tldr" in (request.schema as { properties: object }).properties))).toHaveLength(0);
     for (const speaker of speakers) {
       expect(result.participants.find(participant => participant.speaker === speaker)!.said)
         .toEqual(transcript.segments.filter(segment => segment.speaker === speaker).map(segment => prefix(segment.text)));
@@ -175,7 +176,7 @@ describe("complete long Summary coverage", () => {
     expect(result.participants[0]!.said).toHaveLength(9);
     expect(result.evidence!.participants[0]!.said).toEqual(Array.from({ length: 9 }, (_, ref) => [ref]));
     expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
-    for (const request of requests.filter(request => data(request).candidates && !("tldr" in (request.schema as { properties: object }).properties))) {
+    for (const request of requests.filter(request => data(request).candidates && !("updates" in (request.schema as { properties: object }).properties) && !("tldr" in (request.schema as { properties: object }).properties))) {
       const instruction = (JSON.parse(request.messages.at(-1)!.content) as { instruction: string }).instruction;
       if (instruction.includes("Missing candidate IDs:")) expect(instruction).not.toContain("I will complete Task_");
     }
@@ -286,6 +287,84 @@ describe("complete long Summary coverage", () => {
       "Distinct earlier outcome 16.", "Will retest offline on Thursday.", "Packaging has no owner.", "Will update the guide on Wednesday.",
     ]);
     expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it.each(["You", "Speaker 1"])("marks an earlier proposal superseded by %s without transferring its ownership", async corrector => {
+    const transcript = uniqueCommitments();
+    transcript.segments[0]!.text = original("I propose launching on Monday.");
+    transcript.segments[8]!.speaker = corrector;
+    transcript.segments[8]!.text = original("Final decision: launch Friday instead of Monday.");
+    const inner = adapter();
+    let assessed = false;
+    const requests: TextRequest[] = [];
+    const model: TextModel = { async complete(request) {
+      requests.push(request);
+      if (!("updates" in (request.schema as { properties: object }).properties)) return inner.model.complete(request);
+      const input = data(request);
+      const proposal = input.candidates!.find(fact => fact.text.includes("propose launching"));
+      const correction = input.sources!.find(source => source.ref === 8);
+      const updates = proposal && correction ? [{ candidateId: proposal.id, status: "superseded", correctionSourceIds: [correction.id] }] : [];
+      assessed ||= updates.length > 0;
+      return { text: JSON.stringify({ updates }), metadata: { model: "disposition:test", elapsedMs: 1 } };
+    } };
+    const result = await createGroundedSummariser({ model })(transcript);
+    expect(assessed).toBe(true);
+    const owner = result.participants.find(participant => participant.speaker === "You")!;
+    const point = "Earlier proposal (superseded): I propose launching on Monday.";
+    expect(owner.said).toContain(point);
+    expect(result.evidence!.participants.find(participant => participant.speaker === "You")!.said[owner.said.indexOf(point)]).toEqual([0, 8]);
+    expect(result.participants.find(participant => participant.speaker === corrector)!.said)
+      .toContain("Final decision: launch Friday instead of Monday.");
+    expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it("assesses later context without declaring an unrelated later task a reversal", async () => {
+    const transcript = uniqueCommitments();
+    transcript.segments[0]!.text = original("I propose launching on Monday.");
+    transcript.segments[8]!.text = original("Final decision: review the Monday launch checklist spelling on Friday.");
+    const { model, requests } = adapter();
+    const result = await createGroundedSummariser({ model })(transcript);
+    expect(requests.some(request => "updates" in (request.schema as { properties: object }).properties)).toBe(true);
+    expect(result.participants[0]!.said).toContain("I propose launching on Monday.");
+    expect(result.participants[0]!.said.some(point => point.startsWith("Earlier"))).toBe(false);
+  });
+
+  it.each(["unknown-source", "not-later", "unknown-candidate"])("rejects %s disposition evidence after bounded retries", async invalid => {
+    const transcript = uniqueCommitments();
+    const inner = adapter();
+    let attempts = 0;
+    const model: TextModel = { async complete(request) {
+      if (!("updates" in (request.schema as { properties: object }).properties)) return inner.model.complete(request);
+      attempts++;
+      const input = data(request), fact = input.candidates![0]!;
+      return { text: JSON.stringify({ updates: [{ candidateId: invalid === "unknown-candidate" ? 999 : fact.id,
+        status: "superseded", correctionSourceIds: [invalid === "unknown-source" ? "missing:0" : fact.sourceIds[0]],
+      }] }), metadata: { model: "disposition:test", elapsedMs: 1 } };
+    } };
+    await expect(createGroundedSummariser({ model })(transcript)).rejects.toThrow("failed validation after 3 attempts");
+    expect(attempts).toBe(3);
+  });
+
+  it("accepts correction evidence in a later fragment of the same original segment", async () => {
+    const transcript: Transcript = { segments: [{ start: 0, end: 60, speaker: "You", text: "Monday launch proposal. ".repeat(400) }] };
+    const inner = adapter();
+    let sameOrdinalCorrection = false;
+    const model: TextModel = { async complete(request) {
+      const input = data(request);
+      if (input.primary) return { text: JSON.stringify({ facts: input.primary.map(piece => ({ speaker: piece.speaker,
+        text: piece.part === 0 ? "Proposed Monday." : `Later original claim ${piece.part}.`, sourceIds: [piece.id], kind: piece.part === 0 ? "proposal" : "update",
+      })) }), metadata: { model: "fragment:test", elapsedMs: 1 } };
+      if (!("updates" in (request.schema as { properties: object }).properties)) return inner.model.complete(request);
+      const proposal = input.candidates!.find(fact => fact.text === "Proposed Monday.");
+      const correction = input.sources!.find(source => source.part > 0);
+      const updates = proposal && correction ? [{ candidateId: proposal.id, status: "historical", correctionSourceIds: [correction.id] }] : [];
+      sameOrdinalCorrection ||= updates.length > 0;
+      return { text: JSON.stringify({ updates }), metadata: { model: "fragment:test", elapsedMs: 1 } };
+    } };
+    const result = await createGroundedSummariser({ model })(transcript);
+    expect(sameOrdinalCorrection).toBe(true);
+    expect(result.participants[0]!.said).toContain("Earlier proposal (historical): Proposed Monday.");
+    expect(result.evidence!.participants[0]!.said[0]).toEqual([0]);
   });
 
 });
