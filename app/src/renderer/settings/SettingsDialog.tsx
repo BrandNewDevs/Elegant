@@ -70,14 +70,19 @@ function PermissionRow({ copy, step, name }: { copy: PermissionCopy; step: Permi
           </div>
         )}
       </div>
-      {step.status === "problem" && (
-        <>
-          {step.message && <Problem>{step.message}</Problem>}
-          <Button type="button" variant="link" size="sm" className="mt-1 h-auto p-0" onClick={() => act(copy.settingsAction)}>
-            <ExternalLink aria-hidden />
-            Open System Settings
-          </Button>
-        </>
+      {step.status === "problem" && step.message && <Problem>{step.message}</Problem>}
+      {(step.status === "todo" || step.status === "problem") && (
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="mt-1 h-auto p-0"
+          aria-label={`Open System Settings for ${copy.title.toLowerCase()}`}
+          onClick={() => act(copy.settingsAction)}
+        >
+          <ExternalLink aria-hidden />
+          Open System Settings
+        </Button>
       )}
     </div>
   );
