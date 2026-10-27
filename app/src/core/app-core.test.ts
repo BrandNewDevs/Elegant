@@ -302,6 +302,15 @@ describe("recording and stopping", () => {
     expect(ctx.core.listMeetings()).toEqual([]);
   });
 
+  it("tells listeners about engine trouble without ending the Recording", () => {
+    const { core, engine } = recording();
+    const problems: string[] = [];
+    core.onEngineProblem((message) => problems.push(message));
+    engine.emit({ type: "error", message: "the microphone could not be restarted" });
+    expect(problems).toEqual(["the microphone could not be restarted"]);
+    expect(core.recording).toBeDefined();
+  });
+
   it("tells listeners when a Recording that was running cannot finish", () => {
     const { core, engine } = recording();
     const problems: string[] = [];
