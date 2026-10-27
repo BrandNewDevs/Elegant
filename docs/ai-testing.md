@@ -68,6 +68,16 @@ Use `current` instead of `summary` to include chat, or `chat` to measure chat al
 
 Compare the same fixtures, model digest, quantization, prompt version, context settings and output limits on the M4 and laptop. Compare only Gemma 3 4B and the agreed `gemma4:e2b` candidate. Retain the baseline unless the candidate passes the same quality gates and improves measured results on the M4. Linux speed does not establish Swift or M4 performance.
 
+## Review the current AI behavior
+
+Long-Meeting grouping preserves immutable extracted clauses and their references; it does not ask a reducer to write replacement claims. Check that every distinct commitment, case-sensitive identifier and final decision survived the **initial extraction**, and read any retained earlier proposal in its chronology. Grouping may remain verbose. The TL;DR is separately generated from bounded original claim-and-source bundles, so verify every TL;DR claim against its cited passages rather than assuming the full point list guarantees it.
+
+Chat's audit checks verbatim source quotes, original speakers and complete sentence context when the sentence fits the 300-byte quote limit. For longer sentences, shorter quotes still depend on model judgment about qualifiers. Test opposing views, explicit refusals, quoted malicious instructions, unknown task owners and dates. An explicit statement that no owner or date was agreed is a supported negative answer; a generic warning not to guess is not evidence that a particular fact is absent.
+
+Test distant later corrections in long Meetings. Retrieval carries bounded late original-fragment context into reductions, but a newer unrelated task must not erase another commitment. Include both targeted and broad questions, because broad scans visit all passages and may require more calls or return a budget limitation. Keep verification abstention, incomplete review, structural/transport failure and a completed review finding no support separate. None of those limitations counts as correctly answering an answerable critical question.
+
+Record Summary, chat and retrieval prompt versions alongside the source commit and dirty-state metadata. A successful earlier run is not a quality result for a later prompt. Extended evaluation deadlines must be labeled and cannot satisfy the production Summary's 15-minute gate. Automated checks, agent source inspection, independent human review and actual Mac measurements remain separate. Final CI status must be read from the final PR head.
+
 ## Target Mac acceptance checklist
 
 Run these checks against the final code and prepared models. Record the app commit, device, model metadata, failures and which steps remain pending.
@@ -94,6 +104,7 @@ If a quality or performance gate fails, keep it failed or pending, fix the cause
 | Configured text model missing | Pull the exact model named in the error, check Settings again and retry. An installed model with a different tag is not silently substituted. |
 | Speech/speaker preparation fails | Check local disk space and connectivity for model downloads, restart the app and retry preparation in Settings. Existing downloads are retained. Repeat an actual transcription before claiming offline readiness. |
 | Summary times out or output fails validation | Retry with Regenerate Summary after checking model readiness and memory. The previous successful Summary remains. Repeated failure is an evaluation failure to investigate, not a reason to publish partial output. |
+| Chat returns a verification or evidence-budget limitation | Inspect the cited/available Transcript and ask a narrower question. Do not interpret abstention as proof of absence or as a correctly answered critical question. |
 | Chat fails, is cancelled or interrupted | Use Retry to create a fresh request. Earlier completed messages remain. Clear chat removes that Meeting's history and cancels its work. |
 | Speech-model release fails or engine exits | Restart the app before retrying. The AI queue must not start Gemma before native models are released. Saved Transcripts permit Summary regeneration; do not assume failed native audio can be recreated. |
 | Transcription fails with retained tracks | The core supports retry from saved audio; the current Meetings UI does not expose a transcription-retry button. Keep the tracks and use a development recovery route, or record a new Meeting. Do not delete the Meeting while attempting recovery. |

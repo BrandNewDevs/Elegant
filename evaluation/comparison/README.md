@@ -48,6 +48,14 @@ Resource JSON files retain sampled peaks, initial/peak/last swap, warnings and s
 
 The associated resource report sampled 9.30 GiB peak Ollama process-tree RSS and 3,080 MiB NVIDIA usage. System swap began at 2.33 GiB, peaked near the full 4 GiB swap allocation and ended at 1.94 GiB. These observations include shared mappings and other applications; they are not unique physical-memory totals or M4 measurements. An extended evaluation deadline is used separately to inspect whether the algorithm completes and preserves the final decisions. It does not change the shipped 15-minute deadline or relax the M4 gate.
 
+## Latest verification status (final PR still pending)
+
+Summary v9 completed a fresh 30-segment development slice in 102.28 seconds and 22 calls. This is a synthetic tuning probe, not the full long fixture or a real 60-minute Meeting. Participant points represented all eight predefined important facts on source inspection, but the TL;DR added an unsupported broad statement about unresolved technical details. Earlier controlled v6 runs also incorrectly attached a guide-review deadline to completed search tests. These are failed faithfulness observations, not quality passes.
+
+The fresh chat-v6 short suite completed all seven fixtures with two hard validation failures. Source inspection also found an incorrect answer to an unassigned task deadline, along with answerable questions returning verification limitations. Exact quote provenance checks do not establish answer relevance or factual correctness. Fixes and affected reruns remain required before the final PR is ready.
+
+Summary v10 adds structurally validated labels for superseded claims with strictly later original references. Its focused tests pass; fresh model quality verification is pending. After the disposition additions, typechecking and all 489 app tests pass locally. The evaluation tools have 45 passing Python tests. Latest-head native CI and fresh model quality verification remain required.
+
 ## Release status
 
 Keep Gemma 3 as the default. One short comparison does not establish candidate superiority, and neither model has passed the agreed target-M4 gates here.
