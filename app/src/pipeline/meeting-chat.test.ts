@@ -3,7 +3,7 @@ import { openStore, type Store } from "../store/store.js";
 import { transcriptRevision, type SourceFragment } from "./evidence.js";
 import type { Transcript } from "./pipeline.js";
 import type { TextModel, TextRequest } from "./language-model.js";
-import { createMeetingChat, CHAT_ABSENT, CHAT_INCOMPLETE, CHAT_PROMPT_VERSION } from "./meeting-chat.js";
+import { createMeetingChat, CHAT_ABSENT, CHAT_INCOMPLETE, CHAT_UNVERIFIED, CHAT_PROMPT_VERSION } from "./meeting-chat.js";
 import { requestBytes } from "./model-request.js";
 
 const stores: Store[] = [];
@@ -318,7 +318,7 @@ describe("grounded Meeting chat", () => {
     const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "What did Morgan commit to?" });
     expect(result.answer).toEqual({ text: source.segments[1]!.text, refs: [1], sufficient: true });
     expect(answers).toBe(2);
-    expect(contents(model.requests[2]!).instruction).toContain("set sufficient false; do not give another true fact");
+    expect(contents(model.requests.filter(isAnswer)[1]!).instruction).toContain("set sufficient false; do not give another true fact");
   });
 
   it("does not treat dissent, quoted tests or superseded proposals as contradicting a supported negative candidate", async () => {
@@ -369,7 +369,8 @@ describe("grounded Meeting chat", () => {
     expect(result.generation.calls).toBe(3);
     expect(contents(model.requests[1]!).instruction).toContain("A weekday alone is not the requested calendar date");
     const invalid = fake(() => ({ text: "Friday", sourceIds: ["0:0"], sufficient: true }));
-    await expect(createMeetingChat({ store, model: invalid })({ ...input(id, expectedRevision), question: "What calendar date is the launch?" })).rejects.toThrow("three attempts");
+    expect((await createMeetingChat({ store, model: invalid })({ ...input(id, expectedRevision), question: "What calendar date is the launch?" })).answer)
+      .toEqual({ text: CHAT_UNVERIFIED, refs: [], sufficient: false });
     expect(invalid.requests).toHaveLength(3);
     expect(invalid.requests.every(isAnswer)).toBe(true);
     const weekday = fake(() => ({ text: "Friday", sourceIds: ["0:0"], sufficient: true }));
@@ -385,10 +386,12 @@ describe("grounded Meeting chat", () => {
     expect(result.generation.calls).toBe(2);
   });
 
-  it("keeps unsupported answers failed after three generation-and-audit attempts", async () => {
+  it("abstains after semantic-only verification failures without claiming the fact was absent", async () => {
     const { store, id, expectedRevision } = setup();
     const model = fake(() => positive, { audit: request => auditReply(request, [], false) });
-    await expect(createMeetingChat({ store, model })(input(id, expectedRevision))).rejects.toThrow("three attempts");
+    const result = await createMeetingChat({ store, model })(input(id, expectedRevision));
+    expect(result.answer).toEqual({ text: CHAT_UNVERIFIED, refs: [], sufficient: false });
+    expect(result.answer.text).not.toBe(CHAT_ABSENT);
     expect(model.requests.filter(isAnswer)).toHaveLength(3);
     expect(model.requests.filter(request => "supported" in (request.schema as { properties: object }).properties)).toHaveLength(3);
   });
@@ -499,6 +502,96 @@ describe("grounded Meeting chat", () => {
     expect(result.answer).toEqual({ text: CHAT_INCOMPLETE, refs: [], sufficient: false });
     expect(result.generation.exhaustive).toBe(false);
     expect(model.requests.every(request => !isAnswer(request))).toBe(true);
+  });
+
+  it("rejects a different known Participant substituted into an exact requested-person frame", async () => {
+    const source: Transcript = { segments: [
+      { start: 0, end: 5, speaker: "Speaker 1", text: "I will add the local test by Tuesday." },
+      { start: 5, end: 10, speaker: "You", text: "No one named Mallory took part in this Meeting." },
+    ] };
+    const { store, id, expectedRevision } = setup(source);
+    const model = fake(() => ({ text: "Speaker 1 will add the local test by Tuesday.", sourceIds: ["0:0"], sufficient: true }));
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "What did Mallory commit to?" });
+    expect(result.answer).toEqual({ text: CHAT_UNVERIFIED, refs: [], sufficient: false });
+    expect(result.answer.text).not.toBe(CHAT_ABSENT);
+    expect(model.requests).toHaveLength(3);
+    expect(model.requests.every(isAnswer)).toBe(true);
+  });
+
+  it("allows a requested external person's name when the answer explicitly addresses that person", async () => {
+    const source: Transcript = { segments: [{ start: 0, end: 5, speaker: "You", text: "Morgan Lee promised to send the guide by Thursday." }] };
+    const { store, id, expectedRevision } = setup(source);
+    const model = fake(() => ({ text: "You said Morgan Lee promised to send the guide by Thursday.", sourceIds: ["0:0"], sufficient: true }));
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "What did Morgan Lee commit to?" });
+    expect(result.answer.sufficient).toBe(true);
+    expect(result.answer.text).toContain("Morgan Lee");
+    expect(result.generation.calls).toBe(2);
+  });
+
+  it.each(["What did the team agree to?", "What did we agree to?", "What did the project propose?"])("does not mistake a group, pronoun or task subject for a requested person: %s", async asked => {
+    const source: Transcript = { segments: [{ start: 0, end: 5, speaker: "Speaker 1", text: "I agreed to write the local guide." }] };
+    const { store, id, expectedRevision } = setup(source);
+    const model = fake(() => ({ text: "Speaker 1 agreed to write the local guide.", sourceIds: ["0:0"], sufficient: true }));
+    expect((await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: asked })).answer.sufficient).toBe(true);
+  });
+
+  it("rejects irrelevant budget prose and unrelated task counts instead of treating them as an amount", async () => {
+    const { store, id, expectedRevision } = setup();
+    for (const text of ["Markdown is agreed for export; email will be revisited later.", "Speaker 1 has three testing tasks."]) {
+      const model = fake(() => ({ text, sourceIds: ["1:0"], sufficient: true }));
+      const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "What is the email service budget?" });
+      expect(result.answer).toEqual({ text: CHAT_UNVERIFIED, refs: [], sufficient: false });
+      expect(model.requests).toHaveLength(3);
+      expect(model.requests.every(isAnswer)).toBe(true);
+    }
+  });
+
+  it.each(["$500", "five hundred dollars", "five hundred", "1/2", "half of the budget", "The budget is zero.", "No budget was specified."])("accepts sourced budget values or explicit missing-budget statements: %s", async value => {
+    const source: Transcript = { segments: [{ start: 0, end: 5, speaker: "You", text: `We agreed: ${value}` }] };
+    const { store, id, expectedRevision } = setup(source);
+    const model = fake(() => ({ text: value, sourceIds: ["0:0"], sufficient: true }));
+    const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "What is the project budget?" });
+    expect(result.answer).toEqual({ text: value, refs: [0], sufficient: true });
+    expect(result.generation.calls).toBe(2);
+  });
+
+  it.each(["What did we say about the budget?", "What is the budget status?", "What is the budget approval process?"])("does not require a monetary value for a discussion or status question: %s", async asked => {
+    const source: Transcript = { segments: [{ start: 0, end: 5, speaker: "You", text: "We will discuss the budget next week." }] };
+    const { store, id, expectedRevision } = setup(source);
+    const model = fake(() => ({ text: "You will discuss the budget next week.", sourceIds: ["0:0"], sufficient: true }));
+    expect((await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: asked })).answer.sufficient).toBe(true);
+  });
+
+  it("keeps malformed audits failed even when other attempts fail only semantic verification", async () => {
+    const { store, id, expectedRevision } = setup();
+    let audits = 0;
+    const model = fake(() => positive, { audit: request => ++audits === 2
+      ? { checks: [{ speaker: "You", sourceId: "unknown:0", quote: "Not original", relation: "supports" }], addressesQuestion: true, supported: true }
+      : auditReply(request, [], false) });
+    await expect(createMeetingChat({ store, model })(input(id, expectedRevision))).rejects.toThrow("three attempts");
+    expect(audits).toBe(3);
+  });
+
+  it("still scans once after semantic failures in a partial selection and abstains if full evidence cannot be verified", async () => {
+    const source = long(); source.segments[4]!.text = "You will write the launch guide by Wednesday. " + source.segments[4]!.text;
+    const { store, id, expectedRevision } = setup(source);
+    const passages = store.listPassages(id, expectedRevision);
+    const scoped = { getMeeting: store.getMeeting, listPassages: store.listPassages, searchPassages: () => [passages[0]!] };
+    const stages: string[] = [];
+    const model = fake(request => {
+      const data = contents(request).data;
+      if (isAnswer(request)) return { text: "A proposed answer that could not be verified.", sourceIds: [data.sources![0]!.id], sufficient: true };
+      const matches = data.sources!.filter(source => source.ref === 4);
+      const selected = matches.length ? matches : data.sources!.slice(0, 1);
+      return { sourceIds: selected.map(source => source.id), sufficient: selected.length > 0 };
+    }, { audit: request => auditReply(request, [], false) });
+    const result = await createMeetingChat({ store: scoped, model })({ ...input(id, expectedRevision), question: "Who will write the launch guide?", onStage: stage => stages.push(stage) });
+    expect(stages.filter(stage => stage === "retrieving")).toHaveLength(2);
+    expect(model.requests.filter(isAnswer)).toHaveLength(6);
+    expect(result.answer).toEqual({ text: CHAT_UNVERIFIED, refs: [], sufficient: false });
+    expect(result.generation).toMatchObject({ retrievalMode: "scan", exhaustive: true });
+    expect(result.answer.text).not.toBe(CHAT_ABSENT);
+    expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
   it("propagates connection errors instead of returning a completed absence answer", async () => {
