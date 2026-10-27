@@ -98,3 +98,32 @@ it("shows Settings as a dialog over the Meetings when it is open, and asks to cl
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   expect(window.electron.meetings.settings).toHaveBeenCalledWith(false);
 });
+
+it("opens the Profile page from the sidebar and goes back to the Meeting when one is picked", () => {
+  window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
+    callback({ settingsOpen: false, showInDock: false, meetings: [meeting], selected: meeting, query: "" });
+    return () => {};
+  });
+  window.electron.setup = {
+    ready: vi.fn(),
+    onState: (callback) => {
+      callback({ ...nothingDone, userName: "Kenny" });
+      return () => {};
+    },
+    act: vi.fn(),
+    setUserName: vi.fn(),
+  };
+  render(<MeetingsApp />);
+  expect(screen.getByRole("heading", { name: "zoom.us" })).toBeTruthy();
+
+  fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+  expect(screen.getByRole("heading", { name: "Profile" })).toBeTruthy();
+  expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Kenny");
+  expect(screen.queryByRole("heading", { name: "zoom.us" })).toBeNull();
+  expect(window.electron.meetings.settings).not.toHaveBeenCalled(); // a page, not the Settings dialog
+
+  // The Meeting is already the selected one, so the main process sends nothing new; the click alone must bring it back.
+  fireEvent.click(screen.getByRole("button", { name: /zoom\.us/ }));
+  expect(screen.getByRole("heading", { name: "zoom.us" })).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "Profile" })).toBeNull();
+});

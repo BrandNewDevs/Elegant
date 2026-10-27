@@ -1,7 +1,7 @@
 import { useJobToasts } from "./job-toasts";
 import type { MeetingsViewState } from "../../shared/meetings-view-state";
 import { MeetingDetail } from "./MeetingDetail";
-import { AlertCircle, CheckCircle2, Hourglass, Inbox, MessagesSquare, Radio, Search, Settings, type LucideIcon } from "lucide-react";
+import { AlertCircle, CheckCircle2, Hourglass, Inbox, MessagesSquare, Radio, Search, Settings, UserRound, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Meeting, MeetingListItem, MeetingState } from "../../store/store";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Toaster } from "@/components/ui/sonner";
 import { formatWhen } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { ProfilePage } from "../profile/ProfilePage";
 import { SettingsDialog } from "../settings/SettingsDialog";
 
 const STATE_LABEL: Record<MeetingState, string> = {
@@ -38,11 +39,14 @@ function StateBadge({ state }: { state: MeetingState }) {
   );
 }
 
-function MeetingListRow({ meeting, selected }: { meeting: MeetingListItem; selected: boolean }) {
+function MeetingListRow({ meeting, selected, onSelect }: { meeting: MeetingListItem; selected: boolean; onSelect: () => void }) {
   return (
     <button
       type="button"
-      onClick={() => window.electron.meetings.select(meeting.id)}
+      onClick={() => {
+        onSelect();
+        window.electron.meetings.select(meeting.id);
+      }}
       className={cn(
         "w-full border-b px-3 py-2.5 text-left transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
         selected && "bg-accent",
@@ -61,6 +65,8 @@ function MeetingListRow({ meeting, selected }: { meeting: MeetingListItem; selec
 export function MeetingsApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showInDock, setShowInDock] = useState(false);
+  // Profile is a page of its own in the main area; picking a Meeting brings the Meetings back.
+  const [page, setPage] = useState<"meetings" | "profile">("meetings");
   const [query, setQuery] = useState("");
   const [meetings, setMeetings] = useState<MeetingListItem[]>([]);
   const [selected, setSelected] = useState<Meeting | undefined>();
@@ -111,10 +117,14 @@ export function MeetingsApp() {
               <p>{query.trim() ? "No Meetings match." : "No Meetings yet."}</p>
             </div>
           ) : (
-            meetings.map((m) => <MeetingListRow key={m.id} meeting={m} selected={selected?.id === m.id} />)
+            meetings.map((m) => <MeetingListRow key={m.id} meeting={m} selected={page === "meetings" && selected?.id === m.id} onSelect={() => setPage("meetings")} />)
           )}
         </ScrollArea>
-        <div className="border-t p-2">
+        <div className="space-y-1 border-t p-2">
+          <Button type="button" variant={page === "profile" ? "secondary" : "ghost"} size="sm" className="w-full justify-start" aria-current={page === "profile" ? "page" : undefined} onClick={() => setPage("profile")}>
+            <UserRound aria-hidden />
+            Profile
+          </Button>
           <Button type="button" variant="ghost" size="sm" className="w-full justify-start" onClick={() => window.electron.meetings.settings(true)}>
             <Settings aria-hidden />
             Settings
@@ -123,7 +133,9 @@ export function MeetingsApp() {
       </aside>
       <ScrollArea className="min-h-0 min-w-0 flex-1">
         <main className="min-w-0 p-4 sm:p-6">
-          {selected ? (
+          {page === "profile" ? (
+            <ProfilePage />
+          ) : selected ? (
             <MeetingDetail key={`${selected.id}:${chat?.revision ?? "legacy"}`} meeting={selected} chat={chat} isCurrent={() => selection.current.id === selected.id && selection.current.revision === chat?.revision} />
           ) : (
             <div className="flex flex-col items-center gap-2 pt-24 text-muted-foreground">

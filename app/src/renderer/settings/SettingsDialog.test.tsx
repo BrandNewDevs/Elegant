@@ -67,19 +67,6 @@ it("shows nothing while it is closed", () => {
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
-it("changes the name from Settings, and only offers Save once it differs", () => {
-  const send = pushSetupState({ ...nothingDone, userName: "Kenny" });
-  render(<SettingsDialog open onOpenChange={() => {}} />);
-  const save = screen.getByRole("button", { name: "Save" }) as HTMLButtonElement;
-  expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Kenny");
-  expect(save.disabled).toBe(true);
-
-  fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Ken" } });
-  expect(save.disabled).toBe(false);
-  fireEvent.click(save);
-  expect(send.setUserName).toHaveBeenCalledWith("Ken");
-});
-
 it("does not put focus on the close button when it opens, even though the content arrives later", () => {
   let push: (view: SetupViewState) => void = () => {};
   pushSetupState(nothingDone);
@@ -98,7 +85,7 @@ it("does not put focus on the close button when it opens, even though the conten
 it("scrolls its body but not the header or the close button, so they stay in view", () => {
   pushSetupState(nothingDone);
   render(<SettingsDialog open onOpenChange={() => {}} />);
-  const scroller = screen.getByLabelText("Name").closest(".overflow-y-auto");
+  const scroller = screen.getByLabelText("Show in Dock").closest(".overflow-y-auto");
   expect(scroller).toBeTruthy();
   expect(scroller!.contains(screen.getByRole("button", { name: "Close" }))).toBe(false);
   expect(scroller!.contains(screen.getByRole("heading", { name: "Settings" }))).toBe(false);
