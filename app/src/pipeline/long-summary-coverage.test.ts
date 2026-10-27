@@ -161,6 +161,54 @@ describe("complete long Summary coverage", () => {
     expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
+  it("consolidates equivalent whole-claim paraphrases while retaining every original source", async () => {
+    const transcript = uniqueCommitments();
+    const earlier = "I will test the permission flow by Thursday.";
+    const latest = "By Thursday, I will test permission flow.";
+    transcript.segments[0]!.text = original(earlier);
+    transcript.segments[1]!.text = original(latest);
+    const { model, requests } = assignmentAdapter(facts => {
+      const duplicates = facts.filter(fact => fact.sourceIds.some(id => id === "0:0" || id === "1:0"));
+      const seed = duplicates[0]?.id;
+      return Object.fromEntries(facts.map(fact => [String(fact.id), duplicates.includes(fact) ? seed! : fact.id]));
+    });
+    const result = await createGroundedSummariser({ model })(transcript);
+    const owner = result.participants[0]!;
+    expect(owner.said).toContain(latest);
+    expect(owner.said.some(point => point.includes(earlier))).toBe(false);
+    expect(owner.said).toHaveLength(8);
+    expect(result.evidence!.participants[0]!.said[owner.said.indexOf(latest)]).toEqual([0, 1]);
+    expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
+  });
+
+  it.each([
+    ["deadline", "I will test the permission flow by Thursday.", "By Friday, I will test permission flow."],
+    ["owner", "I will test the permission flow by Thursday.", "By Thursday, Speaker 1 will test permission flow."],
+    ["action", "I will test the permission flow by Thursday.", "By Thursday, I will review permission flow."],
+    ["case-sensitive identifier", "I will deploy Branch Alpha by Thursday.", "By Thursday, I will deploy Branch alpha."],
+    ["identifier punctuation", "I will deploy API-1 by Thursday.", "By Thursday, I will deploy API 1."],
+    ["number", "I will run 3 permission tests by Thursday.", "By Thursday, I will run 4 permission tests."],
+    ["negation", "I will test the permission flow by Thursday.", "By Thursday, I will not test permission flow."],
+    ["modality", "I will test the permission flow by Thursday.", "By Thursday, I might test permission flow."],
+    ["question", "I will test the permission flow by Thursday.", "By Thursday, I will test permission flow?"],
+    ["quotation", "I will test the permission flow by Thursday.", 'By Thursday, "I will test permission flow."'],
+  ])("retains both clauses when a model groups claims with a changed %s", async (_detail, earlier, latest) => {
+    const transcript = uniqueCommitments();
+    transcript.segments[0]!.text = original(earlier);
+    transcript.segments[1]!.text = original(latest);
+    const { model } = assignmentAdapter(facts => {
+      const targets = facts.filter(fact => fact.sourceIds.some(id => id === "0:0" || id === "1:0"));
+      return Object.fromEntries(facts.map(fact => [String(fact.id), targets.includes(fact) ? targets[0]!.id : fact.id]));
+    });
+    const result = await createGroundedSummariser({ model })(transcript);
+    const clauses = result.participants[0]!.said.flatMap(point => point.split("\n"));
+    expect(clauses).toContain(earlier);
+    expect(clauses).toContain(latest);
+    const refs = result.evidence!.participants[0]!.said.flat();
+    expect(refs).toContain(0);
+    expect(refs).toContain(1);
+  });
+
   it("reuses validated unchanged grouping requests when another topic needs another comparison round", async () => {
     const transcript: Transcript = { segments: Array.from({ length: 18 }, (_, index) => ({
       start: index * 20, end: index * 20 + 10, speaker: "You",
