@@ -35,9 +35,22 @@ To build from source you also need:
 
 ### Install a release
 
-1. Download the `.dmg` from the [releases page](https://github.com/BrandNewDevs/Elegant/releases) and drag the app to Applications.
-2. The app is not notarized (that needs an Apple Developer ID), so the first launch is blocked. Open **System Settings → Privacy & Security** and choose **Open Anyway**.
-3. Follow onboarding (see [First run](#first-run)).
+1. Download the `.dmg` from the [releases page](https://github.com/BrandNewDevs/Elegant/releases), open it and drag Elegant to Applications.
+2. Open Elegant from Applications. macOS blocks it, because the app is signed with a personal certificate rather than an Apple Developer ID (so it is not notarized). The dialog offers **Done** and **Move to Trash**; choose **Done**.
+3. Allow it once. On **macOS 15 (Sequoia) and later**:
+   1. Open **System Settings → Privacy & Security**.
+   2. Scroll down to the **Security** section, which says Elegant was blocked to protect your Mac.
+   3. Click **Open Anyway**. The button appears only after the first blocked launch, and only for about an hour afterwards. If it's missing, open Elegant again and come back.
+   4. macOS may ask for your password or Touch ID. Confirm, then click **Open** in the last dialog.
+
+   On macOS 14 (Sonoma) the same **Open Anyway** button should be in the same place, and Control-clicking Elegant and choosing **Open** should work too (macOS 15 removed that route). We haven't tested macOS 14.
+4. Follow onboarding (see [First run](#first-run)).
+
+If you get stuck, or would rather not click through the dialog, you can remove the quarantine flag macOS puts on downloaded files. This is optional; Gatekeeper then never prompts for this app:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Elegant.app
+```
 
 ### Run from source
 
