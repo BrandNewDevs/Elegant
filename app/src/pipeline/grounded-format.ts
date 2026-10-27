@@ -18,8 +18,9 @@ export const GROUNDED_SCHEMA = {
 };
 export const FACTS_SCHEMA = {
   type: "object", properties: { facts: { type: "array", items: {
-    type: "object", properties: { speaker: pointProperties.speaker, text: pointProperties.text, sourceIds: { type: "array", items: { type: "string" }, minItems: 1, uniqueItems: true }, kind: { type: "string", enum: ["proposal", "decision", "commitment", "disagreement", "unresolved", "update"] } },
-    required: ["speaker", "text", "kind", "sourceIds"],
+    type: "object", properties: { kind: { type: "string", enum: ["proposal", "decision", "commitment", "disagreement", "unresolved", "update"] },
+      sourceIds: { type: "array", items: { type: "string" }, minItems: 1, uniqueItems: true }, speaker: pointProperties.speaker, text: pointProperties.text },
+    required: ["kind", "sourceIds", "speaker", "text"],
   } } }, required: ["facts"],
 };
 
