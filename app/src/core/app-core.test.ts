@@ -1606,22 +1606,30 @@ describe("searching Meetings", () => {
 });
 
 describe("show in Dock", () => {
-  it("is off until the user turns it on, and each change is announced once", () => {
+  it("is on until the user turns it off, and each change is announced once", () => {
     const { core } = setup();
     const changes: boolean[] = [];
     core.onShowInDockChange((show) => changes.push(show));
-    expect(core.showInDock).toBe(false);
+    expect(core.showInDock).toBe(true);
 
     core.setShowInDock(true);
-    core.setShowInDock(true);
-    expect(core.showInDock).toBe(true);
+    core.setShowInDock(false);
     core.setShowInDock(false);
     expect(core.showInDock).toBe(false);
-    expect(changes).toEqual([true, false]);
+    core.setShowInDock(true);
+    expect(core.showInDock).toBe(true);
+    expect(changes).toEqual([false, true]);
   });
 
-  it("is remembered by the store, so it survives a restart", () => {
+  it("remembers turning it off, so it survives a restart and an earlier choice of off is kept", () => {
     const store = openStore(":memory:");
+    new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).setShowInDock(false);
+    expect(new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).showInDock).toBe(false);
+  });
+
+  it("remembers turning it on again", () => {
+    const store = openStore(":memory:");
+    store.setSetting("showInDock", "false");
     new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).setShowInDock(true);
     expect(new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).showInDock).toBe(true);
   });
