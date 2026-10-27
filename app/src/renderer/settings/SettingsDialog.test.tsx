@@ -18,8 +18,16 @@ it("explains a permission that was turned off and links to System Settings", () 
   const act = pushSetupState(withState({ microphone: { status: "problem", message: "Allow it in System Settings > Privacy & Security > Microphone." } }));
   render(<SettingsDialog open onOpenChange={() => {}} />);
   expect(screen.getByText(/Privacy & Security > Microphone/)).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Open System Settings" }));
+  fireEvent.click(screen.getByRole("button", { name: "Open System Settings for microphone" }));
   expect(act).toHaveBeenCalledWith("settings-microphone");
+});
+
+it("links each missing permission to its own System Settings pane, and not an allowed one", () => {
+  const act = pushSetupState(withState({ microphone: { status: "done" } }));
+  render(<SettingsDialog open onOpenChange={() => {}} />);
+  expect(screen.queryByRole("button", { name: "Open System Settings for microphone" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Open System Settings for system audio" }));
+  expect(act).toHaveBeenCalledWith("settings-system-audio");
 });
 
 it("downloads the models from here, showing progress while it runs", () => {

@@ -78,9 +78,15 @@ function PermissionStage({ copy, name, view, onContinue }: { copy: PermissionCop
       actions={
         <>
           {step.status === "todo" && (
-            <Button type="button" size="lg" onClick={() => act(copy.action)}>
-              {copy.allowLabel}
-            </Button>
+            <>
+              <Button type="button" size="lg" onClick={() => act(copy.action)}>
+                {copy.allowLabel}
+              </Button>
+              <Button type="button" variant="link" onClick={() => act(copy.settingsAction)}>
+                <ExternalLink aria-hidden />
+                Open System Settings
+              </Button>
+            </>
           )}
           {step.status === "working" && (
             <Button type="button" size="lg" disabled>

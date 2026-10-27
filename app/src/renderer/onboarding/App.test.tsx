@@ -24,6 +24,7 @@ it("skips a permission that is already allowed and goes to the one that is missi
   render(<OnboardingApp />);
   expect(screen.queryByRole("button", { name: "Allow microphone" })).toBeNull();
   expect(screen.getByRole("button", { name: "Allow system audio" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Open System Settings" })).toBeTruthy();
 });
 
 it("shows the permission as allowed when macOS grants it, and Continue moves to the next one", () => {
@@ -55,6 +56,16 @@ it("explains a denied permission and offers System Settings and another try", ()
   expect(send).toHaveBeenCalledWith("settings-system-audio");
   fireEvent.click(screen.getByRole("button", { name: "Check again" }));
   expect(send).toHaveBeenCalledWith("system-audio");
+});
+
+it("offers System Settings before a decision too, for a person who already said no once", () => {
+  const send = pushSetupState(nothingDone);
+  render(<OnboardingApp />);
+  fireEvent.click(screen.getByRole("button", { name: "Get started" }));
+  fireEvent.click(screen.getByRole("button", { name: "Skip for now" }));
+  fireEvent.click(screen.getByRole("button", { name: "Open System Settings" }));
+  expect(send).toHaveBeenCalledWith("settings-microphone");
+  expect(send).not.toHaveBeenCalledWith("microphone");
 });
 
 it("shows a waiting state while macOS has its prompt open", () => {
