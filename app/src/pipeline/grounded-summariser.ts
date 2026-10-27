@@ -8,7 +8,7 @@ import { factsSchema, groundedSchema, refinementSchema, reductionSchema, tldrSch
   type GroundedOutput, type SourcePiece, type SupportedFact, type SupportedPoint } from "./grounded-format.js";
 
 export interface GroundedSummariserOptions { model: TextModel; attempts?: number; maxCalls?: number; deadlineMs?: number }
-export const SUMMARY_PROMPT_VERSION = "grounded-summary-v14";
+export const SUMMARY_PROMPT_VERSION = "grounded-summary-v15";
 const RETRY = " The previous output failed validation: ";
 const RETRY_REASON_LIMIT = 160;
 // Validation diagnostics contain rules and local ID/speaker metadata, never Transcript prose. Reserve exact ASCII bytes.
@@ -327,7 +327,7 @@ async function assessDispositions(initial: SupportedFact[], ask: <T>(mode: Mode,
     const disposition = byClaim.get(claimKey(fact));
     if (!disposition) return fact;
     const sources = uniqueSources([...fact.sources, ...disposition.corrections]);
-    return { ...fact, text: `Earlier ${fact.kind} (superseded): ${fact.text}`, sources,
+    return { ...fact, text: `Earlier ${fact.kind}: ${fact.text}`, sources,
       refs: [...new Set(sources.map(source => source.ref))].sort((a, b) => a - b) };
   });
 }

@@ -342,7 +342,7 @@ describe("complete long Summary coverage", () => {
     const result = await createGroundedSummariser({ model })(transcript);
     expect(assessed).toBe(true);
     const owner = result.participants.find(participant => participant.speaker === "You")!;
-    const point = "Earlier proposal (superseded): I propose launching on Monday.";
+    const point = "Earlier proposal: I propose launching on Monday.";
     expect(owner.said).toContain(point);
     expect(result.evidence!.participants.find(participant => participant.speaker === "You")!.said[owner.said.indexOf(point)]).toEqual([0, 8]);
     expect(result.participants.find(participant => participant.speaker === corrector)!.said)
@@ -423,8 +423,8 @@ describe("complete long Summary coverage", () => {
         metadata: { model: "revisions:test", elapsedMs: 1 } };
     } };
     const result = await createGroundedSummariser({ model })(transcript);
-    expect(result.participants.find(participant => participant.speaker === "You")!.said).toContain("Earlier proposal (superseded): I propose launching on Monday.");
-    expect(result.participants.find(participant => participant.speaker === "Speaker 1")!.said).toEqual(["Earlier proposal (superseded): I propose Monday as the launch day."]);
+    expect(result.participants.find(participant => participant.speaker === "You")!.said).toContain("Earlier proposal: I propose launching on Monday.");
+    expect(result.participants.find(participant => participant.speaker === "Speaker 1")!.said).toEqual(["Earlier proposal: I propose Monday as the launch day."]);
     expect(result.evidence!.participants.find(participant => participant.speaker === "Speaker 1")!.said).toEqual([[1, 8]]);
   });
 
@@ -455,7 +455,7 @@ describe("complete long Summary coverage", () => {
     } };
     const result = await createGroundedSummariser({ model })(transcript);
     expect(sameOrdinalCorrection).toBe(true);
-    expect(result.participants[0]!.said).toContain("Earlier proposal (superseded): Proposed Monday.");
+    expect(result.participants[0]!.said).toContain("Earlier proposal: Proposed Monday.");
     expect(result.evidence!.participants[0]!.said[0]).toEqual([0]);
   });
 
