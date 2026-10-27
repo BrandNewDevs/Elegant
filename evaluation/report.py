@@ -169,9 +169,9 @@ def aggregate(results: dict[str, Any], fixtures: list[dict[str, Any]],
         if covered - point_ids:
             raise ValueError(f"Review for {fixture_id} contains unknown point IDs")
         critical = {point["id"] for point in fixture["points"] if point.get("critical")}
-        coverage = len(covered) / len(point_ids) if point_ids else 1.0
+        coverage = len(covered) / len(point_ids) if point_ids else None
         summary_pass = (
-            coverage >= .9 and critical <= covered and review["criticalDecisionsCovered"]
+            coverage is not None and coverage >= .9 and critical <= covered and review["criticalDecisionsCovered"]
             and review["criticalUnsupportedClaims"] == 0
             and review["attributionErrors"] == 0 and review["invalidReferences"] == 0
             and review["citationSupportErrors"] == 0
@@ -185,8 +185,11 @@ def aggregate(results: dict[str, Any], fixtures: list[dict[str, Any]],
             row["coverage"] = None
             row["criticalPointsCovered"] = None
         if row["summaryStatus"] != "fail" and not summary_skipped:
-            row.update(summaryStatus="pass" if summary_pass else "fail",
-                       reason="Human reviewed against predefined points and original passages")
+            if point_ids:
+                row.update(summaryStatus="pass" if summary_pass else "fail",
+                           reason="Human reviewed against predefined points and original passages")
+            else:
+                row.update(summaryStatus="pending", reason="No predefined Summary points; prepare expectations before judging quality")
         if row["chatStatus"] != "fail" and questions and not missing_chat:
             row["chatStatus"] = "pass" if (
                 review["chatCriticalCorrect"] and review["criticalUnsupportedClaims"] == 0

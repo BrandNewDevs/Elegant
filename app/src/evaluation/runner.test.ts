@@ -35,4 +35,10 @@ describe("production-interface evaluation", () => {
     expect(() => validateFixture({ ...fixture, points: [{ ...fixture.points[0], speaker: "invented" }] })).toThrow("Invalid expected point");
     expect(() => validateFixture({ ...fixture, questions: [{ ...fixture.questions[0], refs: [20] }] })).toThrow("Invalid expected question");
   });
+  it("refuses exported private drafts until their expectations have been reviewed", () => {
+    expect(() => validateFixture({ ...fixture, synthetic: false, expectationsPrepared: false })).toThrow("Prepare and review expected points");
+    expect(validateFixture({ ...fixture, synthetic: false, expectationsPrepared: true }).synthetic).toBe(false);
+    expect(() => validateFixture({ ...fixture, synthetic: false, expectationsPrepared: true, points: [] })).toThrow("Prepare at least one expected point and question");
+    expect(() => validateFixture({ ...fixture, synthetic: false, expectationsPrepared: true, questions: [] })).toThrow("Prepare at least one expected point and question");
+  });
 });

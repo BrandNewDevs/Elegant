@@ -27,6 +27,43 @@ class EvaluationReportTests(unittest.TestCase):
         return aggregate({"runs": [copy.deepcopy(run or RUN)]}, [FIXTURE],
                          {"decision": copy.deepcopy(review or REVIEW)})
 
+    def test_empty_summary_expectations_stay_pending_with_no_coverage_score(self):
+        fixture = copy.deepcopy(FIXTURE)
+        fixture["points"] = []
+        report = aggregate({"runs": [RUN]}, [fixture], {"decision": dict(REVIEW, coveredPointIds=[])})
+        self.assertEqual(report["summaryQuality"], "pending")
+        self.assertIsNone(report["fixtures"][0]["coverage"])
+        self.assertIn("No predefined Summary points", report["fixtures"][0]["reason"])
+        self.assertEqual(report["chatQuality"], "pass")
+
+    def test_empty_chat_expectations_cannot_pass_a_positive_review(self):
+        fixture = copy.deepcopy(FIXTURE)
+        fixture["questions"] = []
+        report = aggregate({"runs": [dict(RUN, chat=[])]}, [fixture], {"decision": REVIEW})
+        self.assertEqual(report["summaryQuality"], "pass")
+        self.assertEqual(report["chatQuality"], "pending")
+
+    def test_empty_expectations_never_override_known_generation_or_structure_failures(self):
+        fixture = copy.deepcopy(FIXTURE)
+        fixture.update(points=[], questions=[])
+        for run in (dict(RUN, error="Summary generation stopped", chat=[]),
+                    dict(RUN, summary={"tldr": "", "participants": []}, chat=[])):
+            with self.subTest(run=run):
+                report = aggregate({"runs": [run]}, [fixture], {"decision": dict(REVIEW, coveredPointIds=[])})
+                self.assertEqual(report["summaryQuality"], "fail")
+                self.assertIsNone(report["fixtures"][0]["coverage"])
+        report = aggregate({"runs": [dict(RUN, chat=[{"questionId": "unexpected", "error": "Model stopped"}])]},
+                           [fixture], {"decision": dict(REVIEW, coveredPointIds=[])})
+        self.assertEqual(report["chatQuality"], "fail")
+
+    def test_an_empty_expected_set_keeps_a_mixed_suite_pending(self):
+        empty = copy.deepcopy(FIXTURE)
+        empty.update(id="empty", points=[], questions=[])
+        report = aggregate({"runs": [RUN, dict(RUN, id="empty", chat=[])]}, [FIXTURE, empty],
+                           {"decision": REVIEW, "empty": dict(REVIEW, coveredPointIds=[])})
+        self.assertEqual(report["summaryQuality"], "pending")
+        self.assertEqual(report["chatQuality"], "pending")
+
     def test_missing_human_review_never_passes(self):
         report = aggregate({"runs": [RUN]}, [FIXTURE])
         self.assertEqual(report["summaryQuality"], "pending")

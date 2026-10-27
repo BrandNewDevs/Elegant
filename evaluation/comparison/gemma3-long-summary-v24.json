@@ -1,0 +1,741 @@
+{
+  "metadata": {
+    "sourceCommit": "4e1c4c4f0d04b13f2f6cea0c18b4b584aafcde30",
+    "sourceDirty": false,
+    "recordedAt": "2026-10-27T07:44:09.020Z",
+    "implementation": "current",
+    "model": {
+      "name": "gemma3:4b-it-q4_K_M",
+      "model": "gemma3:4b-it-q4_K_M",
+      "modified_at": "2026-10-05T05:47:50.046802317+05:30",
+      "size": 3338801804,
+      "digest": "a2af6cc3eb7fa8be8504abaf9b04e88f17a119ec3f04a3addf55f92841195f5a",
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "gemma3",
+        "families": [
+          "gemma3"
+        ],
+        "parameter_size": "4.3B",
+        "quantization_level": "Q4_K_M"
+      },
+      "capabilities": [
+        "completion"
+      ]
+    },
+    "ollama": {
+      "version": "0.34.0"
+    },
+    "hardware": {
+      "platform": "linux",
+      "release": "7.0.0-38-generic",
+      "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+      "memoryBytes": 15950901248,
+      "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU, 4096 MiB"
+    },
+    "settings": {
+      "numCtx": 8192,
+      "temperature": 0,
+      "maxInputBytes": 5500,
+      "maxOutputTokens": 2048,
+      "think": false
+    },
+    "promptVersion": "grounded-summary-v24",
+    "memoryScope": "Node peak RSS only. Ollama, Swift, peak total memory and swap need external observation.",
+    "runCondition": "uncontrolled",
+    "summaryDeadlineMs": 900000,
+    "evaluationDeadlineOverride": false,
+    "chatPromptVersion": "meeting-chat-v14",
+    "evidencePromptVersion": "meeting-evidence-v8"
+  },
+  "fixture": "long-discussion",
+  "synthetic": true,
+  "summaryElapsedMs": 476172.84256200003,
+  "summaryCalls": 62,
+  "nodePeakRssKiB": 99992,
+  "outputPointCount": 69,
+  "outputWordCount": 1140,
+  "summary": {
+    "tldr": "You: Agreed. You: We have no calendar date for Friday and no assigned owner for packaging. Speaker 1: I agree to Friday and Markdown as the final plan.",
+    "participants": [
+      {
+        "speaker": "You",
+        "said": [
+          "These choices are subject to the final offline review.",
+          "Participant labels should remain stable in the stored Transcript.\nDisplay names can change after a rename without changing the original spoken words.\nWe are repeating this behavior for the review; this statement does not create a new implementation commitment.",
+          "We are still waiting for the final offline result before settling the launch choices.",
+          "Speech models and the language model should run sequentially to fit the laptop memory budget.",
+          "We need actual target-device measurements before making performance claims.",
+          "Repeating this concern does not establish any measured latency or memory result.",
+          "Summary points need supporting Transcript passages so a reader can inspect the source.",
+          "A reference establishes where to look, but does not itself prove a generated statement is faithful.",
+          "This is a review observation, not approval of an untested quality claim.",
+          "Search should find the selected Meeting without bringing unrelated Meeting evidence into chat.",
+          "Passage boundaries need attention because a question may refer to a decision that follows its explanation.",
+          "This is a review topic rather than an assignment to a named Participant.",
+          "The permission flow needs separate explanations for microphone access and system audio access.\nA user should press a button before a permission request appears.\nWe are reviewing the existing flow here and are not adding a new assignment or deadline.",
+          "Keeping audio is an optional setting.\nThe review should cover deletion after successful transcription and deletion of retained audio with the Meeting.\nThis repeats the expected flow, and it does not assign any person a new audio retention task.",
+          "A chat answer should say when the available Transcript does not establish a fact.\nThe model should not infer an owner or calendar date from a suggestion.\nThis is the same grounding requirement discussed earlier, with no new deadline or ownership claim.",
+          "Earlier proposal: For the initial release plan we provisionally choose Monday and PDF export.",
+          "Final decision: launch on Friday with Markdown export.",
+          "Friday replaces Monday and Markdown replaces PDF.",
+          "The provisional plan is withdrawn.",
+          "We have no calendar date for Friday and no assigned owner for packaging.",
+          "Agreed.",
+          "The demo must be able to work without a network once models and tokenizer assets have been prepared.\nA successful download is not proof that the later offline flow works.\nDo not infer either from this discussion."
+        ]
+      },
+      {
+        "speaker": "Speaker 1",
+        "said": [
+          "We will revisit both at the end after checking the offline results.",
+          "Summary points need supporting Transcript passages so a reader can inspect the source.",
+          "A reference establishes where to look, but does not itself prove a generated statement is faithful.",
+          "This is a review observation, not approval of an untested quality claim.",
+          "Search should find the selected Meeting without bringing unrelated Meeting evidence into chat.",
+          "Passage boundaries need attention because a question may refer to a decision that follows its explanation.",
+          "This is a review topic rather than an assignment to a named Participant.",
+          "The permission flow needs separate explanations for microphone access and system audio access.\nA user should press a button before a permission request appears.\nWe are reviewing the existing flow here and are not adding a new assignment or deadline.",
+          "Keeping audio is an optional setting.",
+          "The review should cover deletion after successful transcription and deletion of retained audio with the Meeting.",
+          "This repeats the expected flow, and it does not assign any person a new audio retention task.",
+          "A chat answer should say when the available Transcript does not establish a fact.",
+          "The model should not infer an owner or calendar date from a suggestion.",
+          "This is the same grounding requirement discussed earlier, with no new deadline or ownership claim.",
+          "Participant labels should remain stable in the stored Transcript.",
+          "We are repeating this behavior for the review; this statement does not create a new implementation commitment.",
+          "Display names can change after a rename without changing the original spoken words.",
+          "The demo must be able to work without a network once models and tokenizer assets have been prepared.",
+          "A successful download is not proof that the later offline flow works.",
+          "We are still waiting for the final offline result before settling the launch choices.",
+          "Speech models and the language model should run sequentially to fit the laptop memory budget.",
+          "Repeating this concern does not establish any measured latency or memory result.",
+          "We need actual target-device measurements before making performance claims.",
+          "My earlier agreement was provisional.",
+          "Earlier decision: I accept Monday and PDF provisionally.",
+          "Earlier decision: Given that result, I propose Friday instead of Monday, and Markdown instead of PDF.",
+          "I agree to Friday and Markdown as the final plan.",
+          "I will update the demo guide by Wednesday."
+        ]
+      },
+      {
+        "speaker": "Speaker 2",
+        "said": [
+          "Keeping audio is an optional setting.\nThe review should cover deletion after successful transcription and deletion of retained audio with the Meeting.\nThis repeats the expected flow, and it does not assign any person a new audio retention task.",
+          "A chat answer should say when the available Transcript does not establish a fact.\nThe model should not infer an owner or calendar date from a suggestion.\nThis is the same grounding requirement discussed earlier, with no new deadline or ownership claim.",
+          "Participant labels should remain stable in the stored Transcript.",
+          "Display names can change after a rename without changing the original spoken words.",
+          "We are repeating this behavior for the review; this statement does not create a new implementation commitment.",
+          "The demo must be able to work without a network once models and tokenizer assets have been prepared.",
+          "A successful download is not proof that the later offline flow works.",
+          "We are still waiting for the final offline result before settling the launch choices.",
+          "Speech models and the language model should run sequentially to fit the laptop memory budget.\nWe need actual target-device measurements before making performance claims.\nRepeating this concern does not establish any measured latency or memory result.",
+          "Summary points need supporting Transcript passages so a reader can inspect the source.\nThis is a review observation, not approval of an untested quality claim.",
+          "A reference establishes where to look, but does not itself prove a generated statement is faithful.",
+          "Search should find the selected Meeting without bringing unrelated Meeting evidence into chat.",
+          "Passage boundaries need attention because a question may refer to a decision that follows its explanation.",
+          "This is a review topic rather than an assignment to a named Participant.",
+          "The final offline review failed for the PDF path.",
+          "Markdown export passed that check.",
+          "A user should press a button before a permission request appears.\nThe permission flow needs separate explanations for microphone access and system audio access.\nWe are reviewing the existing flow here and are not adding a new assignment or deadline.\nThese are test outcomes for this synthetic discussion, not measurements of the actual app.",
+          "I will rerun the offline workflow on Thursday.",
+          "No one has measured the M4 memory peak yet."
+        ]
+      }
+    ],
+    "evidence": {
+      "revision": "34b25c3be1c730eaee03eeb5a04d92eaad7c735bf2791018c9a6a1fae05bd6c8",
+      "tldr": [
+        181,
+        183
+      ],
+      "participants": [
+        {
+          "speaker": "You",
+          "said": [
+            [
+              0
+            ],
+            [
+              11,
+              35,
+              59,
+              83,
+              107,
+              131,
+              155
+            ],
+            [
+              14,
+              38,
+              62,
+              86,
+              110,
+              134,
+              158
+            ],
+            [
+              17,
+              41,
+              65,
+              89,
+              113,
+              137,
+              161
+            ],
+            [
+              17,
+              41,
+              65,
+              89,
+              113,
+              137,
+              161
+            ],
+            [
+              17,
+              41,
+              65,
+              89,
+              113,
+              137,
+              161
+            ],
+            [
+              20,
+              44,
+              68,
+              92,
+              116,
+              140,
+              164
+            ],
+            [
+              20,
+              44,
+              68,
+              92,
+              116,
+              140,
+              164
+            ],
+            [
+              20,
+              44,
+              68,
+              92,
+              116,
+              140,
+              164
+            ],
+            [
+              23,
+              47,
+              71,
+              95,
+              119,
+              143,
+              167
+            ],
+            [
+              23,
+              47,
+              71,
+              95,
+              119,
+              143,
+              167
+            ],
+            [
+              23,
+              47,
+              71,
+              95,
+              119,
+              143,
+              167
+            ],
+            [
+              2,
+              26,
+              50,
+              74,
+              98,
+              122,
+              146,
+              170
+            ],
+            [
+              5,
+              29,
+              53,
+              77,
+              101,
+              125,
+              149,
+              173
+            ],
+            [
+              8,
+              32,
+              56,
+              80,
+              104,
+              128,
+              152,
+              176
+            ],
+            [
+              0,
+              180
+            ],
+            [
+              180
+            ],
+            [
+              180
+            ],
+            [
+              180
+            ],
+            [
+              183
+            ],
+            [
+              183
+            ],
+            [
+              14,
+              38,
+              62,
+              86,
+              110,
+              134,
+              158,
+              183
+            ]
+          ]
+        },
+        {
+          "speaker": "Speaker 1",
+          "said": [
+            [
+              1
+            ],
+            [
+              12,
+              36,
+              60,
+              84,
+              108,
+              132,
+              156
+            ],
+            [
+              12,
+              36,
+              60,
+              84,
+              108,
+              132,
+              156
+            ],
+            [
+              12,
+              36,
+              60,
+              84,
+              108,
+              132,
+              156
+            ],
+            [
+              15,
+              39,
+              63,
+              87,
+              111,
+              135,
+              159
+            ],
+            [
+              15,
+              39,
+              63,
+              87,
+              111,
+              135,
+              159
+            ],
+            [
+              15,
+              39,
+              63,
+              87,
+              111,
+              135,
+              159
+            ],
+            [
+              18,
+              42,
+              66,
+              90,
+              114,
+              138,
+              162
+            ],
+            [
+              21,
+              45,
+              69,
+              93,
+              117,
+              141,
+              165
+            ],
+            [
+              21,
+              45,
+              69,
+              93,
+              117,
+              141,
+              165
+            ],
+            [
+              21,
+              45,
+              69,
+              93,
+              117,
+              141,
+              165
+            ],
+            [
+              24,
+              48,
+              72,
+              96,
+              120,
+              144,
+              168
+            ],
+            [
+              24,
+              48,
+              72,
+              96,
+              120,
+              144,
+              168
+            ],
+            [
+              24,
+              48,
+              72,
+              96,
+              120,
+              144,
+              168
+            ],
+            [
+              3,
+              27,
+              51,
+              75,
+              99,
+              123,
+              147,
+              171
+            ],
+            [
+              3,
+              27,
+              51,
+              75,
+              99,
+              123,
+              147,
+              171
+            ],
+            [
+              3,
+              27,
+              51,
+              75,
+              99,
+              123,
+              147,
+              171
+            ],
+            [
+              6,
+              30,
+              54,
+              78,
+              102,
+              126,
+              150,
+              174
+            ],
+            [
+              6,
+              30,
+              54,
+              78,
+              102,
+              126,
+              150,
+              174
+            ],
+            [
+              6,
+              30,
+              54,
+              78,
+              102,
+              126,
+              150,
+              174
+            ],
+            [
+              9,
+              33,
+              57,
+              81,
+              105,
+              129,
+              153,
+              177
+            ],
+            [
+              9,
+              33,
+              57,
+              81,
+              105,
+              129,
+              153,
+              177
+            ],
+            [
+              9,
+              33,
+              57,
+              81,
+              105,
+              129,
+              153,
+              177
+            ],
+            [
+              179
+            ],
+            [
+              1,
+              180
+            ],
+            [
+              179,
+              180
+            ],
+            [
+              181
+            ],
+            [
+              181
+            ]
+          ]
+        },
+        {
+          "speaker": "Speaker 2",
+          "said": [
+            [
+              13,
+              37,
+              61,
+              85,
+              109,
+              133,
+              157
+            ],
+            [
+              16,
+              40,
+              64,
+              88,
+              112,
+              136,
+              160
+            ],
+            [
+              19,
+              43,
+              67,
+              91,
+              115,
+              139,
+              163
+            ],
+            [
+              19,
+              43,
+              67,
+              91,
+              115,
+              139,
+              163
+            ],
+            [
+              19,
+              43,
+              67,
+              91,
+              115,
+              139,
+              163
+            ],
+            [
+              22,
+              46,
+              70,
+              94,
+              118,
+              142,
+              166
+            ],
+            [
+              22,
+              46,
+              70,
+              94,
+              118,
+              142,
+              166
+            ],
+            [
+              22,
+              46,
+              70,
+              94,
+              118,
+              142,
+              166
+            ],
+            [
+              25,
+              49,
+              73,
+              97,
+              121,
+              145,
+              169
+            ],
+            [
+              4,
+              28,
+              52,
+              76,
+              100,
+              124,
+              148,
+              172
+            ],
+            [
+              4,
+              28,
+              52,
+              76,
+              100,
+              124,
+              148,
+              172
+            ],
+            [
+              7,
+              31,
+              55,
+              79,
+              103,
+              127,
+              151,
+              175
+            ],
+            [
+              7,
+              31,
+              55,
+              79,
+              103,
+              127,
+              151,
+              175
+            ],
+            [
+              7,
+              31,
+              55,
+              79,
+              103,
+              127,
+              151,
+              175
+            ],
+            [
+              178
+            ],
+            [
+              178
+            ],
+            [
+              10,
+              34,
+              58,
+              82,
+              106,
+              130,
+              154,
+              178
+            ],
+            [
+              182
+            ],
+            [
+              182
+            ]
+          ]
+        }
+      ]
+    },
+    "generation": {
+      "promptVersion": "grounded-summary-v24",
+      "model": "gemma3:4b-it-q4_K_M",
+      "elapsedMs": 476172.60634,
+      "calls": 62,
+      "promptTokens": 67860,
+      "outputTokens": 2271
+    }
+  },
+  "sourceInspection": {
+    "coveredPointIds": [
+      "final-day",
+      "final-format",
+      "offline-result",
+      "guide",
+      "offline-retest",
+      "memory-unknown",
+      "unassigned-packaging",
+      "date-unknown"
+    ],
+    "criticalPointsCovered": 7,
+    "criticalPointsExpected": 7,
+    "reviewType": "Source inspection against this synthetic fixture; not an independent human review",
+    "remainingIssues": [
+      "TL;DR includes a bare acknowledgement and repeats the final Friday/Markdown decision.",
+      "Participant output remains verbose."
+    ],
+    "resourceLimit": "Only Node peak RSS was recorded; Ollama/system memory, swap and M4 performance were not measured."
+  }
+}

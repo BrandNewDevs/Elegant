@@ -39,9 +39,11 @@ Fixture `refs` are zero-based segment ordinals, not database IDs. Answers and ex
 
 Copy `private-manifest.example.json` outside the repository and fill in paths only after creating the examples. Its four examples are pending, not recorded or evaluated. `path` must point to a private fixture JSON with the same shape above and `synthetic: false`; it does not point directly to audio. Keep both that fixture and the filled manifest outside Git.
 
-On the Mac, record approximately 5-, 10-, 20- and 60-minute Meetings with people who agree to be recorded. Run each through the actual app, then export its ordered Transcript segments to the fixture's Transcript JSON shape. The current Markdown export is not a JSON fixture; copy the structured Transcript through local tooling rather than treating Markdown as machine-readable fixture input. Do not upload it to a cloud tool. The real audio-to-Transcript end-to-end checks remain pending until run on the Mac.
+On the Mac, record approximately 5-, 10-, 20- and 60-minute Meetings with people who agree to be recorded. Run each through the actual app, then use the read-only `evaluation/export_private.py` tool to export a draft fixture from the local database to a new file outside Git. See [the private export procedure](../docs/ai-testing.md) for commands. The current Markdown export is not a JSON fixture. Do not upload private material to a cloud tool. The real audio-to-Transcript end-to-end checks remain pending until run on the Mac.
 
 Use 5 and 20 minutes for tuning, and reserve 10 and 60 minutes for final evaluation. For every example, add expected points, critical decisions, supporting segment ordinals, answerable questions, absent-answer questions and contextual follow-ups. Hand-correct representative excerpts for recognition and speaker attribution scoring, and review all passages supporting critical decisions. Do not overwrite the original model Transcript with the corrected reference: retain both privately so errors can be measured.
+
+Exported drafts have `expectationsPrepared: false`. The runner refuses them before any model call. Fill and review their expected points and questions, then set it to `true` and add the private path to your external manifest. Exporting a Transcript does not create a reviewed test set.
 
 Commit only synthetic fixtures, tooling and reports that contain no private content. Do not commit filled manifests with private paths, Recordings, real people's Transcripts, or generated answers derived from them.
 
@@ -52,10 +54,17 @@ From `app/`:
 ```
 AI_MODEL=gemma3:4b-it-q4_K_M AI_SPLIT=tuning pnpm run eval:ai current ../evaluation/fixtures /tmp/current.json
 AI_MODEL=gemma3:4b-it-q4_K_M pnpm run eval:ai baseline ../evaluation/fixtures /tmp/baseline-suite.json
+AI_MODEL=gemma3:4b-it-q4_K_M pnpm run eval:ai summary ../evaluation/fixtures /tmp/summaries.json
 pnpm run eval:ai private-current /absolute/private/manifest.json /absolute/private/results.json
 ```
 
 `AI_SPLIT=tuning` or `reserved` selects a split; omit it to run all. Use tuning examples while changing prompts. Baseline runs on synthetic reserved examples are visible to implementers and cannot be described as blind evaluation. The private 10- and 60-minute examples remain the final untouched checks. Set `AI_RUN_CONDITION=cold` or `warm` only after controlling model loading; otherwise leave its default `uncontrolled`.
+
+`summary` and `private-summary` measure the production Summary pipeline without generating chat answers. Chat stays skipped, and chat quality remains pending. Current-pipeline results also include an operational `requests` list: serialized bytes, actual prompt/output token counts, timing and transport failure status. It contains no prompt text. Check individual prompt counts against the 6,144-token input allowance (8,192 minus the 2,048-token response reservation); a successful count on one example does not establish a universal tokenizer bound.
+
+For diagnosis on a slow device, `AI_SUMMARY_DEADLINE_MS=1800000` permits a 30-minute Summary evaluation instead of the default 15-minute deadline. The runner records this override; it does not change the shipped app or relax the M4 latency gate. Use an extended run to inspect quality after a default-deadline failure, retaining both results. Valid evaluation limits are 1–3,600,000 milliseconds.
+
+`AI_SYNTHETIC_TRACE=1` explicitly saves request messages, schemas and raw model responses alongside current synthetic results for debugging. It is off by default and refused for private modes before reading a manifest or contacting a model. Only use fixtures that truly contain synthetic material. Normal operational results retain request sizes and token counts without prompts. Keep debug traces local until reviewing what they contain.
 
 From the repository root:
 
@@ -64,7 +73,7 @@ python3 evaluation/report.py /tmp/current.json --fixtures evaluation/fixtures --
 python3 -m unittest discover -s evaluation -p 'test_*.py'
 ```
 
-The review JSON maps each fixture ID to `coveredPointIds` (an array), nonnegative integer counts `unsupportedClaims`, `criticalUnsupportedClaims`, `attributionErrors`, `invalidReferences`, `retrievalMisses`, `citationSupportErrors`, and booleans `criticalDecisionsCovered`, `chatCriticalCorrect`. Review against the original passages. Do not mark chat correct while it is skipped. Without complete human review the quality gate stays pending. Each result saves model output, errors, calls, timings and process peak RSS. Chat is reported as skipped until its production module is integrated.
+The review JSON maps each fixture ID to `coveredPointIds` (an array), nonnegative integer counts `unsupportedClaims`, `criticalUnsupportedClaims`, `attributionErrors`, `invalidReferences`, `retrievalMisses`, `citationSupportErrors`, and booleans `criticalDecisionsCovered`, `chatCriticalCorrect`. Review against the original passages. Do not mark chat correct while it is skipped. Without complete human review the quality gate stays pending. Each result saves model output, errors, calls, timings and process peak RSS. Chat runs in `current` and `chat` modes; baseline and Summary-only modes report it as skipped.
 
 Optional `--speech /private/speech-review.json` accepts `{"excerpts":[{"reference":"corrected words","hypothesis":"recognized words","referenceSpeaker":"You","hypothesisSpeaker":"You"}]}`. Align excerpts by hand. WER is normalized word edit distance; speaker mismatch counts are excerpt-level observations, not diarization error rate. Neither measures overlapping-speaker accuracy on its own.
 
@@ -96,3 +105,16 @@ pnpm --dir app run eval:ai private-chat /absolute/private/manifest.json /absolut
 The `chat` modes intentionally skip Summary generation and use the production Meeting-chat module on stored Transcripts. Reports leave Summary quality pending, even when chat has been reviewed. Results separate Summary latency/calls from individual chat latency/calls. Follow-ups use actual prior answers, never expected answers.
 
 `chat/linux-short-answers.json` records four real Gemma answers to synthetic questions: writer, contextual deadline, undecided release date, and excluded calendar integration. The writer and deadline cite the expected passage; the negative outcomes remain explicit. Some extra citation choices and inline citation formatting still need quality review. `linux-before-followup-fix.json` is a failed earlier observation, not a passed evaluation: it demonstrates why a standalone question and focused evidence audit were needed. Neither file establishes real Meeting quality or M4 performance; final independent quality gates remain pending.
+
+## Measure memory alongside a run
+
+Build the TypeScript evaluation command before measuring so compilation is excluded:
+
+```
+pnpm --dir app exec tsc -p tsconfig.build.json
+AI_MODEL=gemma3:4b-it-q4_K_M python3 evaluation/measure.py --output /tmp/resources.json --include-ollama --nvidia -- node app/dist/evaluation/cli.js summary evaluation/fixtures /tmp/summaries.json
+```
+
+Omit `--nvidia` on the Mac. The wrapper discards command stdout/stderr and does not store command arguments. The evaluation command writes its own result file, so private outputs must still stay outside Git. The wrapper samples summed process-tree RSS, optional separate Ollama RSS, system swap and optional NVIDIA memory; these are not a unique physical-memory total. Missing measurements are null with warnings. Use Activity Monitor on the Mac to inspect memory pressure and retained Swift models too. See [device testing and recovery](../docs/ai-testing.md) for the full procedure.
+
+Pass `--label cold` or `--label warm` only after establishing that condition yourself. The label does not prepare it. To compare models, use identical fixture files, generation settings and production commit, unload the previous model, verify Ollama has no resident model before the cold run, then immediately repeat after verifying the selected model remains resident. Record the digest and quantization on each machine: matching tag names alone do not establish matching weights. Keep the baseline unless the candidate meets quality and target-M4 gates.

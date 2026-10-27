@@ -4,6 +4,7 @@ export interface EvaluationFixture {
   id: string;
   split: "tuning" | "reserved";
   synthetic: boolean;
+  expectationsPrepared?: boolean;
   transcript: Transcript;
   points: { id: string; text: string; speaker: string; refs: number[]; critical: boolean }[];
   questions: { id: string; question: string; answer: string | null; refs: number[]; followUpTo?: string; critical: boolean }[];
@@ -27,7 +28,7 @@ export async function evaluateFixture(fixture: EvaluationFixture, pipeline: Eval
   const chat: { questionId: string; answer?: EvaluationAnswer; error?: string; skipped?: string; elapsedMs?: number; calls?: number }[] = [];
   const completed = new Map<string, { question: string; answer: EvaluationAnswer }[]>();
   for (const question of fixture.questions) {
-    if (!pipeline.answer) { chat.push({ questionId: question.id, skipped: "Meeting chat is not implemented in this revision" }); continue; }
+    if (!pipeline.answer) { chat.push({ questionId: question.id, skipped: "Chat was not selected for this evaluation" }); continue; }
     const history = question.followUpTo ? completed.get(question.followUpTo) ?? [] : [];
     const queryStarted = performance.now(), beforeQuery = callCount();
     try {
@@ -46,6 +47,8 @@ export function validateFixture(value: unknown): EvaluationFixture {
   const fixture = value as EvaluationFixture;
   if (!fixture || typeof fixture.id !== "string" || !["tuning", "reserved"].includes(fixture.split) || typeof fixture.synthetic !== "boolean"
       || !Array.isArray(fixture.transcript?.segments) || !Array.isArray(fixture.points) || !Array.isArray(fixture.questions)) throw new Error("Invalid evaluation fixture");
+  if (fixture.expectationsPrepared === false) throw new Error("Prepare and review expected points, decisions and questions before evaluating this private draft; then set expectationsPrepared to true");
+  if (!fixture.points.length || !fixture.questions.length) throw new Error("Prepare at least one expected point and question before evaluating; an empty review cannot establish quality");
   const nonempty = (s: unknown): s is string => typeof s === "string" && s.trim().length > 0;
   let previousStart = -Infinity;
   fixture.transcript.segments.forEach(s => {

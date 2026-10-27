@@ -1,0 +1,1254 @@
+{
+  "metadata": {
+    "sourceCommit": "a5c65b5bba7ee85c719988c1803ad3f23422f5bf",
+    "sourceDirty": true,
+    "recordedAt": "2026-10-26T23:15:25.717Z",
+    "implementation": "current",
+    "model": {
+      "name": "gemma3:4b-it-q4_K_M",
+      "model": "gemma3:4b-it-q4_K_M",
+      "modified_at": "2026-10-05T05:47:50.046802317+05:30",
+      "size": 3338801804,
+      "digest": "a2af6cc3eb7fa8be8504abaf9b04e88f17a119ec3f04a3addf55f92841195f5a",
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "gemma3",
+        "families": [
+          "gemma3"
+        ],
+        "parameter_size": "4.3B",
+        "quantization_level": "Q4_K_M"
+      },
+      "capabilities": [
+        "completion"
+      ]
+    },
+    "ollama": {
+      "version": "0.34.0"
+    },
+    "hardware": {
+      "platform": "linux",
+      "release": "7.0.0-38-generic",
+      "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+      "memoryBytes": 15950888960,
+      "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU, 4096 MiB"
+    },
+    "settings": {
+      "numCtx": 8192,
+      "temperature": 0,
+      "maxInputBytes": 5500,
+      "maxOutputTokens": 2048
+    },
+    "promptVersion": "grounded-summary-v3",
+    "memoryScope": "Node peak RSS only. Ollama, Swift, peak total memory and swap need external observation.",
+    "runCondition": "uncontrolled",
+    "summaryDeadlineMs": 900000,
+    "evaluationDeadlineOverride": false,
+    "chatPromptVersion": "meeting-chat-v2"
+  },
+  "runs": [
+    {
+      "id": "long-discussion",
+      "split": "reserved",
+      "synthetic": true,
+      "chat": [
+        {
+          "questionId": "final-plan",
+          "answer": {
+            "text": "I could not review enough of the Transcript to answer reliably. Please ask a narrower question.",
+            "refs": [],
+            "sufficient": false,
+            "revision": "34b25c3be1c730eaee03eeb5a04d92eaad7c735bf2791018c9a6a1fae05bd6c8",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 107945.34734,
+              "calls": 37,
+              "promptTokens": 39513,
+              "outputTokens": 1620,
+              "retrievalCalls": 37,
+              "retrievalMode": "scan",
+              "exhaustive": false
+            }
+          },
+          "elapsedMs": 107950.54615299999,
+          "calls": 37
+        },
+        {
+          "questionId": "guide-owner",
+          "answer": {
+            "text": "I could not review enough of the Transcript to answer reliably. Please ask a narrower question.",
+            "refs": [],
+            "sufficient": false,
+            "revision": "34b25c3be1c730eaee03eeb5a04d92eaad7c735bf2791018c9a6a1fae05bd6c8",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 100108.95709,
+              "calls": 35,
+              "promptTokens": 36947,
+              "outputTokens": 1387,
+              "retrievalCalls": 35,
+              "retrievalMode": "fts",
+              "exhaustive": false
+            }
+          },
+          "elapsedMs": 100109.20371300001,
+          "calls": 35
+        },
+        {
+          "questionId": "guide-deadline",
+          "error": "The standalone question failed validation after three attempts: Name the task or person from priorUserQuestion explicitly; remove unresolved pronouns such as it, they, their, that, this, he or she",
+          "elapsedMs": 2990.315143999993,
+          "calls": 3
+        },
+        {
+          "questionId": "retest",
+          "answer": {
+            "text": "I could not review enough of the Transcript to answer reliably. Please ask a narrower question.",
+            "refs": [],
+            "sufficient": false,
+            "revision": "34b25c3be1c730eaee03eeb5a04d92eaad7c735bf2791018c9a6a1fae05bd6c8",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 70918.00770699998,
+              "calls": 26,
+              "promptTokens": 28021,
+              "outputTokens": 968,
+              "retrievalCalls": 26,
+              "retrievalMode": "fts",
+              "exhaustive": false
+            }
+          },
+          "elapsedMs": 70918.29630300004,
+          "calls": 26
+        },
+        {
+          "questionId": "packaging",
+          "error": "The model answer failed validation after three attempts: The cited passages do not support this answer or its relevance. Answer the requested task only and cite matching original sources",
+          "elapsedMs": 11178.329405999975,
+          "calls": 7
+        },
+        {
+          "questionId": "peak",
+          "answer": {
+            "text": "I could not review enough of the Transcript to answer reliably. Please ask a narrower question.",
+            "refs": [],
+            "sufficient": false,
+            "revision": "34b25c3be1c730eaee03eeb5a04d92eaad7c735bf2791018c9a6a1fae05bd6c8",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 44322.59985300002,
+              "calls": 18,
+              "promptTokens": 18930,
+              "outputTokens": 512,
+              "retrievalCalls": 18,
+              "retrievalMode": "fts",
+              "exhaustive": false
+            }
+          },
+          "elapsedMs": 44322.879625,
+          "calls": 18
+        },
+        {
+          "questionId": "date",
+          "answer": {
+            "text": "I could not review enough of the Transcript to answer reliably. Please ask a narrower question.",
+            "refs": [],
+            "sufficient": false,
+            "revision": "34b25c3be1c730eaee03eeb5a04d92eaad7c735bf2791018c9a6a1fae05bd6c8",
+            "generation": {
+              "promptVersion": "meeting-chat-v2",
+              "model": "gemma3:4b-it-q4_K_M",
+              "elapsedMs": 71203.26799100003,
+              "calls": 26,
+              "promptTokens": 27610,
+              "outputTokens": 909,
+              "retrievalCalls": 26,
+              "retrievalMode": "fts",
+              "exhaustive": false
+            }
+          },
+          "elapsedMs": 71203.54197899997,
+          "calls": 26
+        }
+      ],
+      "summarySkipped": true,
+      "elapsedMs": 408673.266204,
+      "calls": 152,
+      "summaryElapsedMs": 0.01118900000000167,
+      "summaryCalls": 0,
+      "peakRssKiB": 97388
+    }
+  ],
+  "requests": [
+    {
+      "call": 1,
+      "bytes": 4924,
+      "promptTokens": 1065,
+      "outputTokens": 34,
+      "elapsedMs": 2574.064526
+    },
+    {
+      "call": 2,
+      "bytes": 4917,
+      "promptTokens": 1066,
+      "outputTokens": 59,
+      "elapsedMs": 3672.909967
+    },
+    {
+      "call": 3,
+      "bytes": 4890,
+      "promptTokens": 1063,
+      "outputTokens": 21,
+      "elapsedMs": 2245.7373559999996
+    },
+    {
+      "call": 4,
+      "bytes": 4922,
+      "promptTokens": 1072,
+      "outputTokens": 20,
+      "elapsedMs": 2195.3522190000003
+    },
+    {
+      "call": 5,
+      "bytes": 4886,
+      "promptTokens": 1053,
+      "outputTokens": 30,
+      "elapsedMs": 2821.171153000001
+    },
+    {
+      "call": 6,
+      "bytes": 4944,
+      "promptTokens": 1089,
+      "outputTokens": 30,
+      "elapsedMs": 2611.0637929999994
+    },
+    {
+      "call": 7,
+      "bytes": 4910,
+      "promptTokens": 1083,
+      "outputTokens": 21,
+      "elapsedMs": 2215.6472239999985
+    },
+    {
+      "call": 8,
+      "bytes": 4941,
+      "promptTokens": 1095,
+      "outputTokens": 35,
+      "elapsedMs": 2858.7504530000006
+    },
+    {
+      "call": 9,
+      "bytes": 4930,
+      "promptTokens": 1093,
+      "outputTokens": 20,
+      "elapsedMs": 2243.960805999999
+    },
+    {
+      "call": 10,
+      "bytes": 4950,
+      "promptTokens": 1094,
+      "outputTokens": 30,
+      "elapsedMs": 2617.643859
+    },
+    {
+      "call": 11,
+      "bytes": 4952,
+      "promptTokens": 1119,
+      "outputTokens": 27,
+      "elapsedMs": 2487.971383
+    },
+    {
+      "call": 12,
+      "bytes": 4972,
+      "promptTokens": 1112,
+      "outputTokens": 22,
+      "elapsedMs": 2306.117735
+    },
+    {
+      "call": 13,
+      "bytes": 4962,
+      "promptTokens": 1115,
+      "outputTokens": 21,
+      "elapsedMs": 2234.4753200000014
+    },
+    {
+      "call": 14,
+      "bytes": 4970,
+      "promptTokens": 1109,
+      "outputTokens": 58,
+      "elapsedMs": 3730.430776000001
+    },
+    {
+      "call": 15,
+      "bytes": 4957,
+      "promptTokens": 1120,
+      "outputTokens": 27,
+      "elapsedMs": 2472.5956450000012
+    },
+    {
+      "call": 16,
+      "bytes": 4977,
+      "promptTokens": 1117,
+      "outputTokens": 27,
+      "elapsedMs": 2468.9783039999966
+    },
+    {
+      "call": 17,
+      "bytes": 4951,
+      "promptTokens": 1108,
+      "outputTokens": 30,
+      "elapsedMs": 2703.0819310000006
+    },
+    {
+      "call": 18,
+      "bytes": 5211,
+      "promptTokens": 1239,
+      "outputTokens": 22,
+      "elapsedMs": 2296.414901999997
+    },
+    {
+      "call": 19,
+      "bytes": 4974,
+      "promptTokens": 1093,
+      "outputTokens": 60,
+      "elapsedMs": 3698.2167950000003
+    },
+    {
+      "call": 20,
+      "bytes": 4907,
+      "promptTokens": 1072,
+      "outputTokens": 60,
+      "elapsedMs": 3686.0115249999944
+    },
+    {
+      "call": 21,
+      "bytes": 4956,
+      "promptTokens": 1088,
+      "outputTokens": 59,
+      "elapsedMs": 3673.070151
+    },
+    {
+      "call": 22,
+      "bytes": 4954,
+      "promptTokens": 1106,
+      "outputTokens": 44,
+      "elapsedMs": 3079.1105280000047
+    },
+    {
+      "call": 23,
+      "bytes": 4982,
+      "promptTokens": 1138,
+      "outputTokens": 63,
+      "elapsedMs": 3878.258833
+    },
+    {
+      "call": 24,
+      "bytes": 4991,
+      "promptTokens": 1117,
+      "outputTokens": 69,
+      "elapsedMs": 4034.1458809999967
+    },
+    {
+      "call": 25,
+      "bytes": 2605,
+      "promptTokens": 561,
+      "outputTokens": 21,
+      "elapsedMs": 1666.4128309999942
+    },
+    {
+      "call": 26,
+      "bytes": 4974,
+      "promptTokens": 1093,
+      "outputTokens": 60,
+      "elapsedMs": 2817.376084000003
+    },
+    {
+      "call": 27,
+      "bytes": 4907,
+      "promptTokens": 1072,
+      "outputTokens": 60,
+      "elapsedMs": 3167.730899999995
+    },
+    {
+      "call": 28,
+      "bytes": 4956,
+      "promptTokens": 1088,
+      "outputTokens": 59,
+      "elapsedMs": 2947.8022429999983
+    },
+    {
+      "call": 29,
+      "bytes": 4980,
+      "promptTokens": 1122,
+      "outputTokens": 62,
+      "elapsedMs": 3707.3785079999943
+    },
+    {
+      "call": 30,
+      "bytes": 4992,
+      "promptTokens": 1123,
+      "outputTokens": 69,
+      "elapsedMs": 4100.991641999994
+    },
+    {
+      "call": 31,
+      "bytes": 3830,
+      "promptTokens": 865,
+      "outputTokens": 45,
+      "elapsedMs": 2872.482699999993
+    },
+    {
+      "call": 32,
+      "bytes": 4974,
+      "promptTokens": 1093,
+      "outputTokens": 60,
+      "elapsedMs": 3186.4047430000064
+    },
+    {
+      "call": 33,
+      "bytes": 4907,
+      "promptTokens": 1072,
+      "outputTokens": 60,
+      "elapsedMs": 2915.097729000001
+    },
+    {
+      "call": 34,
+      "bytes": 4956,
+      "promptTokens": 1088,
+      "outputTokens": 59,
+      "elapsedMs": 2867.9521439999953
+    },
+    {
+      "call": 35,
+      "bytes": 4980,
+      "promptTokens": 1122,
+      "outputTokens": 62,
+      "elapsedMs": 2924.2474220000004
+    },
+    {
+      "call": 36,
+      "bytes": 4992,
+      "promptTokens": 1123,
+      "outputTokens": 69,
+      "elapsedMs": 3355.173794999995
+    },
+    {
+      "call": 37,
+      "bytes": 2999,
+      "promptTokens": 665,
+      "outputTokens": 45,
+      "elapsedMs": 2429.8310060000076
+    },
+    {
+      "call": 38,
+      "bytes": 4925,
+      "promptTokens": 1065,
+      "outputTokens": 26,
+      "elapsedMs": 2306.311004000003
+    },
+    {
+      "call": 39,
+      "bytes": 4918,
+      "promptTokens": 1066,
+      "outputTokens": 30,
+      "elapsedMs": 2514.0839790000027
+    },
+    {
+      "call": 40,
+      "bytes": 4891,
+      "promptTokens": 1063,
+      "outputTokens": 59,
+      "elapsedMs": 3615.928316000005
+    },
+    {
+      "call": 41,
+      "bytes": 4923,
+      "promptTokens": 1072,
+      "outputTokens": 39,
+      "elapsedMs": 2879.711209000001
+    },
+    {
+      "call": 42,
+      "bytes": 4887,
+      "promptTokens": 1053,
+      "outputTokens": 25,
+      "elapsedMs": 2526.1085579999926
+    },
+    {
+      "call": 43,
+      "bytes": 4945,
+      "promptTokens": 1089,
+      "outputTokens": 30,
+      "elapsedMs": 2548.335435000001
+    },
+    {
+      "call": 44,
+      "bytes": 4911,
+      "promptTokens": 1083,
+      "outputTokens": 19,
+      "elapsedMs": 2106.787421000001
+    },
+    {
+      "call": 45,
+      "bytes": 4942,
+      "promptTokens": 1095,
+      "outputTokens": 29,
+      "elapsedMs": 2532.6344249999966
+    },
+    {
+      "call": 46,
+      "bytes": 4931,
+      "promptTokens": 1093,
+      "outputTokens": 30,
+      "elapsedMs": 2538.8130089999904
+    },
+    {
+      "call": 47,
+      "bytes": 4953,
+      "promptTokens": 1119,
+      "outputTokens": 69,
+      "elapsedMs": 4007.655123000004
+    },
+    {
+      "call": 48,
+      "bytes": 4973,
+      "promptTokens": 1112,
+      "outputTokens": 22,
+      "elapsedMs": 2250.744464999996
+    },
+    {
+      "call": 49,
+      "bytes": 4963,
+      "promptTokens": 1115,
+      "outputTokens": 22,
+      "elapsedMs": 2369.552370999998
+    },
+    {
+      "call": 50,
+      "bytes": 4958,
+      "promptTokens": 1120,
+      "outputTokens": 30,
+      "elapsedMs": 2662.1034729999956
+    },
+    {
+      "call": 51,
+      "bytes": 4978,
+      "promptTokens": 1117,
+      "outputTokens": 39,
+      "elapsedMs": 3009.8437269999995
+    },
+    {
+      "call": 52,
+      "bytes": 4952,
+      "promptTokens": 1108,
+      "outputTokens": 27,
+      "elapsedMs": 2552.1414039999945
+    },
+    {
+      "call": 53,
+      "bytes": 5212,
+      "promptTokens": 1239,
+      "outputTokens": 15,
+      "elapsedMs": 2040.2737130000023
+    },
+    {
+      "call": 54,
+      "bytes": 4976,
+      "promptTokens": 1087,
+      "outputTokens": 42,
+      "elapsedMs": 3237.144899999985
+    },
+    {
+      "call": 55,
+      "bytes": 4929,
+      "promptTokens": 1071,
+      "outputTokens": 49,
+      "elapsedMs": 3484.575334000023
+    },
+    {
+      "call": 56,
+      "bytes": 4913,
+      "promptTokens": 1070,
+      "outputTokens": 49,
+      "elapsedMs": 3373.6941529999895
+    },
+    {
+      "call": 57,
+      "bytes": 4919,
+      "promptTokens": 1090,
+      "outputTokens": 34,
+      "elapsedMs": 2650.7515059999714
+    },
+    {
+      "call": 58,
+      "bytes": 4976,
+      "promptTokens": 1124,
+      "outputTokens": 51,
+      "elapsedMs": 3361.5045979999995
+    },
+    {
+      "call": 59,
+      "bytes": 4958,
+      "promptTokens": 1125,
+      "outputTokens": 70,
+      "elapsedMs": 4114.8163589999895
+    },
+    {
+      "call": 60,
+      "bytes": 3113,
+      "promptTokens": 677,
+      "outputTokens": 15,
+      "elapsedMs": 1513.7157740000112
+    },
+    {
+      "call": 61,
+      "bytes": 4965,
+      "promptTokens": 1085,
+      "outputTokens": 32,
+      "elapsedMs": 2524.8780620000034
+    },
+    {
+      "call": 62,
+      "bytes": 4943,
+      "promptTokens": 1077,
+      "outputTokens": 26,
+      "elapsedMs": 2399.313709000009
+    },
+    {
+      "call": 63,
+      "bytes": 4959,
+      "promptTokens": 1104,
+      "outputTokens": 62,
+      "elapsedMs": 3679.4896709999884
+    },
+    {
+      "call": 64,
+      "bytes": 4912,
+      "promptTokens": 1121,
+      "outputTokens": 51,
+      "elapsedMs": 3458.590891
+    },
+    {
+      "call": 65,
+      "bytes": 2764,
+      "promptTokens": 595,
+      "outputTokens": 21,
+      "elapsedMs": 1661.2569650000078
+    },
+    {
+      "call": 66,
+      "bytes": 4980,
+      "promptTokens": 1104,
+      "outputTokens": 52,
+      "elapsedMs": 3015.574278999993
+    },
+    {
+      "call": 67,
+      "bytes": 4955,
+      "promptTokens": 1115,
+      "outputTokens": 65,
+      "elapsedMs": 3822.7829530000163
+    },
+    {
+      "call": 68,
+      "bytes": 3102,
+      "promptTokens": 691,
+      "outputTokens": 21,
+      "elapsedMs": 1682.8321899999864
+    },
+    {
+      "call": 69,
+      "bytes": 5006,
+      "promptTokens": 1113,
+      "outputTokens": 63,
+      "elapsedMs": 3739.630226999987
+    },
+    {
+      "call": 70,
+      "bytes": 4749,
+      "promptTokens": 1088,
+      "outputTokens": 55,
+      "elapsedMs": 3528.272234999982
+    },
+    {
+      "call": 71,
+      "bytes": 5006,
+      "promptTokens": 1113,
+      "outputTokens": 63,
+      "elapsedMs": 3030.0501499999955
+    },
+    {
+      "call": 72,
+      "bytes": 3922,
+      "promptTokens": 888,
+      "outputTokens": 55,
+      "elapsedMs": 3194.513229000004
+    },
+    {
+      "call": 73,
+      "bytes": 1254,
+      "promptTokens": 226,
+      "outputTokens": 18,
+      "elapsedMs": 1139.3911190000072
+    },
+    {
+      "call": 74,
+      "bytes": 1439,
+      "promptTokens": 265,
+      "outputTokens": 18,
+      "elapsedMs": 1032.6851730000053
+    },
+    {
+      "call": 75,
+      "bytes": 1439,
+      "promptTokens": 265,
+      "outputTokens": 18,
+      "elapsedMs": 806.456915000017
+    },
+    {
+      "call": 76,
+      "bytes": 4940,
+      "promptTokens": 1068,
+      "outputTokens": 22,
+      "elapsedMs": 2005.71510999999
+    },
+    {
+      "call": 77,
+      "bytes": 4933,
+      "promptTokens": 1069,
+      "outputTokens": 20,
+      "elapsedMs": 2160.1585339999874
+    },
+    {
+      "call": 78,
+      "bytes": 4906,
+      "promptTokens": 1066,
+      "outputTokens": 21,
+      "elapsedMs": 2232.8119000000006
+    },
+    {
+      "call": 79,
+      "bytes": 4914,
+      "promptTokens": 1068,
+      "outputTokens": 20,
+      "elapsedMs": 2195.161997999996
+    },
+    {
+      "call": 80,
+      "bytes": 4949,
+      "promptTokens": 1080,
+      "outputTokens": 59,
+      "elapsedMs": 3666.7591419999953
+    },
+    {
+      "call": 81,
+      "bytes": 4927,
+      "promptTokens": 1088,
+      "outputTokens": 20,
+      "elapsedMs": 2227.3152810000174
+    },
+    {
+      "call": 82,
+      "bytes": 4944,
+      "promptTokens": 1097,
+      "outputTokens": 21,
+      "elapsedMs": 2241.613207999995
+    },
+    {
+      "call": 83,
+      "bytes": 4946,
+      "promptTokens": 1096,
+      "outputTokens": 20,
+      "elapsedMs": 2166.448865000013
+    },
+    {
+      "call": 84,
+      "bytes": 4962,
+      "promptTokens": 1113,
+      "outputTokens": 22,
+      "elapsedMs": 2278.3794070000004
+    },
+    {
+      "call": 85,
+      "bytes": 4978,
+      "promptTokens": 1125,
+      "outputTokens": 45,
+      "elapsedMs": 3140.1895800000057
+    },
+    {
+      "call": 86,
+      "bytes": 4978,
+      "promptTokens": 1118,
+      "outputTokens": 21,
+      "elapsedMs": 2237.3164490000054
+    },
+    {
+      "call": 87,
+      "bytes": 4966,
+      "promptTokens": 1113,
+      "outputTokens": 21,
+      "elapsedMs": 2209.8641979999957
+    },
+    {
+      "call": 88,
+      "bytes": 4981,
+      "promptTokens": 1124,
+      "outputTokens": 34,
+      "elapsedMs": 2801.440219000011
+    },
+    {
+      "call": 89,
+      "bytes": 4967,
+      "promptTokens": 1111,
+      "outputTokens": 22,
+      "elapsedMs": 2280.1022179999854
+    },
+    {
+      "call": 90,
+      "bytes": 5227,
+      "promptTokens": 1242,
+      "outputTokens": 17,
+      "elapsedMs": 2038.3462200000067
+    },
+    {
+      "call": 91,
+      "bytes": 5163,
+      "promptTokens": 1140,
+      "outputTokens": 58,
+      "elapsedMs": 3634.2867149999947
+    },
+    {
+      "call": 92,
+      "bytes": 4948,
+      "promptTokens": 1085,
+      "outputTokens": 29,
+      "elapsedMs": 2467.1106259999797
+    },
+    {
+      "call": 93,
+      "bytes": 4961,
+      "promptTokens": 1127,
+      "outputTokens": 37,
+      "elapsedMs": 2797.1567510000023
+    },
+    {
+      "call": 94,
+      "bytes": 5020,
+      "promptTokens": 1135,
+      "outputTokens": 69,
+      "elapsedMs": 4076.8686279999965
+    },
+    {
+      "call": 95,
+      "bytes": 1959,
+      "promptTokens": 400,
+      "outputTokens": 21,
+      "elapsedMs": 1446.0358899999992
+    },
+    {
+      "call": 96,
+      "bytes": 5168,
+      "promptTokens": 1146,
+      "outputTokens": 63,
+      "elapsedMs": 3790.798602999974
+    },
+    {
+      "call": 97,
+      "bytes": 4988,
+      "promptTokens": 1128,
+      "outputTokens": 64,
+      "elapsedMs": 3896.124331000028
+    },
+    {
+      "call": 98,
+      "bytes": 4818,
+      "promptTokens": 1104,
+      "outputTokens": 57,
+      "elapsedMs": 3570.687485000002
+    },
+    {
+      "call": 99,
+      "bytes": 5168,
+      "promptTokens": 1146,
+      "outputTokens": 63,
+      "elapsedMs": 3200.0536740000243
+    },
+    {
+      "call": 100,
+      "bytes": 4988,
+      "promptTokens": 1128,
+      "outputTokens": 65,
+      "elapsedMs": 3152.4914379999973
+    },
+    {
+      "call": 101,
+      "bytes": 3987,
+      "promptTokens": 904,
+      "outputTokens": 57,
+      "elapsedMs": 2877.874318999995
+    },
+    {
+      "call": 102,
+      "bytes": 5200,
+      "promptTokens": 1236,
+      "outputTokens": 22,
+      "elapsedMs": 2338.1193910000147
+    },
+    {
+      "call": 103,
+      "bytes": 2115,
+      "promptTokens": 395,
+      "outputTokens": 45,
+      "elapsedMs": 2495.4296809999505
+    },
+    {
+      "call": 104,
+      "bytes": 1667,
+      "promptTokens": 304,
+      "outputTokens": 10,
+      "elapsedMs": 846.6894960000063
+    },
+    {
+      "call": 105,
+      "bytes": 2287,
+      "promptTokens": 426,
+      "outputTokens": 32,
+      "elapsedMs": 1755.4143109999713
+    },
+    {
+      "call": 106,
+      "bytes": 1650,
+      "promptTokens": 295,
+      "outputTokens": 10,
+      "elapsedMs": 872.1439899999532
+    },
+    {
+      "call": 107,
+      "bytes": 2287,
+      "promptTokens": 426,
+      "outputTokens": 44,
+      "elapsedMs": 1938.8236610000022
+    },
+    {
+      "call": 108,
+      "bytes": 1701,
+      "promptTokens": 306,
+      "outputTokens": 10,
+      "elapsedMs": 900.3513000000385
+    },
+    {
+      "call": 109,
+      "bytes": 5292,
+      "promptTokens": 1152,
+      "outputTokens": 25,
+      "elapsedMs": 2175.284411999979
+    },
+    {
+      "call": 110,
+      "bytes": 4913,
+      "promptTokens": 1076,
+      "outputTokens": 25,
+      "elapsedMs": 2430.7826420000056
+    },
+    {
+      "call": 111,
+      "bytes": 4915,
+      "promptTokens": 1060,
+      "outputTokens": 20,
+      "elapsedMs": 2227.4625820000074
+    },
+    {
+      "call": 112,
+      "bytes": 4930,
+      "promptTokens": 1092,
+      "outputTokens": 20,
+      "elapsedMs": 2254.0854130000225
+    },
+    {
+      "call": 113,
+      "bytes": 4937,
+      "promptTokens": 1089,
+      "outputTokens": 20,
+      "elapsedMs": 2170.525816999958
+    },
+    {
+      "call": 114,
+      "bytes": 4929,
+      "promptTokens": 1101,
+      "outputTokens": 25,
+      "elapsedMs": 2419.7983349999995
+    },
+    {
+      "call": 115,
+      "bytes": 4936,
+      "promptTokens": 1098,
+      "outputTokens": 20,
+      "elapsedMs": 2255.498397999967
+    },
+    {
+      "call": 116,
+      "bytes": 4978,
+      "promptTokens": 1124,
+      "outputTokens": 21,
+      "elapsedMs": 2197.589481999981
+    },
+    {
+      "call": 117,
+      "bytes": 4963,
+      "promptTokens": 1121,
+      "outputTokens": 21,
+      "elapsedMs": 2216.2895070000086
+    },
+    {
+      "call": 118,
+      "bytes": 4966,
+      "promptTokens": 1114,
+      "outputTokens": 28,
+      "elapsedMs": 2586.360886999988
+    },
+    {
+      "call": 119,
+      "bytes": 4982,
+      "promptTokens": 1117,
+      "outputTokens": 21,
+      "elapsedMs": 2224.018544999999
+    },
+    {
+      "call": 120,
+      "bytes": 4798,
+      "promptTokens": 1142,
+      "outputTokens": 21,
+      "elapsedMs": 2219.4670550000155
+    },
+    {
+      "call": 121,
+      "bytes": 4910,
+      "promptTokens": 1060,
+      "outputTokens": 39,
+      "elapsedMs": 2914.191462000017
+    },
+    {
+      "call": 122,
+      "bytes": 4916,
+      "promptTokens": 1094,
+      "outputTokens": 41,
+      "elapsedMs": 2995.535846999963
+    },
+    {
+      "call": 123,
+      "bytes": 3802,
+      "promptTokens": 851,
+      "outputTokens": 21,
+      "elapsedMs": 1916.6804030000349
+    },
+    {
+      "call": 124,
+      "bytes": 5276,
+      "promptTokens": 1152,
+      "outputTokens": 56,
+      "elapsedMs": 3649.926573999983
+    },
+    {
+      "call": 125,
+      "bytes": 1757,
+      "promptTokens": 361,
+      "outputTokens": 21,
+      "elapsedMs": 1451.5471619999735
+    },
+    {
+      "call": 126,
+      "bytes": 5100,
+      "promptTokens": 1126,
+      "outputTokens": 67,
+      "elapsedMs": 3930.3634350000066
+    },
+    {
+      "call": 127,
+      "bytes": 5291,
+      "promptTokens": 1151,
+      "outputTokens": 24,
+      "elapsedMs": 2411.3754489999847
+    },
+    {
+      "call": 128,
+      "bytes": 4931,
+      "promptTokens": 1071,
+      "outputTokens": 25,
+      "elapsedMs": 2443.7595640000072
+    },
+    {
+      "call": 129,
+      "bytes": 4896,
+      "promptTokens": 1064,
+      "outputTokens": 27,
+      "elapsedMs": 2484.225980999996
+    },
+    {
+      "call": 130,
+      "bytes": 4931,
+      "promptTokens": 1080,
+      "outputTokens": 20,
+      "elapsedMs": 2219.8971879999735
+    },
+    {
+      "call": 131,
+      "bytes": 4926,
+      "promptTokens": 1084,
+      "outputTokens": 25,
+      "elapsedMs": 2462.664860000019
+    },
+    {
+      "call": 132,
+      "bytes": 4946,
+      "promptTokens": 1086,
+      "outputTokens": 25,
+      "elapsedMs": 2435.123888000031
+    },
+    {
+      "call": 133,
+      "bytes": 4928,
+      "promptTokens": 1100,
+      "outputTokens": 35,
+      "elapsedMs": 2855.9482940000016
+    },
+    {
+      "call": 134,
+      "bytes": 4935,
+      "promptTokens": 1097,
+      "outputTokens": 62,
+      "elapsedMs": 3808.3307939999504
+    },
+    {
+      "call": 135,
+      "bytes": 4994,
+      "promptTokens": 1123,
+      "outputTokens": 27,
+      "elapsedMs": 2496.7495670000208
+    },
+    {
+      "call": 136,
+      "bytes": 4955,
+      "promptTokens": 1110,
+      "outputTokens": 27,
+      "elapsedMs": 2486.663690999965
+    },
+    {
+      "call": 137,
+      "bytes": 4992,
+      "promptTokens": 1120,
+      "outputTokens": 28,
+      "elapsedMs": 2648.1513339999947
+    },
+    {
+      "call": 138,
+      "bytes": 4950,
+      "promptTokens": 1109,
+      "outputTokens": 27,
+      "elapsedMs": 2501.3175699999556
+    },
+    {
+      "call": 139,
+      "bytes": 4981,
+      "promptTokens": 1116,
+      "outputTokens": 28,
+      "elapsedMs": 2560.9513349999906
+    },
+    {
+      "call": 140,
+      "bytes": 4797,
+      "promptTokens": 1141,
+      "outputTokens": 28,
+      "elapsedMs": 2580.0072829999845
+    },
+    {
+      "call": 141,
+      "bytes": 4929,
+      "promptTokens": 1078,
+      "outputTokens": 45,
+      "elapsedMs": 3122.4647669999977
+    },
+    {
+      "call": 142,
+      "bytes": 4965,
+      "promptTokens": 1101,
+      "outputTokens": 44,
+      "elapsedMs": 3116.297812999983
+    },
+    {
+      "call": 143,
+      "bytes": 4958,
+      "promptTokens": 1099,
+      "outputTokens": 31,
+      "elapsedMs": 2711.8196250000037
+    },
+    {
+      "call": 144,
+      "bytes": 4976,
+      "promptTokens": 1133,
+      "outputTokens": 45,
+      "elapsedMs": 3263.652606000018
+    },
+    {
+      "call": 145,
+      "bytes": 4446,
+      "promptTokens": 1023,
+      "outputTokens": 39,
+      "elapsedMs": 2778.6885890000267
+    },
+    {
+      "call": 146,
+      "bytes": 4911,
+      "promptTokens": 1083,
+      "outputTokens": 54,
+      "elapsedMs": 3513.3498089999775
+    },
+    {
+      "call": 147,
+      "bytes": 4965,
+      "promptTokens": 1113,
+      "outputTokens": 56,
+      "elapsedMs": 3569.1276029999717
+    },
+    {
+      "call": 148,
+      "bytes": 4045,
+      "promptTokens": 931,
+      "outputTokens": 27,
+      "elapsedMs": 2155.143484
+    },
+    {
+      "call": 149,
+      "bytes": 4926,
+      "promptTokens": 1088,
+      "outputTokens": 55,
+      "elapsedMs": 3505.2215619999915
+    },
+    {
+      "call": 150,
+      "bytes": 4877,
+      "promptTokens": 1119,
+      "outputTokens": 25,
+      "elapsedMs": 2342.2506530000246
+    },
+    {
+      "call": 151,
+      "bytes": 4931,
+      "promptTokens": 1094,
+      "outputTokens": 60,
+      "elapsedMs": 3287.747185000044
+    },
+    {
+      "call": 152,
+      "bytes": 1559,
+      "promptTokens": 296,
+      "outputTokens": 20,
+      "elapsedMs": 1313.2094909999869
+    }
+  ],
+  "observation": "Failed long-chat development observation: broad and targeted retrieval could not compact relevant evidence, and critical questions were not answered. Not a quality or latency pass."
+}

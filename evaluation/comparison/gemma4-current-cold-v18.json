@@ -1,0 +1,157 @@
+{
+  "metadata": {
+    "sourceCommit": "e34a7d13555e166e6a80e591c3b1e655ba76b1c9",
+    "sourceDirty": false,
+    "recordedAt": "2026-10-27T03:54:07.403Z",
+    "implementation": "current",
+    "model": {
+      "name": "gemma4:e2b",
+      "model": "gemma4:e2b",
+      "modified_at": "2026-10-08T11:35:50.014787522+05:30",
+      "size": 4587156505,
+      "digest": "b37049369adfe3d2b653af0ab301a062ca5cbe96ace6aa0d3f2559ee9b563fc2",
+      "details": {
+        "parent_model": "gemma4-validation-20260929:e2b-imatrix-attention-q6-q8-draft2",
+        "format": "gguf",
+        "family": "gemma4",
+        "families": [
+          "gemma4"
+        ],
+        "parameter_size": "4.6B",
+        "quantization_level": "Q4_K_M",
+        "context_length": 131072,
+        "embedding_length": 1536
+      },
+      "capabilities": [
+        "completion",
+        "tools",
+        "thinking",
+        "vision"
+      ]
+    },
+    "ollama": {
+      "version": "0.34.0"
+    },
+    "hardware": {
+      "platform": "linux",
+      "release": "7.0.0-38-generic",
+      "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+      "memoryBytes": 15950888960,
+      "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU, 4096 MiB"
+    },
+    "settings": {
+      "numCtx": 8192,
+      "temperature": 0,
+      "maxInputBytes": 5500,
+      "maxOutputTokens": 2048,
+      "think": false
+    },
+    "promptVersion": "grounded-summary-v18",
+    "memoryScope": "Node peak RSS only. Ollama, Swift, peak total memory and swap need external observation.",
+    "runCondition": "cold",
+    "summaryDeadlineMs": 900000,
+    "evaluationDeadlineOverride": false,
+    "chatPromptVersion": "meeting-chat-v13",
+    "evidencePromptVersion": "meeting-evidence-v6"
+  },
+  "runs": [
+    {
+      "id": "straightforward",
+      "split": "tuning",
+      "synthetic": true,
+      "summary": {
+        "tldr": "You: The desktop settings screen is ready. I will write the permission guide by Thursday. You: We agree to keep the first release English only. We are not adding calendar integration. Speaker 1: Agreed. The release date is still undecided.",
+        "participants": [
+          {
+            "speaker": "You",
+            "said": [
+              "The desktop settings screen is ready. I will write the permission guide by Thursday.",
+              "We agree to keep the first release English only. We are not adding calendar integration."
+            ]
+          },
+          {
+            "speaker": "Speaker 1",
+            "said": [
+              "I completed the search tests. I will review your permission guide on Friday.",
+              "Agreed. The release date is still undecided."
+            ]
+          }
+        ],
+        "evidence": {
+          "revision": "f7313415bdba64ad2f1ffcbcf43370b0d18de66b0f4e49b216239e4a5e66c8cf",
+          "tldr": [
+            0,
+            2,
+            3
+          ],
+          "participants": [
+            {
+              "speaker": "You",
+              "said": [
+                [
+                  0
+                ],
+                [
+                  2
+                ]
+              ]
+            },
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                [
+                  1
+                ],
+                [
+                  3
+                ]
+              ]
+            }
+          ]
+        },
+        "generation": {
+          "promptVersion": "grounded-summary-v18",
+          "model": "gemma4:e2b",
+          "elapsedMs": 11605.71083,
+          "calls": 1,
+          "promptTokens": 533,
+          "outputTokens": 222
+        }
+      },
+      "chat": [
+        {
+          "questionId": "owner",
+          "skipped": "Chat was not selected for this evaluation"
+        },
+        {
+          "questionId": "deadline",
+          "skipped": "Chat was not selected for this evaluation"
+        },
+        {
+          "questionId": "release",
+          "skipped": "Chat was not selected for this evaluation"
+        },
+        {
+          "questionId": "calendar",
+          "skipped": "Chat was not selected for this evaluation"
+        }
+      ],
+      "summarySkipped": false,
+      "elapsedMs": 11606.024953,
+      "calls": 1,
+      "summaryElapsedMs": 11606.008013,
+      "summaryCalls": 1,
+      "peakRssKiB": 67580
+    }
+  ],
+  "requests": [
+    {
+      "call": 1,
+      "bytes": 3409,
+      "promptTokens": 533,
+      "outputTokens": 222,
+      "elapsedMs": 11602.753305
+    }
+  ],
+  "conditionMethod": "Verified all Ollama models unloaded before cold; selected model resident before immediate identical warm run. OS caches and background apps not controlled."
+}

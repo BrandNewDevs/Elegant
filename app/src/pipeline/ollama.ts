@@ -92,7 +92,7 @@ export class OllamaClient implements LanguageModel, TextModel {
         method: "POST",
         headers: { "content-type": "application/json" },
         redirect: "error",
-        body: JSON.stringify({ model: this.model, messages: request.messages, stream: false, format: request.schema,
+        body: JSON.stringify({ model: this.model, messages: request.messages, stream: false, format: request.schema, think: AI_SETTINGS.think,
           options: { num_ctx: this.numCtx, num_predict: maxOutputTokens, temperature: AI_SETTINGS.temperature } }),
         signal,
       });

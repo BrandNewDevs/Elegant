@@ -4,37 +4,53 @@ export type { SourceFragment as SourcePiece } from "./evidence.js";
 import type { SourceFragment as SourcePiece } from "./evidence.js";
 export type FactKind = "proposal" | "decision" | "commitment" | "disagreement" | "unresolved" | "update";
 export interface SupportedPoint { speaker: string; text: string; refs: number[] }
-export interface SupportedFact extends SupportedPoint { kind: FactKind; sources: SourcePiece[] }
+export interface SupportedFact extends SupportedPoint { kind: FactKind; sources: SourcePiece[]; leaves?: SupportedFact[] }
 export interface GroundedOutput { tldr: string; tldrRefs: number[]; points: SupportedPoint[] }
 
 const refsSchema = { type: "array", items: { type: "integer" }, minItems: 1, uniqueItems: true };
 const pointProperties = { speaker: { type: "string" }, text: { type: "string" }, refs: refsSchema };
 export const GROUNDED_SCHEMA = {
   type: "object", properties: {
-    tldr: { type: "string" }, tldrRefs: refsSchema,
+    // Generate claims first; TLDR selection cannot author a different factual claim.
     points: { type: "array", items: { type: "object", properties: pointProperties, required: ["speaker", "text", "refs"] } },
-  }, required: ["tldr", "tldrRefs", "points"],
+    tldrPointIds: { type: "array", minItems: 1, maxItems: 3, uniqueItems: true, items: { type: "integer", minimum: 0 } },
+  }, required: ["points", "tldrPointIds"],
 };
-export const FACTS_SCHEMA = {
-  type: "object", properties: { facts: { type: "array", items: {
-    type: "object", properties: { speaker: pointProperties.speaker, text: pointProperties.text, sourceIds: { type: "array", items: { type: "string" }, minItems: 1, uniqueItems: true }, kind: { type: "string", enum: ["proposal", "decision", "commitment", "disagreement", "unresolved", "update"] } },
-    required: ["speaker", "text", "kind", "sourceIds"],
-  } } }, required: ["facts"],
-};
-
 /** Restrict structured output to evidence that was actually supplied in this request. */
 export function groundedSchema(sources: SourcePiece[]) {
-  const refs = { ...refsSchema, items: { type: "integer", enum: [...new Set(sources.map(source => source.ref))] } };
-  return { ...GROUNDED_SCHEMA, properties: { ...GROUNDED_SCHEMA.properties, tldrRefs: refs,
-    points: { ...GROUNDED_SCHEMA.properties.points, items: { ...GROUNDED_SCHEMA.properties.points.items,
-      properties: { ...pointProperties, refs, speaker: { type: "string", enum: [...new Set(sources.map(source => source.speaker))] } } } } } };
+  const speakers = [...new Set(sources.map(source => source.speaker))];
+  return { ...GROUNDED_SCHEMA, properties: { ...GROUNDED_SCHEMA.properties,
+    points: { ...GROUNDED_SCHEMA.properties.points, items: { anyOf: speakers.map(speaker => ({
+      type: "object", properties: { ...pointProperties, speaker: { type: "string", enum: [speaker] },
+        refs: { ...refsSchema, items: { type: "integer", enum: [...new Set(sources.filter(source => source.speaker === speaker).map(source => source.ref))] } },
+      }, required: ["speaker", "text", "refs"], additionalProperties: false,
+    })) } },
+  } };
 }
-export function factsSchema(sources: SourcePiece[], speakers = sources) {
-  const facts = FACTS_SCHEMA.properties.facts;
-  return { ...FACTS_SCHEMA, properties: { facts: { ...facts, items: { ...facts.items, properties: { ...facts.items.properties,
-    speaker: { type: "string", enum: [...new Set(speakers.map(source => source.speaker))] },
-    sourceIds: { ...facts.items.properties.sourceIds, items: { type: "string", enum: sources.map(source => source.id) } },
-  } } } } };
+/** Consolidation must account for every candidate without moving contributions between speakers. */
+export function reductionSchema(_sources: SourcePiece[], candidates: readonly unknown[]) {
+  // Every candidate has a required assignment; the model cannot omit claims or
+  // generate replacement prose, speakers, kinds or citations.
+  return { type: "object", properties: Object.fromEntries(candidates.map((_, id) => [String(id), {
+    type: "integer", enum: Array.from({ length: id + 1 }, (_, seed) => seed),
+  }])), required: candidates.map((_, id) => String(id)), additionalProperties: false };
+}
+
+export function parseFactAssignments(json: string, candidates: SupportedFact[]): number[] {
+  const value = object(json);
+  const missing = candidates.map((_, id) => id).filter(id => !Object.hasOwn(value, String(id)));
+  if (missing.length) return problem(coverageReason("Missing candidate IDs", missing, candidates));
+  if (Object.keys(value).some(key => !candidates.some((_, id) => key === String(id)))) return problem("Use only the supplied candidate ID keys");
+  return candidates.map((_, id) => {
+    const seed = value[String(id)];
+    if (typeof seed !== "number" || !Number.isInteger(seed) || seed < 0 || seed > id) return problem(`Candidate ID ${id} needs an integer group ID between 0 and ${id}`);
+    return seed;
+  });
+}
+export function tldrSchema(candidates: readonly unknown[]) {
+  return { type: "object", properties: { candidateIds: { type: "array", minItems: 1, maxItems: 3, uniqueItems: true,
+    items: { type: "integer", enum: candidates.map((_, id) => id) },
+  } }, required: ["candidateIds"], additionalProperties: false };
 }
 
 /** Refinement cites draft point IDs; application code carries their original evidence forward. */
@@ -47,6 +63,13 @@ export function refinementSchema(points: SupportedPoint[]) {
 
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const problem = (message: string): never => { throw new InvalidSummaryError(message); };
+/** Diagnostics contain only local IDs and original speaker labels, never candidate or Transcript prose. */
+function coverageReason(prefix: string, ids: number[], points: { speaker: string }[]): string {
+  const listed = ids.slice(0, 4).map(id => `${id}(${points[id]!.speaker})`).join(", ");
+  const more = ids.length > 4 ? ` +${ids.length - 4} more` : "";
+  return `${prefix}: ${listed}${more}. Cover every required ID once under its original speaker.`
+    .replace(/[^\x20-\x7e]|["\\]/g, " ").slice(0, 160);
+}
 function object(json: string): Record<string, unknown> {
   let value: unknown;
   try { value = JSON.parse(json); } catch { return problem("Output must be a JSON object"); }
@@ -61,17 +84,21 @@ function references(value: unknown, sources: SourcePiece[]): number[] {
   // Repeating a valid identifier adds no evidence; normalize without spending a model retry.
   return [...new Set(value)].sort((a, b) => a - b) as number[];
 }
-function point(value: unknown, sources: SourcePiece[]): SupportedPoint {
+function point(value: unknown, sources: SourcePiece[], ownSpeechOnly = false): SupportedPoint {
   if (!record(value)) return problem("Every point must be an object");
   const speaker = text(value.speaker);
   const refs = references(value.refs, sources);
   if (!sources.some(source => source.speaker === speaker && refs.includes(source.ref))) return problem("Attribute each point to a supplied speaker with that speaker's evidence");
+  if (ownSpeechOnly && !refs.every(ref => sources.some(source => source.ref === ref && source.speaker === speaker))) {
+    return problem("Direct Participant points must cite only their own speech; put another speaker's correction under that speaker");
+  }
   return { speaker, text: text(value.text), refs };
 }
 export function parseGrounded(json: string, sources: SourcePiece[]): GroundedOutput {
   const value = object(json);
   if (!Array.isArray(value.points)) return problem("points must be a list");
-  return { tldr: text(value.tldr), tldrRefs: references(value.tldrRefs, sources), points: value.points.map(value => point(value, sources)) };
+  const points = value.points.map(value => point(value, sources, true));
+  return { ...composeTldr(value.tldrPointIds, points), points };
 }
 export function parseRefinedPoints(json: string, draft: SupportedPoint[]): SupportedPoint[] {
   const value = object(json);
@@ -82,26 +109,27 @@ export function parseRefinedPoints(json: string, draft: SupportedPoint[]): Suppo
     const speaker = text(value.speaker);
     if (!Array.isArray(value.covers) || !value.covers.length || !value.covers.every(id => Number.isInteger(id) && id >= 0 && id < draft.length)) return problem("Use the supplied draft point IDs in covers");
     const ids = [...new Set(value.covers)] as number[];
-    if (ids.some(id => draft[id]!.speaker !== speaker)) return problem("A refined point may cover only draft points by the same speaker");
+    const wrongSpeaker = ids.filter(id => draft[id]!.speaker !== speaker);
+    if (wrongSpeaker.length) return problem(coverageReason("Wrong speaker for draft IDs", wrongSpeaker, draft));
     ids.forEach(id => covered.add(id));
     return { speaker, text: text(value.text), refs: [...new Set(ids.flatMap(id => draft[id]!.refs))].sort((a, b) => a - b) };
   });
-  if (covered.size !== draft.length) return problem("Every original draft point must be covered by a refined point");
+  if (covered.size !== draft.length) return problem(coverageReason("Missing draft IDs", draft.map((_, id) => id).filter(id => !covered.has(id)), draft));
   return points;
 }
 
-export function parseFacts(json: string, sources: SourcePiece[], primary?: SourcePiece[]): SupportedFact[] {
-  const value = object(json);
-  if (!Array.isArray(value.facts)) return problem("facts must be a list");
-  return value.facts.map(value => {
-    if (!record(value) || typeof value.kind !== "string" || !["proposal", "decision", "commitment", "disagreement", "unresolved", "update"].includes(value.kind)) return problem("Use a supported fact kind");
-    if (!Array.isArray(value.sourceIds) || !value.sourceIds.length || !value.sourceIds.every(id => typeof id === "string" && sources.some(source => source.id === id))) return problem("Cite sourceIds supplied with the original passages");
-    const selected = sources.filter(source => (value.sourceIds as string[]).includes(source.id));
-    // The model cites one identifier system. Derive public ordinals from validated original pieces.
-    const p = point({ ...value, refs: [...new Set(selected.map(source => source.ref))] }, selected);
-    if (primary && !selected.some(source => source.speaker === p.speaker && primary.some(piece => piece.id === source.id))) return problem("Extract only points made by speakers in the primary source pieces");
-    return { ...p, kind: value.kind as FactKind, sources: selected };
-  });
+/** Whole immutable claims keep a TLDR from transferring another task's date or owner. */
+function composeTldr(value: unknown, points: SupportedPoint[]): { tldr: string; tldrRefs: number[] } {
+  if (!Array.isArray(value) || !value.length
+      || !value.every(id => Number.isInteger(id) && id >= 0 && id < points.length)) return problem("Select supplied point IDs for the TLDR");
+  const ids = [...new Set(value)] as number[];
+  if (ids.length > 3) return problem("Select at most three distinct whole claims for the TLDR");
+  const selected = ids.map(id => points[id]!);
+  return { tldr: selected.map(point => `${point.speaker}: ${point.text}`).join(" "),
+    tldrRefs: [...new Set(selected.flatMap(point => point.refs))].sort((a, b) => a - b) };
+}
+export function parseTldrSelection(json: string, candidates: SupportedPoint[]): { tldr: string; tldrRefs: number[] } {
+  return composeTldr(object(json).candidateIds, candidates);
 }
 
 /** Source pieces are original text, never generated intermediate prose. */
