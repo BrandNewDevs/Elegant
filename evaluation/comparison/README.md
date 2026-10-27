@@ -29,7 +29,7 @@ An implementation spot check found that the Gemma 3 warm baseline TL;DR suggests
 
 `gemma4-current-before-final-summary.json` is an exploratory production-v1 tuning observation: its per-Participant list omits Speaker 1's review commitment and uncertainty, while repeating You's points. It is retained as a failure observation. A quick response or valid JSON is not a quality pass.
 
-## Production short Summary comparison
+## Earlier production-v2 short Summary comparison
 
 The same `straightforward` fixture and production-v2 Summary prompt were used for both models, with 8,192 context tokens, 2,048 maximum output tokens, a 5,500-byte complete-request bound and temperature zero. Cold/warm model residency was controlled as above; background applications and OS caches were not controlled.
 
@@ -48,20 +48,31 @@ Resource JSON files retain sampled peaks, initial/peak/last swap, warnings and s
 
 The associated resource report sampled 9.30 GiB peak Ollama process-tree RSS and 3,080 MiB NVIDIA usage. System swap began at 2.33 GiB, peaked near the full 4 GiB swap allocation and ended at 1.94 GiB. These observations include shared mappings and other applications; they are not unique physical-memory totals or M4 measurements. An extended evaluation deadline is used separately to inspect whether the algorithm completes and preserves the final decisions. It does not change the shipped 15-minute deadline or relax the M4 gate.
 
-## Latest verification status (final PR still pending)
+## Current short Summary comparison
 
-Summary v9 completed a fresh 30-segment development slice in 102.28 seconds and 22 calls. This is a synthetic tuning probe, not the full long fixture or a real 60-minute Meeting. Participant points represented all eight predefined important facts on source inspection, but the TL;DR added an unsupported broad statement about unresolved technical details. Earlier controlled v6 runs also incorrectly attached a guide-review deadline to completed search tests. These are failed faithfulness observations, not quality passes.
+`gemma3-short-summary-v16.json` and `gemma4-short-summary-v16.json` use the same clean source commit `4cc7100`, seven short fixtures and identical production settings, including thinking disabled. These are uncontrolled runs, not cold/warm or M4 measurements. They call the actual production Summary implementation.
 
-The fresh chat-v6 short suite completed all seven fixtures with two hard validation failures. Source inspection also found an incorrect answer to an unassigned task deadline, along with answerable questions returning verification limitations. Exact quote provenance checks do not establish answer relevance or factual correctness. Fixes and affected reruns remain required before the final PR is ready.
+| Model | Completed | Calls | Total for seven fixtures | Important / critical points represented on agent source review |
+| --- | ---: | ---: | ---: | ---: |
+| Gemma 3 | 7/7 | 9 | 97.16 s | 27/27 / 21/21 |
+| Gemma 4 e2b | 7/7 | 8 | 26.02 s | 27/27 / 21/21 |
 
-Summary v10 adds structurally validated labels for superseded claims with strictly later original references. Its focused tests pass; fresh model quality verification is pending. After the disposition additions, typechecking and all 489 app tests pass locally. The evaluation tools have 45 passing Python tests. Latest-head native CI and fresh model quality verification remain required.
+This is agent review against tuned synthetic fixtures, **not independent human review or a blind release gate**. Both runs retain the expected Participant attribution; no unsupported critical decision, owner or deadline was found. Gemma 3's inspected citations support its claims. Gemma 4's spoken-instructions introduction cites segment 2 instead of the exact source in segment 0; that noncritical mistake propagates into its TL;DR. Its disagreement refinement also leaks a draft marker. Gemma 3 can repeat a task in the TL;DR or omit another important point there even when the Participant list retains it. Keep Gemma 3 as the default; faster output alone does not clear the quality and M4 gates.
+
+The TL;DR now selects whole existing claims and derives references rather than generating another factual paraphrase. Long reduction proposes SAME-CLAIM equivalents; application checks retain changed identifiers, owners, deadlines, numbers, symbols, negation and qualifications. Uncertain paraphrases remain visible, so long outputs can be verbose. Earlier claims retain links to strictly later revision context without asserting an invented superseded status.
+
+Resource reports omit full time-series samples but retain their counts. The sampled Ollama process-tree RSS peak was 5.28 GiB in both runs; sampling includes previous model residency and is not an isolated physical-memory measurement. NVIDIA peaks were 2,874 / 3,082 MiB. System swap peaked at 2.84 / 4.00 GiB respectively, including other applications and previous workload. Do not sum these figures or treat them as target-M4 observations.
+
+## Chat verification
+
+`gemma3-short-chat-before-fragment-context.json` records an actual chat-v12 run: all 30 short-fixture questions completed without hard errors in 40 model calls. Source inspection found that the reviewer answer selected the negative writing sentence while omitting the affirmative review commitment immediately before it. It is retained as a failed quality observation, not a passed chat gate.
+
+Chat now publishes the whole original fragment containing a selected canonical sentence, with its actual speaker and derived citations. This preserves neighboring commitments and qualifiers. The active question follows the evidence in the model request. A failed follow-up rewrite retains the original two user questions as intent context instead of guessing a subject. A second model self-audit was removed because actual runs showed it rejected explicit negative evidence and rubber-stamped wrong passages. Canonical wording establishes provenance, not semantic relevance; final source review remains necessary.
+
+The latest whole-fragment chat run and full synthetic long Summary are pending. Earlier failed runs remain versioned above. No incomplete result, cached replay or small development slice is a real 60-minute or successful production-latency measurement.
 
 ## Release status
 
-Keep Gemma 3 as the default. One short comparison does not establish candidate superiority, and neither model has passed the agreed target-M4 gates here.
+Automated seam tests cover bounded requests, source identity, unknown IDs, queue cancellation, history isolation, restart interruption, replacement/deletion guards, IPC validation, renderer controls and citation navigation. These tests establish behavior with fake models, not factual correctness. Final-head app/native CI and final model observations are required before merging the last PR.
 
-Automated seam tests cover request bounds, validation, source identity, queue cancellation, history isolation, restart interruption, replacement/deletion guards, IPC validation, renderer controls and citation navigation. Fake-model tests establish those behaviors; they do not establish generated factual correctness.
-
-At the final PR's initial code head, CI passed typechecking and production builds, 410 Node/renderer tests on Linux, 414 app/integration tests on macOS, 44 Swift tests and 33 Python tests. Later report-only changes still require the latest head's checks before merge.
-
-Independent human-reviewed 90% key-point coverage, every critical final decision, attribution and citation support remain pending. The four self-recorded Meetings are not available in this environment. No real 60-minute Recording, native offline flow, M4 latency, memory-pressure or retained Swift-model measurement is claimed. Use [the device checklist](../../docs/ai-testing.md), correct private references outside Git and retain failed outcomes until fixed and rerun.
+The private manifest still has no supplied recordings. Independent human-reviewed 90% coverage, every critical final decision and answer, the actual offline native flow, M4 latency, memory pressure, retained Swift-model measurements and the real 60-minute check remain pending. Use [the device checklist](../../docs/ai-testing.md), keep private references outside Git and record failed outcomes until fixed and rerun. The synthetic reserved cases were used during tuning and cannot be called blind final evaluation.
