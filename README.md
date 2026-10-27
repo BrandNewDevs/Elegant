@@ -1,4 +1,4 @@
-Elegant
+### Elegant
 
 A personal macOS menu-bar app that notices when you are in an online call, offers to record it, and produces a transcript and summary entirely on your own machine. No audio, transcript or summary ever leaves the Mac ([ADR 0002](./docs/adr/0002-fully-local-processing.md)).
 
