@@ -4,7 +4,7 @@ export type { SourceFragment as SourcePiece } from "./evidence.js";
 import type { SourceFragment as SourcePiece } from "./evidence.js";
 export type FactKind = "proposal" | "decision" | "commitment" | "disagreement" | "unresolved" | "update";
 export interface SupportedPoint { speaker: string; text: string; refs: number[] }
-export interface SupportedFact extends SupportedPoint { kind: FactKind; sources: SourcePiece[] }
+export interface SupportedFact extends SupportedPoint { kind: FactKind; sources: SourcePiece[]; leaves?: SupportedFact[] }
 export interface GroundedOutput { tldr: string; tldrRefs: number[]; points: SupportedPoint[] }
 
 const refsSchema = { type: "array", items: { type: "integer" }, minItems: 1, uniqueItems: true };
@@ -39,12 +39,24 @@ export function factsSchema(sources: SourcePiece[], speakers = sources) {
 }
 
 /** Consolidation must account for every candidate without moving contributions between speakers. */
-export function reductionSchema(sources: SourcePiece[], candidates: SupportedFact[]) {
-  const schema = factsSchema(sources, sources.filter(source => candidates.some(candidate => candidate.speaker === source.speaker)));
-  const facts = schema.properties.facts;
-  return { ...schema, properties: { facts: { ...facts, items: { ...facts.items, properties: { ...facts.items.properties,
-    covers: { type: "array", minItems: 1, uniqueItems: true, items: { type: "integer", enum: candidates.map((_, index) => index) } },
-  }, required: [...facts.items.required, "covers"] } } } };
+export function reductionSchema(_sources: SourcePiece[], candidates: SupportedFact[]) {
+  // Every candidate has a required assignment; the model cannot omit claims or
+  // generate replacement prose, speakers, kinds or citations.
+  return { type: "object", properties: Object.fromEntries(candidates.map((_, id) => [String(id), {
+    type: "integer", enum: Array.from({ length: id + 1 }, (_, seed) => seed),
+  }])), required: candidates.map((_, id) => String(id)), additionalProperties: false };
+}
+
+export function parseFactAssignments(json: string, candidates: SupportedFact[]): number[] {
+  const value = object(json);
+  const missing = candidates.map((_, id) => id).filter(id => !Object.hasOwn(value, String(id)));
+  if (missing.length) return problem(coverageReason("Missing candidate IDs", missing, candidates));
+  if (Object.keys(value).some(key => !candidates.some((_, id) => key === String(id)))) return problem("Use only the supplied candidate ID keys");
+  return candidates.map((_, id) => {
+    const seed = value[String(id)];
+    if (typeof seed !== "number" || !Number.isInteger(seed) || seed < 0 || seed > id) return problem(`Candidate ID ${id} needs an integer group ID between 0 and ${id}`);
+    return seed;
+  });
 }
 export function tldrSchema(sources: SourcePiece[]) {
   return { type: "object", properties: { tldr: { type: "string" },
@@ -131,22 +143,6 @@ export function parseFacts(json: string, sources: SourcePiece[], primary?: Sourc
     && primary.some(piece => piece.id === source.id))) : facts;
 }
 
-export function parseReducedFacts(json: string, sources: SourcePiece[], candidates: SupportedFact[]): SupportedFact[] {
-  const value = object(json);
-  const facts = parseFacts(json, sources);
-  const covered = new Set<number>();
-  (value.facts as unknown[]).forEach((raw, index) => {
-    if (!record(raw) || !Array.isArray(raw.covers) || !raw.covers.length
-        || !raw.covers.every(id => Number.isInteger(id) && id >= 0 && id < candidates.length)) return problem(`Use candidate IDs 0..${candidates.length - 1} from requiredCoverage, each exactly once in covers`);
-    for (const id of new Set(raw.covers as number[])) {
-      if (covered.has(id)) return problem(coverageReason("Duplicate candidate IDs", [id], candidates));
-      if (candidates[id]!.speaker !== facts[index]!.speaker) return problem(coverageReason("Wrong speaker for candidate IDs", [id], candidates));
-      covered.add(id);
-    }
-  });
-  if (covered.size !== candidates.length) return problem(coverageReason("Missing candidate IDs", candidates.map((_, id) => id).filter(id => !covered.has(id)), candidates));
-  return facts;
-}
 export function parseTldrSources(json: string, sources: SourcePiece[]): { tldr: string; tldrRefs: number[] } {
   const value = object(json);
   if (!Array.isArray(value.sourceIds) || !value.sourceIds.length
