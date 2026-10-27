@@ -30,7 +30,7 @@ const payload = (request: TextRequest): Payload => (JSON.parse(request.messages[
 /** A deterministic adapter exercises orchestration, budgets and provenance, not factual model quality. */
 function hierarchicalReply(request: TextRequest): unknown {
   const input = payload(request);
-  if ("updates" in (request.schema as { properties: object }).properties) return { updates: [] };
+  if ("revisions" in (request.schema as { properties: object }).properties) return { revisions: Object.fromEntries(input.candidates!.map(fact => [String(fact.id), "unchanged"])) };
   if (input.primary) return { facts: input.primary.map(source => ({ speaker: source.speaker, text: `Important point from ${source.id}.`,
     sourceIds: [source.id], kind: "update" })) };
   if (input.candidates && !("candidateIds" in (request.schema as { properties: object }).properties)) return Object.fromEntries(input.candidates.map(fact => [String(fact.id), fact.id]));
@@ -355,7 +355,7 @@ describe("evidence-backed Summary generation", () => {
     const source = longTranscript();
     const model = fake(hierarchicalReply);
     const result = await createGroundedSummariser({ model })(source);
-    const reductions = model.requests.filter(request => payload(request).candidates && !("updates" in (request.schema as { properties: object }).properties) && !("candidateIds" in (request.schema as { properties: object }).properties));
+    const reductions = model.requests.filter(request => payload(request).candidates && !("revisions" in (request.schema as { properties: object }).properties) && !("candidateIds" in (request.schema as { properties: object }).properties));
     expect(reductions.length).toBeGreaterThan(2);
     expect(model.requests.every(request => requestBytes(request) <= 5500)).toBe(true);
     for (const request of reductions) {
@@ -417,7 +417,7 @@ describe("evidence-backed Summary generation", () => {
         expect(new Set(properties.sourceIds!.items!.enum)).toEqual(new Set(sources.map(source => source.id)));
         expect(new Set(properties.speaker!.enum)).toEqual(new Set((input.candidates ?? input.primary ?? sources).map(source => source.speaker)));
 
-      } else if ("updates" in schema.properties) {
+      } else if ("revisions" in schema.properties) {
         expect(input.sources!.length).toBeGreaterThan(0);
       } else if (input.candidates && !("candidateIds" in schema.properties)) {
         expect(Object.keys(schema.properties)).toEqual(input.candidates.map(fact => String(fact.id)));

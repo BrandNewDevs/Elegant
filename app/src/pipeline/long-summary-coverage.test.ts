@@ -19,7 +19,7 @@ function adapter(reduce: (facts: Fact[], sources: Piece[], request: TextRequest)
     requests.push(request);
     const input = data(request);
     let output: unknown;
-    if ("updates" in (request.schema as { properties: object }).properties) output = { updates: [] };
+    if ("revisions" in (request.schema as { properties: object }).properties) output = { revisions: Object.fromEntries(input.candidates!.map(fact => [String(fact.id), "unchanged"])) };
     else if (input.primary) output = { facts: input.primary.filter(piece => piece.part === 0).map(piece => ({
       speaker: piece.speaker, text: prefix(piece.text), kind: /propose|suggest/i.test(piece.text) ? "proposal" : /final decision/i.test(piece.text) ? "decision" : "commitment", sourceIds: [piece.id],
     })) };
@@ -36,7 +36,7 @@ function assignmentAdapter(assign: (facts: Fact[], request: TextRequest) => unkn
   const model: TextModel = { async complete(request) {
     requests.push(request);
     const input = data(request);
-    if (input.candidates && !("updates" in (request.schema as { properties: object }).properties) && !("candidateIds" in (request.schema as { properties: object }).properties)) {
+    if (input.candidates && !("revisions" in (request.schema as { properties: object }).properties) && !("candidateIds" in (request.schema as { properties: object }).properties)) {
       return { text: JSON.stringify(assign(input.candidates, request)), metadata: { model: "assignment:test", elapsedMs: 1 } };
     }
     return inner.model.complete(request);
@@ -153,7 +153,7 @@ describe("complete long Summary coverage", () => {
     });
     const result = await createGroundedSummariser({ model })(transcript);
     expect(mixedContextCalls).toBe(0);
-    expect(requests.filter(request => data(request).candidates && !("updates" in (request.schema as { properties: object }).properties) && !("candidateIds" in (request.schema as { properties: object }).properties))).toHaveLength(0);
+    expect(requests.filter(request => data(request).candidates && !("revisions" in (request.schema as { properties: object }).properties) && !("candidateIds" in (request.schema as { properties: object }).properties))).toHaveLength(0);
     for (const speaker of speakers) {
       expect(result.participants.find(participant => participant.speaker === speaker)!.said)
         .toEqual(transcript.segments.filter(segment => segment.speaker === speaker).map(segment => prefix(segment.text)));
@@ -208,7 +208,7 @@ describe("complete long Summary coverage", () => {
     expect(result.participants[0]!.said).toHaveLength(9);
     expect(result.evidence!.participants[0]!.said).toEqual(Array.from({ length: 9 }, (_, ref) => [ref]));
     expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
-    for (const request of requests.filter(request => data(request).candidates && !("updates" in (request.schema as { properties: object }).properties) && !("candidateIds" in (request.schema as { properties: object }).properties))) {
+    for (const request of requests.filter(request => data(request).candidates && !("revisions" in (request.schema as { properties: object }).properties) && !("candidateIds" in (request.schema as { properties: object }).properties))) {
       const instruction = (JSON.parse(request.messages.at(-1)!.content) as { instruction: string }).instruction;
       if (instruction.includes("Missing candidate IDs:")) expect(instruction).not.toContain("I will complete Task_");
     }
@@ -331,13 +331,13 @@ describe("complete long Summary coverage", () => {
     const requests: TextRequest[] = [];
     const model: TextModel = { async complete(request) {
       requests.push(request);
-      if (!("updates" in (request.schema as { properties: object }).properties)) return inner.model.complete(request);
+      if (!("revisions" in (request.schema as { properties: object }).properties)) return inner.model.complete(request);
       const input = data(request);
       const proposal = input.candidates!.find(fact => fact.text.includes("propose launching"));
       const correction = input.sources!.find(source => source.ref === 8);
-      const updates = proposal && correction ? [{ candidateId: proposal.id, status: "superseded", correctionSourceIds: [correction.id] }] : [];
-      assessed ||= updates.length > 0;
-      return { text: JSON.stringify({ updates }), metadata: { model: "disposition:test", elapsedMs: 1 } };
+      const revisions = Object.fromEntries(input.candidates!.map(fact => [String(fact.id), proposal && correction && fact.id === proposal.id ? correction.id : "unchanged"]));
+      assessed ||= !!proposal && !!correction;
+      return { text: JSON.stringify({ revisions }), metadata: { model: "disposition:test", elapsedMs: 1 } };
     } };
     const result = await createGroundedSummariser({ model })(transcript);
     expect(assessed).toBe(true);
@@ -350,61 +350,95 @@ describe("complete long Summary coverage", () => {
     expect(requests.every(request => requestBytes(request) <= 5500)).toBe(true);
   });
 
-  it("assesses later context without declaring an unrelated later task a reversal", async () => {
+  it("does not schedule a superseding annotation for an unrelated later task", async () => {
     const transcript = uniqueCommitments();
     transcript.segments[0]!.text = original("I propose launching on Monday.");
     transcript.segments[8]!.text = original("Final decision: review the Monday launch checklist spelling on Friday.");
     const { model, requests } = adapter();
     const result = await createGroundedSummariser({ model })(transcript);
-    expect(requests.some(request => "updates" in (request.schema as { properties: object }).properties)).toBe(true);
+    expect(requests.some(request => "revisions" in (request.schema as { properties: object }).properties)).toBe(false);
     expect(result.participants[0]!.said).toContain("I propose launching on Monday.");
     expect(result.participants[0]!.said.some(point => point.startsWith("Earlier"))).toBe(false);
   });
 
-  it("constrains each disposition candidate to strictly later source choices in its schema", async () => {
+  it("requires every eligible candidate and constrains its correction choices to later explicit original revisions", async () => {
+    const transcript = uniqueCommitments();
+    transcript.segments[0]!.text = original("I propose launching on Monday.");
+    transcript.segments[8]!.text = original("Final decision: launch Friday instead of Monday.");
     const { model, requests } = adapter();
-    await createGroundedSummariser({ model })(uniqueCommitments());
-    const comparisons = requests.filter(request => "updates" in (request.schema as { properties: object }).properties);
+    await createGroundedSummariser({ model })(transcript);
+    const comparisons = requests.filter(request => "revisions" in (request.schema as { properties: object }).properties);
     expect(comparisons.length).toBeGreaterThan(0);
     for (const request of comparisons) {
       const input = data(request);
-      const schema = request.schema as { properties: { updates: { items: { anyOf: {
-        properties: { candidateId: { enum: number[] }; correctionSourceIds: { items: { enum: string[] } } };
-      }[] } } } };
-      for (const choice of schema.properties.updates.items.anyOf) {
-        const fact = input.candidates![choice.properties.candidateId.enum[0]!]!;
+      const schema = request.schema as { properties: { revisions: { properties: Record<string, { enum: string[] }>; required: string[] } } };
+      const revisions = schema.properties.revisions;
+      expect(revisions.required).toEqual(input.candidates!.map(fact => String(fact.id)));
+      for (const [id, choice] of Object.entries(revisions.properties)) {
+        const fact = input.candidates![Number(id)]!;
         const own = input.sources!.filter(source => fact.sourceIds.includes(source.id) && source.speaker === fact.speaker)
           .sort((left, right) => left.ref - right.ref || left.part - right.part).at(-1)!;
-        const ids = choice.properties.correctionSourceIds.items.enum;
-        expect(ids.length).toBeGreaterThan(0);
-        expect(ids.every(id => {
-          const source = input.sources!.find(source => source.id === id)!;
-          return source.ref > own.ref || source.ref === own.ref && source.part > own.part;
-        })).toBe(true);
-        expect(ids).not.toContain(own.id);
+        expect(choice.enum[0]).toBe("unchanged");
+        expect(choice.enum.slice(1)).toEqual(["8:0"]);
+        expect(choice.enum).not.toContain(own.id);
+        expect(choice.enum).not.toContain("historical");
+        expect(choice.enum).not.toContain("unresolved");
       }
       expect(requestBytes(request)).toBeLessThanOrEqual(5500);
     }
   });
 
-  it.each(["unknown-source", "not-later", "unknown-candidate"])("rejects %s disposition evidence after bounded retries", async invalid => {
+  it.each(["unknown-source", "not-later", "unknown-candidate", "missing-candidate", "invented-status"])("rejects %s revision output after bounded retries", async invalid => {
     const transcript = uniqueCommitments();
+    transcript.segments[0]!.text = original("I propose launching on Monday.");
+    transcript.segments[8]!.text = original("Final decision: launch Friday instead of Monday.");
     const inner = adapter();
     let attempts = 0;
     const model: TextModel = { async complete(request) {
-      if (!("updates" in (request.schema as { properties: object }).properties)) return inner.model.complete(request);
+      if (!("revisions" in (request.schema as { properties: object }).properties)) return inner.model.complete(request);
       attempts++;
       const input = data(request), fact = input.candidates![0]!;
-      return { text: JSON.stringify({ updates: [{ candidateId: invalid === "unknown-candidate" ? 999 : fact.id,
-        status: "superseded", correctionSourceIds: [invalid === "unknown-source" ? "missing:0" : fact.sourceIds[0]],
-      }] }), metadata: { model: "disposition:test", elapsedMs: 1 } };
+      const revisions = Object.fromEntries(input.candidates!.map(candidate => [String(candidate.id), "unchanged"]));
+      revisions[String(fact.id)] = invalid === "unknown-source" ? "missing:0" : invalid === "invented-status" ? "unresolved" : fact.sourceIds[0]!;
+      if (invalid === "unknown-candidate") revisions["999"] = "unchanged";
+      if (invalid === "missing-candidate") delete revisions[String(fact.id)];
+      return { text: JSON.stringify({ revisions }), metadata: { model: "disposition:test", elapsedMs: 1 } };
     } };
     await expect(createGroundedSummariser({ model })(transcript)).rejects.toThrow("failed validation after 3 attempts");
     expect(attempts).toBe(3);
   });
 
+  it("assesses both Participants' earlier proposals against the same final replacement", async () => {
+    const transcript = uniqueCommitments();
+    transcript.segments[0]!.text = original("I propose launching on Monday.");
+    transcript.segments[1]!.speaker = "Speaker 1";
+    transcript.segments[1]!.text = original("I propose Monday as the launch day.");
+    transcript.segments[8]!.speaker = "Speaker 2";
+    transcript.segments[8]!.text = original("Final decision: launch Friday instead of Monday.");
+    const inner = adapter();
+    const model: TextModel = { async complete(request) {
+      if (!("revisions" in (request.schema as { properties: object }).properties)) return inner.model.complete(request);
+      const input = data(request);
+      return { text: JSON.stringify({ revisions: Object.fromEntries(input.candidates!.map(fact => [String(fact.id), "8:0"])) }),
+        metadata: { model: "revisions:test", elapsedMs: 1 } };
+    } };
+    const result = await createGroundedSummariser({ model })(transcript);
+    expect(result.participants.find(participant => participant.speaker === "You")!.said).toContain("Earlier proposal (superseded): I propose launching on Monday.");
+    expect(result.participants.find(participant => participant.speaker === "Speaker 1")!.said).toEqual(["Earlier proposal (superseded): I propose Monday as the launch day."]);
+    expect(result.evidence!.participants.find(participant => participant.speaker === "Speaker 1")!.said).toEqual([[1, 8]]);
+  });
+
+  it("never requests a new uncertainty annotation for unchanged requirement reviews", async () => {
+    const transcript = uniqueCommitments();
+    transcript.segments.forEach(segment => { segment.text = original("Review the existing permission requirement. We are not adding an assignment or a deadline."); });
+    const { model, requests } = adapter();
+    const result = await createGroundedSummariser({ model })(transcript);
+    expect(requests.some(request => "revisions" in (request.schema as { properties: object }).properties)).toBe(false);
+    expect(result.participants[0]!.said.every(point => !point.startsWith("Earlier"))).toBe(true);
+  });
+
   it("accepts correction evidence in a later fragment of the same original segment", async () => {
-    const transcript: Transcript = { segments: [{ start: 0, end: 60, speaker: "You", text: "Monday launch proposal. ".repeat(400) }] };
+    const transcript: Transcript = { segments: [{ start: 0, end: 60, speaker: "You", text: "Monday launch proposal. " + "background discussion ".repeat(50) + "Friday replaces Monday. " + "Later discussion. ".repeat(400) }] };
     const inner = adapter();
     let sameOrdinalCorrection = false;
     const model: TextModel = { async complete(request) {
@@ -412,16 +446,16 @@ describe("complete long Summary coverage", () => {
       if (input.primary) return { text: JSON.stringify({ facts: input.primary.map(piece => ({ speaker: piece.speaker,
         text: piece.part === 0 ? "Proposed Monday." : `Later original claim ${piece.part}.`, sourceIds: [piece.id], kind: piece.part === 0 ? "proposal" : "update",
       })) }), metadata: { model: "fragment:test", elapsedMs: 1 } };
-      if (!("updates" in (request.schema as { properties: object }).properties)) return inner.model.complete(request);
+      if (!("revisions" in (request.schema as { properties: object }).properties)) return inner.model.complete(request);
       const proposal = input.candidates!.find(fact => fact.text === "Proposed Monday.");
-      const correction = input.sources!.find(source => source.part > 0);
-      const updates = proposal && correction ? [{ candidateId: proposal.id, status: "historical", correctionSourceIds: [correction.id] }] : [];
-      sameOrdinalCorrection ||= updates.length > 0;
-      return { text: JSON.stringify({ updates }), metadata: { model: "fragment:test", elapsedMs: 1 } };
+      const correction = input.sources!.find(source => source.part > 0 && source.text.includes("replaces Monday"));
+      const revisions = Object.fromEntries(input.candidates!.map(fact => [String(fact.id), proposal && correction && fact.id === proposal.id ? correction.id : "unchanged"]));
+      sameOrdinalCorrection ||= !!proposal && !!correction;
+      return { text: JSON.stringify({ revisions }), metadata: { model: "fragment:test", elapsedMs: 1 } };
     } };
     const result = await createGroundedSummariser({ model })(transcript);
     expect(sameOrdinalCorrection).toBe(true);
-    expect(result.participants[0]!.said).toContain("Earlier proposal (historical): Proposed Monday.");
+    expect(result.participants[0]!.said).toContain("Earlier proposal (superseded): Proposed Monday.");
     expect(result.evidence!.participants[0]!.said[0]).toEqual([0]);
   });
 
