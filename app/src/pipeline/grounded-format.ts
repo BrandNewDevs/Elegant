@@ -40,7 +40,7 @@ export function factsSchema(sources: SourcePiece[], speakers = sources) {
 
 /** Consolidation must account for every candidate without moving contributions between speakers. */
 export function reductionSchema(sources: SourcePiece[], candidates: SupportedFact[]) {
-  const schema = factsSchema(sources);
+  const schema = factsSchema(sources, sources.filter(source => candidates.some(candidate => candidate.speaker === source.speaker)));
   const facts = schema.properties.facts;
   return { ...schema, properties: { facts: { ...facts, items: { ...facts.items, properties: { ...facts.items.properties,
     covers: { type: "array", minItems: 1, uniqueItems: true, items: { type: "integer", enum: candidates.map((_, index) => index) } },
