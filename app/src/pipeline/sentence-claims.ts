@@ -28,6 +28,7 @@ export function parseSentenceClassifications(json: string, primary: OriginalSent
     || !value.classifications || typeof value.classifications !== "object" || Array.isArray(value.classifications)) {
     return invalid("Return classifications for every primary sentence ID");
   }
+  if (Object.keys(value).some(key => key !== "classifications")) return invalid("Return only classifications, never generated text or attribution");
   const classifications = value.classifications as Record<string, unknown>;
   const missing = primary.filter(sentence => !Object.hasOwn(classifications, sentence.id));
   if (missing.length) return invalid(`Classify every primary sentence ID; missing ${missing.slice(0, 4).map(sentence => sentence.id).join(", ")}`);

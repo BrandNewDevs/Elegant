@@ -28,6 +28,15 @@ describe("original sentence extraction contract", () => {
     expect(result.map(fact => fact.text)).toEqual(["No one has measured the M4 memory peak yet."]);
   });
 
+  it("rejects generated prose and attribution outside the classification contract", () => {
+    const primary = originalSentences(sources);
+    const classifications = Object.fromEntries(primary.map(sentence => [sentence.id, "update"]));
+    for (const extra of [{ text: "Invented outcome" }, { speaker: "Someone else" }, { refs: [0] }]) {
+      expect(() => parseSentenceClassifications(JSON.stringify({ classifications, ...extra }), primary, lookup))
+        .toThrow("Return only classifications");
+    }
+  });
+
   it.each(["missing", "unknown", "context", "bad-kind"])("rejects %s classifications instead of silently losing source content", invalid => {
     const primary = originalSentences(sources.slice(1));
     const classifications: Record<string, unknown> = Object.fromEntries(primary.map(sentence => [sentence.id, "update"]));
