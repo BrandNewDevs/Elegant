@@ -55,6 +55,12 @@ jobs:
         run: |
           hash=$(scripts/import-signing-identity.sh "$RUNNER_TEMP/signing.keychain-db")
           [ "$hash" = "$SIGNING_IDENTITY_SHA1" ] || { echo "::error::the signing secret holds certificate $hash, not $SIGNING_IDENTITY_SHA1"; exit 1; }
+      # dmgbuild lays out the installer window without scripting Finder, so it works on the headless runner.
+      - name: Install dmgbuild
+        run: |
+          python3 -m venv "$RUNNER_TEMP/dmgbuild"
+          "$RUNNER_TEMP/dmgbuild/bin/pip" install --quiet dmgbuild==1.6.7
+          echo "$RUNNER_TEMP/dmgbuild/bin" >> "$GITHUB_PATH"
       - name: Build the .dmg (manual run)
         if: github.event_name == 'workflow_dispatch'
         run: scripts/dmg.sh "$SIGNING_IDENTITY_SHA1"
