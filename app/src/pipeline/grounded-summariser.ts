@@ -230,6 +230,7 @@ function assembleGroups(assignments: number[], facts: SupportedFact[]): Supporte
 
 async function consolidate(initial: SupportedFact[], ask: <T>(mode: Mode, payload: object, parse: (json: string) => T) => Promise<T>, check: () => void): Promise<GroundedOutput> {
   let facts = distinctFacts(initial);
+  const assignmentsByRequest = new Map<string, number[]>();
   if (!facts.length) throw new Error("Summary incomplete: no supported facts were extracted");
   // Completed comparison rounds may clarify or merge facts. They never need to shrink all evidence into one request.
   for (let round = 0; round < 4; round++) {
@@ -246,11 +247,20 @@ async function consolidate(initial: SupportedFact[], ask: <T>(mode: Mode, payloa
       for (const speaker of speakers) {
         check();
         const owned = group.filter(fact => fact.speaker === speaker);
-        // Keep every mixed-group original passage: a singleton may still need
-        // another speaker's correction, but can cover only its own candidates.
+        // With immutable claim text a singleton can only assign itself to zero;
+        // foreign context cannot change that result or add a new owned claim.
+        if (owned.length === 1) { next.push(owned[0]!); continue; }
+        // Keep every mixed-group original passage for multi-candidate grouping.
         const payload = { ...candidates(owned), sources: context };
         if (!fits("reduce", payload)) throw new Error("Summary incomplete: speaker comparison exceeds the request budget");
-        next.push(...await ask("reduce", payload, json => assembleGroups(parseFactAssignments(json, owned), owned)));
+        const key = JSON.stringify(requestFor("reduce", payload));
+        let assignments = assignmentsByRequest.get(key);
+        if (!assignments) {
+          assignments = await ask("reduce", payload, json => parseFactAssignments(json, owned));
+          assignmentsByRequest.set(key, assignments);
+        }
+        check();
+        next.push(...assembleGroups(assignments, owned));
       }
     }
     check();
