@@ -164,7 +164,7 @@ describe("complete long Summary coverage", () => {
   it("consolidates equivalent whole-claim paraphrases while retaining every original source", async () => {
     const transcript = uniqueCommitments();
     const earlier = "I will test the permission flow by Thursday.";
-    const latest = "By Thursday, I will test permission flow.";
+    const latest = "By Thursday, I will test the permission flow.";
     transcript.segments[0]!.text = original(earlier);
     transcript.segments[1]!.text = original(latest);
     const { model, requests } = assignmentAdapter(facts => {
@@ -189,6 +189,7 @@ describe("complete long Summary coverage", () => {
     ["identifier punctuation", "I will deploy API-1 by Thursday.", "By Thursday, I will deploy API 1."],
     ["number", "I will run 3 permission tests by Thursday.", "By Thursday, I will run 4 permission tests."],
     ["single-letter identifier", "I will test branch A.", "I will test branch."],
+    ["lowercase identifier", "I will test branch a.", "I will test branch."],
     ["currency", "Budget is $500.", "Budget is €500."],
     ["comparison operator", "Latency must be < 60 ms.", "Latency must be > 60 ms."],
     ["signed value", "The balance is -500.", "The balance is +500."],

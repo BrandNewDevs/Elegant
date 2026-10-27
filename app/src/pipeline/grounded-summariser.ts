@@ -232,7 +232,7 @@ function compactLeaves(raw: SupportedFact[]): SupportedFact[] {
 
 /**
  * Model grouping proposes equivalence. This conservative literal guard permits
- * grammar and one fronted weekday deadline, but refuses uncertain paraphrases
+ * punctuation and one fronted weekday deadline, but refuses uncertain paraphrases
  * that change substantive word order, identifiers, modality or qualifications.
  */
 function equivalentDetails(fact: SupportedFact): string {
@@ -247,8 +247,7 @@ function equivalentDetails(fact: SupportedFact): string {
     deadline = time[1]!.toLowerCase();
     text = text.slice(0, time.index) + text.slice(time.index! + time[0].length);
   }
-  const terms = (text.match(/[\p{L}\p{N}_]+(?:['’][\p{L}\p{N}_]+)*/gu) ?? [])
-    .filter(word => !/^(?:a|an|the)$/.test(word));
+  const terms = text.match(/[\p{L}\p{N}_]+(?:['’][\p{L}\p{N}_]+)*/gu) ?? [];
   return JSON.stringify({ speaker: fact.speaker, kind: fact.kind, terms, deadline, identifiers,
     symbols: [...text].filter(character => /[^\p{L}\p{N}_\s,.]/u.test(character)),
     question: fact.text.includes("?"), quotations: fact.text.match(/["“”]/g) ?? [] });
