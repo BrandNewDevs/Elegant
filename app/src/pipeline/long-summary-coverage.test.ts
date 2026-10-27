@@ -23,10 +23,9 @@ function adapter(reduce: (facts: Fact[], sources: Piece[], request: TextRequest)
     const input = data(request);
     let output: unknown;
     if ("revisions" in (request.schema as { properties: object }).properties) output = { revisions: Object.fromEntries(input.candidates!.map(fact => [String(fact.id), "unchanged"])) };
-    else if (input.primary) output = { classifications: Object.fromEntries(input.primary.map(piece => [piece.id,
+    else if (input.primary) output = { classifications: input.primary.map(piece =>
       sourceId(piece).endsWith(":0") && piece.id.endsWith(":0")
-        ? /propose|suggest/i.test(piece.text) ? "proposal" : /final decision/i.test(piece.text) ? "decision" : "commitment" : "procedure",
-    ])) };
+        ? /propose|suggest/i.test(piece.text) ? "proposal" : /final decision/i.test(piece.text) ? "decision" : "commitment" : "procedure") };
     else if (input.candidates && !("candidateIds" in (request.schema as { properties: object }).properties)) output = Object.fromEntries(reduce(input.candidates, input.sources!, request).flatMap(fact => (fact.covers ?? []).map(id => [String(id), Math.min(...fact.covers!)])));
     else output = { candidateIds: input.candidates!.slice(0, 3).map(fact => fact.id) };
     return { text: JSON.stringify(output), metadata: { model: "coverage:test", elapsedMs: 1 } };
@@ -394,10 +393,9 @@ describe("complete long Summary coverage", () => {
       requests.push(request);
       const primary = data(request).primary;
       if (!primary) return inner.model.complete(request);
-      return { text: JSON.stringify({ classifications: Object.fromEntries(primary.map(piece => [piece.id,
+      return { text: JSON.stringify({ classifications: primary.map(piece =>
         !sourceId(piece).endsWith(":0") || !piece.id.endsWith(":0") ? "procedure" : Number(sourceId(piece).split(":")[0]) === 19 ? "unresolved"
-          : [17, 18].includes(Number(sourceId(piece).split(":")[0])) ? "commitment" : "decision",
-      ])) }), metadata: { model: "priority:test", elapsedMs: 1 } };
+          : [17, 18].includes(Number(sourceId(piece).split(":")[0])) ? "commitment" : "decision") }), metadata: { model: "priority:test", elapsedMs: 1 } };
     } };
     await createGroundedSummariser({ model })(transcript);
     const final = data(requests.at(-1)!);
@@ -529,9 +527,8 @@ describe("complete long Summary coverage", () => {
     let sameOrdinalCorrection = false;
     const model: TextModel = { async complete(request) {
       const input = data(request);
-      if (input.primary) return { text: JSON.stringify({ classifications: Object.fromEntries(input.primary.map(piece => [piece.id,
-        piece.text === "Monday launch proposal." ? "proposal" : "update",
-      ])) }), metadata: { model: "fragment:test", elapsedMs: 1 } };
+      if (input.primary) return { text: JSON.stringify({ classifications: input.primary.map(piece =>
+        piece.text === "Monday launch proposal." ? "proposal" : "update") }), metadata: { model: "fragment:test", elapsedMs: 1 } };
       if (!("revisions" in (request.schema as { properties: object }).properties)) return inner.model.complete(request);
       const proposal = input.candidates!.find(fact => fact.text === "Monday launch proposal.");
       const correction = input.sources!.find(source => source.part > 0 && source.text.includes("replaces Monday"));

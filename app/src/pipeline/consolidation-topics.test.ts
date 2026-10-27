@@ -29,9 +29,8 @@ function topicModel(nameFor: (text: string) => string = topic) {
     let output: unknown;
     if ("revisions" in (request.schema as { properties: object }).properties) { output = { revisions: Object.fromEntries(payload.candidates!.map(fact => [String(fact.id), "unchanged"])) }; }
     else if (payload.primary) {
-      output = { classifications: Object.fromEntries(payload.primary.map(piece => [piece.id,
-        sourceId(piece).endsWith(":0") && piece.id.endsWith(":0") ? "update" : "procedure",
-      ])) };
+      output = { classifications: payload.primary.map(piece =>
+        sourceId(piece).endsWith(":0") && piece.id.endsWith(":0") ? "update" : "procedure") };
     } else if (payload.candidates && !("candidateIds" in (request.schema as { properties: object }).properties)) {
       const facts = payload.candidates!;
       const original = new Map(payload.sources!.map(piece => [piece.id, piece]));
