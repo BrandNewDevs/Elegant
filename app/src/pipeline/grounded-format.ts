@@ -39,7 +39,7 @@ export function factsSchema(sources: SourcePiece[], speakers = sources) {
 }
 
 /** Consolidation must account for every candidate without moving contributions between speakers. */
-export function reductionSchema(_sources: SourcePiece[], candidates: SupportedFact[]) {
+export function reductionSchema(_sources: SourcePiece[], candidates: readonly unknown[]) {
   // Every candidate has a required assignment; the model cannot omit claims or
   // generate replacement prose, speakers, kinds or citations.
   return { type: "object", properties: Object.fromEntries(candidates.map((_, id) => [String(id), {

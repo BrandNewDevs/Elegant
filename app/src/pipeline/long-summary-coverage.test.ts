@@ -329,6 +329,32 @@ describe("complete long Summary coverage", () => {
     expect(result.participants[0]!.said.some(point => point.startsWith("Earlier"))).toBe(false);
   });
 
+  it("constrains each disposition candidate to strictly later source choices in its schema", async () => {
+    const { model, requests } = adapter();
+    await createGroundedSummariser({ model })(uniqueCommitments());
+    const comparisons = requests.filter(request => "updates" in (request.schema as { properties: object }).properties);
+    expect(comparisons.length).toBeGreaterThan(0);
+    for (const request of comparisons) {
+      const input = data(request);
+      const schema = request.schema as { properties: { updates: { items: { anyOf: {
+        properties: { candidateId: { enum: number[] }; correctionSourceIds: { items: { enum: string[] } } };
+      }[] } } } };
+      for (const choice of schema.properties.updates.items.anyOf) {
+        const fact = input.candidates![choice.properties.candidateId.enum[0]!]!;
+        const own = input.sources!.filter(source => fact.sourceIds.includes(source.id) && source.speaker === fact.speaker)
+          .sort((left, right) => left.ref - right.ref || left.part - right.part).at(-1)!;
+        const ids = choice.properties.correctionSourceIds.items.enum;
+        expect(ids.length).toBeGreaterThan(0);
+        expect(ids.every(id => {
+          const source = input.sources!.find(source => source.id === id)!;
+          return source.ref > own.ref || source.ref === own.ref && source.part > own.part;
+        })).toBe(true);
+        expect(ids).not.toContain(own.id);
+      }
+      expect(requestBytes(request)).toBeLessThanOrEqual(5500);
+    }
+  });
+
   it.each(["unknown-source", "not-later", "unknown-candidate"])("rejects %s disposition evidence after bounded retries", async invalid => {
     const transcript = uniqueCommitments();
     const inner = adapter();
