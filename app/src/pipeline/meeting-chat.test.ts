@@ -537,7 +537,7 @@ describe("grounded Meeting chat", () => {
 
   it("rejects irrelevant budget prose and unrelated task counts instead of treating them as an amount", async () => {
     const { store, id, expectedRevision } = setup();
-    for (const text of ["Markdown is agreed for export; email will be revisited later.", "Speaker 1 has three testing tasks."]) {
+    for (const text of ["Markdown is agreed for export; email will be revisited later.", "Speaker 1 has three testing tasks.", "One person was approved for the task.", "We approved one person for the task."]) {
       const model = fake(() => ({ text, sourceIds: ["1:0"], sufficient: true }));
       const result = await createMeetingChat({ store, model })({ ...input(id, expectedRevision), question: "What is the email service budget?" });
       expect(result.answer).toEqual({ text: CHAT_UNVERIFIED, refs: [], sufficient: false });
@@ -546,7 +546,7 @@ describe("grounded Meeting chat", () => {
     }
   });
 
-  it.each(["$500", "five hundred dollars", "five hundred", "1/2", "half of the budget", "The budget is zero.", "No budget was specified."])("accepts sourced budget values or explicit missing-budget statements: %s", async value => {
+  it.each(["$500", "five hundred dollars", "five hundred", "Five hundred was approved for it.", "Five hundred is the allocation.", "We approved five hundred for it.", "We allocated five hundred to it.", "We set aside five hundred for it.", "1/2", "half of the budget", "The budget is zero.", "No budget was specified."])("accepts sourced budget values or explicit missing-budget statements: %s", async value => {
     const source: Transcript = { segments: [{ start: 0, end: 5, speaker: "You", text: `We agreed: ${value}` }] };
     const { store, id, expectedRevision } = setup(source);
     const model = fake(() => ({ text: value, sourceIds: ["0:0"], sufficient: true }));

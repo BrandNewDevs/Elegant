@@ -111,6 +111,9 @@ function budgetAnswerIsTyped(question: string, answer: string): boolean {
   const text = answer.replace(/\bSpeaker\s+\d+\b/gi, "").replace(/\b\d+:\d+\b/g, "").trim();
   if (new RegExp(String.raw`(?<![\p{L}\p{N}_])(?:${CURRENCY}\s*${VALUE}|${VALUE}\s*${CURRENCY})(?![\p{L}\p{N}_])`, "iu").test(text)) return true;
   if (new RegExp(String.raw`\b(?:budget(?:ed)?|amount|costs?|price|fee|funding|allocation|value|allocated|spend|spent|pay|paid)\b\s*(?:(?:is|was|of|to|at|totals?|totaled|set at|[:=])\s*)?(?:(?:about|around|approximately|roughly|up to|at least|at most)\s+)?${VALUE}(?![\p{L}\p{N}_])`, "iu").test(text)) return true;
+  // Require the quantity to touch its allocation verb, so "one person was approved" is not an amount.
+  if (new RegExp(String.raw`^${VALUE}\s+(?:is|was|approved|allocated)\b`, "i").test(text)) return true;
+  if (new RegExp(String.raw`\b(?:approved|allocated|set aside)\s+${VALUE}(?=\s*(?:[.!?]|$)|\s+(?:for|to|towards?|of|in|on)\b)`, "i").test(text)) return true;
   return new RegExp(String.raw`^(?:(?:about|around|approximately|roughly|up to|at least|at most)\s+)?${VALUE}(?:\s*(?:%|percent|per cent))?(?:\s+(?:of\s+(?:the\s+)?(?:budget|amount|funds|total)|per\s+(?:month|week|year|person|unit)))?[.!]?$`, "i").test(text);
 }
 
