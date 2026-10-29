@@ -6,7 +6,7 @@ import { summaryPassages, type SummaryPassage } from './summary-passages.js';
 import { sourceStatements, matchStatements, statementKey, UnsupportedSummaryRewrite, type SourceStatement } from './summary-statements.js';
 import { InvalidSummaryError } from './validate-summary.js';
 
-export const SUMMARY_PROMPT_VERSION = 'readable-summary-v9';
+export const SUMMARY_PROMPT_VERSION = 'readable-summary-v10';
 interface Claim { speaker: string; text: string; sources: number[]; kind: string; atoms: SourceStatement[] }
 const kinds = ['update', 'decision', 'commitment', 'proposal', 'disagreement', 'unresolved'];
 const integers = { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'integer' } };
@@ -122,7 +122,14 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
     const overview = (items: Claim[]) => ({ openingTopic, statusPointIds: attention(items), points: items.map((point, id) => ({ id, speaker: point.speaker, text: point.text, kind: point.kind, lastMention: Math.max(...point.sources), wordCount: point.text.match(/\S+/gu)?.length ?? 0 })) });
     let claims: Claim[] = [];
     for (const speaker of [...new Set(passages.map(p => p.speaker))]) {
-      const owned = passages.filter(p => p.speaker === speaker);
+      // Repeated complete evidence needs only one model extraction. Keep the latest
+      // original references; short or unfinished passages retain every occurrence.
+      const seen = new Set<string>();
+      const owned = passages.filter(p => p.speaker === speaker).reverse().filter(p => {
+        if (p.text.length < 200 || !/^[A-Z]/u.test(p.text) || !/[.!?]$/u.test(p.text)) return true;
+        if (seen.has(p.text)) return false;
+        seen.add(p.text); return true;
+      }).reverse();
       for (let position = 0; position < owned.length;) {
         const batch: SummaryPassage[] = [];
         while (position < owned.length && fits('extract', { evidence: wire([...batch, owned[position]!]) })) batch.push(owned[position++]!);

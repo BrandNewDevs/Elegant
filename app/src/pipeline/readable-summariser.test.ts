@@ -85,6 +85,24 @@ describe('readable Summary production seam', () => {
   it('uses integer timeouts when less than one model timeout remains', async () => {
     await expect(createReadableSummariser({ model: model(), deadlineMs: 1000 })(transcript)).resolves.toHaveProperty('tldr');
   });
+  it('extracts exact repeated complete passages once and keeps the latest original references', async () => {
+    const repeated = 'The permission guide explains microphone access and system audio access separately, describes the buttons that trigger each permission request, and documents the recovery steps for a previously denied permission without making an implementation commitment.';
+    let copiesSent = 0;
+    const fake: TextModel = { async complete(request) {
+      const { data } = JSON.parse(request.messages[1]!.content);
+      copiesSent += data.evidence?.filter((e: { text: string }) => e.text === repeated).length ?? 0;
+      return { text: JSON.stringify(data.points ? { sentences: [{ covers: [0] }] } : { points: [] }), metadata: { model: 'fake', elapsedMs: 1 } };
+    } };
+    const result = await createReadableSummariser({ model: fake })({ segments: [
+      { start: 0, end: 5, speaker: 'You', text: repeated },
+      { start: 6, end: 7, speaker: 'Speaker 1', text: 'No owner assigned.' },
+      { start: 8, end: 13, speaker: 'You', text: repeated },
+    ] });
+    expect(copiesSent).toBe(1);
+    expect(result.participants.find(p => p.speaker === 'You')!.said).toEqual([repeated]);
+    expect(result.evidence!.participants.find(p => p.speaker === 'You')!.said).toEqual([[2]]);
+    expect(result.participants.find(p => p.speaker === 'Speaker 1')!.said).toContain('No owner assigned.');
+  });
   it('honours cancellation before contacting the model', async () => {
     const controller = new AbortController(); controller.abort();
     await expect(createReadableSummariser({ model: model() })(transcript, { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' });
