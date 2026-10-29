@@ -1,0 +1,55 @@
+{
+  "id": "fragmented-status-update",
+  "split": "tuning",
+  "synthetic": true,
+  "transcript": {
+    "segments": [
+      {
+        "start": 0,
+        "end": 12,
+        "speaker": "You",
+        "text": "We use Gemma 3 4B locally"
+      },
+      {
+        "start": 12,
+        "end": 13,
+        "speaker": "You",
+        "text": "through Ollama. It creates a TL;DR, organizes key points by speaker, and answers questions with Transcript references."
+      },
+      {
+        "start": 13,
+        "end": 20,
+        "speaker": "Speaker 1",
+        "text": "The tests are not finished. This call is one of the tests."
+      },
+      {
+        "start": 21,
+        "end": 23,
+        "speaker": "You",
+        "text": "Summary and Summary and Cut."
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "local-ai",
+      "text": "The app uses Gemma 3 4B through Ollama for local AI features.",
+      "speaker": "You",
+      "refs": [
+        0
+      ],
+      "critical": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "model",
+      "question": "Which model is used?",
+      "answer": "Gemma 3 4B",
+      "refs": [
+        0
+      ],
+      "critical": true
+    }
+  ]
+}
