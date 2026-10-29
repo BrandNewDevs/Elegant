@@ -338,7 +338,7 @@ export class AppCore {
     this.deps.store.setSetting(CHECK_FOR_UPDATES_SETTING, String(check));
   }
 
-  /** The newest release version the person has been told about, so the same release is not announced at every launch. */
+  /** The newest release version the person has been told about (that it is ready or could not be installed), so the same release is not announced at every launch. */
   get lastNotifiedUpdate(): string | undefined {
     return this.deps.store.getSetting(LAST_NOTIFIED_UPDATE_SETTING);
   }
@@ -442,6 +442,16 @@ export class AppCore {
     const pipelineJobs = this.jobs.snapshot.filter(job => job.owner === `meeting:${id}`);
     if (pipelineJobs.some(job => job.kind !== "summary")) return false;
     return meeting.state !== "processing" || (pipelineJobs.length > 0 && pipelineJobs.every(job => job.kind === "summary"));
+  }
+
+  /**
+   * Why the app must not be restarted right now, if it must not: a Recording is running or still being handed over by the
+   * engine, or AI work is queued or running. Quitting normally stops a Recording and cancels the work; an update does not.
+   */
+  get restartBlock(): "recording" | "ai-work" | undefined {
+    if (this._recording || this.recordingMeetingId !== undefined) return "recording";
+    if (this.jobs.snapshot.length > 0 || this.inFlight.size > 0) return "ai-work";
+    return undefined;
   }
 
   /** Resolves when managed AI work and its underlying native tasks have settled. */

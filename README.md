@@ -52,6 +52,12 @@ If you get stuck, or would rather not click through the dialog, you can remove t
 xattr -dr com.apple.quarantine /Applications/Elegant.app
 ```
 
+### Updates
+
+From version 0.1.3 on, Elegant updates itself. At launch it asks GitHub whether a newer release is published, downloads it in the background and shows **Version X is ready. Restart to update**; **Restart** (also in the menu bar) installs it and reopens the app. It never restarts by itself, and it refuses while a Recording is running or a Meeting is being processed. Updating sends nothing about you or your Meetings, and updates are accepted only if they are signed with the same certificate as the installed app. The **Check for updates** switch in Settings turns the check off. If an update fails, the toast links to the release page.
+
+Earlier versions have no updater, so the first update (to 0.1.3 or later) is installed by hand: download the `.dmg` as above and replace the app in Applications.
+
 ### Run from source
 
 ```sh
@@ -97,10 +103,10 @@ Run these from `app/`:
 | `pnpm test` | Build the engine, run its Swift tests, then the Vitest suite |
 | `pnpm start` | Build and run the menu-bar app |
 | `pnpm run package [identity]` | Build the signed `app/out/<name>.app` |
-| `pnpm run release <identity>` | Wrap the app in a `.dmg` and attach it to a draft GitHub release for `package.json`'s version |
+| `pnpm run release <identity>` | Build the `.dmg`, a `.zip` of the app and `latest-mac.yml` (what the updater reads) and attach all three to a draft GitHub release for `package.json`'s version |
 | `pnpm run eval:ai`, `eval:baseline`, `eval:retrieval` | AI evaluation harnesses (see [`evaluation`](./evaluation)) |
 
-Releases normally come from CI: push a `v<version>` tag that matches `app/package.json` and the Release workflow builds the `.dmg` and attaches it to a draft release. Publish the draft once you've checked it.
+Releases normally come from CI: push a `v<version>` tag that matches `app/package.json` and the Release workflow builds the `.dmg`, the `.zip` and `latest-mac.yml` and attaches them to a draft release. Publish the draft once you've checked it: installed copies of 0.1.3 or later see only a published release, so publishing is what rolls the update out.
 
 ### Layout
 

@@ -1,7 +1,8 @@
 #!/bin/zsh
-# Builds out/<display name>-<version>.dmg (scripts/dmg.sh) and attaches it to a draft GitHub release v<version> at the
-# current commit. Publish the draft on GitHub once it has been checked. The Release workflow runs this for a pushed
-# v<version> tag; run it by hand only when CI cannot.
+# Builds out/<display name>-<version>.dmg (scripts/dmg.sh) and the update files next to it (scripts/update-archive.sh: a .zip of
+# the app and latest-mac.yml, which the in-app updater reads), and attaches all three to a draft GitHub release v<version> at
+# the current commit. Publish the draft on GitHub once it has been checked; the updater only sees a published release. The
+# Release workflow runs this for a pushed v<version> tag; run it by hand only when CI cannot.
 #
 # usage: pnpm run release <signing identity>
 # The identity is required: an ad-hoc app would lose its permissions on every update.
@@ -13,11 +14,13 @@ IDENTITY="${1:-${SIGN_IDENTITY:-}}"
 [ -z "$(git status --porcelain)" ] || { echo "commit or set aside your changes first; the release is tagged at HEAD" >&2; exit 1; }
 
 scripts/dmg.sh "$IDENTITY"
+scripts/update-archive.sh
 
 NAME=$(node --input-type=module -e 'import { DISPLAY_NAME } from "./dist/config.js"; console.log(DISPLAY_NAME)')
 VERSION=$(node -p 'require("./package.json").version')
 TAG="v$VERSION"
 DMG="out/$NAME-$VERSION.dmg"
+ZIP="out/${NAME// /-}-$VERSION-arm64.zip" # the name scripts/update-archive.sh gives it
 
 # The draft's body: this template (install steps, permissions), then the "What's Changed" list that GitHub generates
 # from the pull requests merged since the previous release (everything so far, for the first release). The list comes
@@ -37,6 +40,10 @@ If you get stuck, or would rather never see the dialog, this optional command re
 xattr -dr com.apple.quarantine /Applications/$NAME.app
 \`\`\`
 
+## Updating
+
+From version 0.1.3 on, $NAME updates itself: it downloads a newer release in the background and offers **Restart to update**, never during a Recording or while a Meeting is being processed. Earlier versions have no updater, so the first update has to be installed by hand as above. The \`.zip\` and \`latest-mac.yml\` attached to this release are what the updater reads; they are not an install, and you can ignore them.
+
 ## Permissions
 
 $NAME needs the **microphone** and **system audio capture**. It asks only when you press the button for each in onboarding or Settings, never on its own. macOS ties these grants to the signing identity, and every release is signed with the same one, so updating does not ask again.
@@ -48,5 +55,5 @@ EOF
 
 # In the Release workflow the commit is already on GitHub, checked out at its tag.
 [ -n "${GITHUB_ACTIONS:-}" ] || git push -q origin HEAD
-gh release create "$TAG" "$DMG" --draft --target "$(git rev-parse HEAD)" --title "$NAME $VERSION" --notes-file "$NOTES" --generate-notes
+gh release create "$TAG" "$DMG" "$ZIP" out/latest-mac.yml --draft --target "$(git rev-parse HEAD)" --title "$NAME $VERSION" --notes-file "$NOTES" --generate-notes
 rm -f "$NOTES"

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import type { UpdateNotice } from "../../core/update-check";
+import type { UpdateState } from "../../core/updater";
 import type { Meeting } from "../../store/store";
 import type { MeetingsViewState } from "../../shared/meetings-view-state";
 import { createMeetingsApi, nothingDone } from "@/lib/test-electron";
@@ -129,17 +129,52 @@ it("opens the Profile page from the sidebar and goes back to the Meeting when on
   expect(screen.queryByRole("heading", { name: "Profile" })).toBeNull();
 });
 
-it("toasts a newer release with a View release button that asks to open its page", async () => {
-  let announce: (update: UpdateNotice) => void = () => {};
-  window.electron.meetings.onUpdateAvailable = vi.fn((callback: (update: UpdateNotice) => void) => {
+type UpdateNews = Exclude<UpdateState, { status: "idle" }>;
+
+function subscribeToUpdates() {
+  let announce: (update: UpdateNews) => void = () => {};
+  window.electron.meetings.onUpdate = vi.fn((callback: (update: UpdateNews) => void) => {
     announce = callback;
     return () => {};
   });
-  render(<MeetingsApp />);
-  expect(screen.queryByText("Version 0.2.0 is available")).toBeNull();
+  return (update: UpdateNews) => act(() => announce(update));
+}
 
-  act(() => announce({ version: "0.2.0", url: "https://github.com/BrandNewDevs/Elegant/releases/tag/v0.2.0" }));
-  expect(await screen.findByText("Version 0.2.0 is available")).toBeTruthy();
+it("shows an update downloading, then ready with a Restart button that asks the app to restart", async () => {
+  const announce = subscribeToUpdates();
+  window.electron.meetings.restartForUpdate = vi.fn(async () => ({ ok: true as const }));
+  render(<MeetingsApp />);
+
+  announce({ status: "downloading", version: "0.2.0", percent: 42 });
+  expect(await screen.findByText("Downloading version 0.2.0… 42%")).toBeTruthy();
+
+  announce({ status: "ready", version: "0.2.0" });
+  expect(await screen.findByText("Version 0.2.0 is ready. Restart to update")).toBeTruthy();
+  expect(screen.queryByText(/Downloading version/)).toBeNull(); // one toast, replaced in place
+  expect(window.electron.meetings.restartForUpdate).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Restart" }));
+  expect(window.electron.meetings.restartForUpdate).toHaveBeenCalledTimes(1);
+});
+
+it("says why when the app refuses to restart, and keeps the Restart button for later", async () => {
+  const announce = subscribeToUpdates();
+  window.electron.meetings.restartForUpdate = vi.fn(async () => ({ ok: false as const, reason: "A Recording is in progress. Stop it first, then restart to update." }));
+  render(<MeetingsApp />);
+
+  announce({ status: "ready", version: "0.2.0" });
+  fireEvent.click(await screen.findByRole("button", { name: "Restart" }));
+  expect(await screen.findByText("A Recording is in progress. Stop it first, then restart to update.")).toBeTruthy();
+  expect(screen.getByText("Version 0.2.0 is ready. Restart to update")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Restart" }));
+  expect(window.electron.meetings.restartForUpdate).toHaveBeenCalledTimes(2);
+});
+
+it("toasts a failed update with a View release button that asks to open its page", async () => {
+  const announce = subscribeToUpdates();
+  render(<MeetingsApp />);
+
+  announce({ status: "failed", version: "0.2.0", url: "https://github.com/BrandNewDevs/Elegant/releases/tag/v0.2.0", message: "no" });
+  expect(await screen.findByText("Could not update to version 0.2.0")).toBeTruthy();
   expect(window.electron.meetings.openRelease).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "View release" }));
   expect(window.electron.meetings.openRelease).toHaveBeenCalledTimes(1);

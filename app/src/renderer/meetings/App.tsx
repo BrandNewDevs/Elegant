@@ -89,14 +89,36 @@ export function MeetingsApp() {
       setMeetings(state.meetings);
       setSelected(state.selected);
     });
-    // A newer release stays on screen until the person closes it; it only links to the release page, nothing is installed.
-    const unsubscribeUpdate = window.electron.meetings.onUpdateAvailable((update) => {
-      toast(`Version ${update.version} is available`, {
-        id: `update-${update.version}`,
-        duration: Infinity,
-        closeButton: true,
-        action: { label: "View release", onClick: () => window.electron.meetings.openRelease() },
-      });
+    // One toast follows an update from downloading to ready (or failed) and stays on screen until the person closes it. Restart
+    // keeps it open when the app refuses (a Recording or AI work is going on), so it can be pressed again later.
+    const unsubscribeUpdate = window.electron.meetings.onUpdate((update) => {
+      const id = "update";
+      if (update.status === "downloading") {
+        toast.loading(`Downloading version ${update.version}… ${update.percent}%`, { id, duration: Infinity });
+      } else if (update.status === "ready") {
+        toast(`Version ${update.version} is ready. Restart to update`, {
+          id,
+          duration: Infinity,
+          closeButton: true,
+          action: {
+            label: "Restart",
+            onClick: (event) => {
+              event.preventDefault();
+              void window.electron.meetings.restartForUpdate().then((result) => {
+                if (!result.ok) toast.error(result.reason, { id: "update-refused", duration: 8000 });
+              });
+            },
+          },
+        });
+      } else {
+        toast.error(`Could not update to version ${update.version}`, {
+          id,
+          description: "You can still download it from the release page.",
+          duration: Infinity,
+          closeButton: true,
+          action: { label: "View release", onClick: () => window.electron.meetings.openRelease() },
+        });
+      }
     });
     window.electron.meetings.ready();
     return () => {

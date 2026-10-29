@@ -119,7 +119,7 @@ function UpdatesCard({ checkForUpdates, name }: { checkForUpdates: boolean; name
             </Label>
           </CardHeading>
           <CardDescription>
-            When {name} starts, it asks GitHub whether a newer release is out and tells you with a link. It sends nothing about you or your Meetings, and installs nothing.
+            When {name} starts, it asks GitHub whether a newer release is out and downloads it in the background. You choose when to restart into it, and not while a Recording or a Meeting's processing is under way. It sends nothing about you or your Meetings.
           </CardDescription>
         </div>
         <Switch id="check-for-updates" checked={checkForUpdates} onCheckedChange={(checked) => window.electron.meetings.setCheckForUpdates(checked)} />

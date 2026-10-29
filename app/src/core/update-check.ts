@@ -1,29 +1,3 @@
-/** A published release newer than the running app. */
-export interface UpdateNotice {
-  /** The version without its leading `v`, for example `0.2.0`. */
-  version: string;
-  /** The release page on github.com. */
-  url: string;
-}
-
-export interface UpdateCheckOptions {
-  /** The running app's version, as in package.json. */
-  currentVersion: string;
-  /** `owner/name` of the GitHub repository. */
-  repo: string;
-  /** Sent as the User-Agent, which the GitHub API requires: the display name and version. */
-  userAgent: string;
-  fetch: typeof fetch;
-  /** Whether the person allows the check; asked before the request and again once it has answered. */
-  enabled: () => boolean;
-  /** The last version the person was told about, so the same release is not announced twice. */
-  lastNotified: () => string | undefined;
-  /** How long to wait for GitHub before giving up. */
-  timeoutMs?: number;
-}
-
-const DEFAULT_TIMEOUT_MS = 5000;
-
 interface Semver {
   core: number[];
   prerelease: string[];
@@ -73,33 +47,17 @@ export function isGithubUrl(url: unknown): url is string {
   }
 }
 
+/** The page of a release on github.com, where the person can download it by hand. */
+export function releasePageUrl(repo: string, version: string): string {
+  return `https://github.com/${repo}/releases/tag/v${version}`;
+}
+
 /**
- * Asks GitHub for the repository's latest published release (never a draft or a pre-release) and returns it when it is newer
- * than the running app and the person has not been told about it yet. A plain GET that sends nothing about the person; every
- * failure, an offline Mac included, is silent and gives undefined. It downloads and installs nothing.
+ * Whether a release feed (`latest-mac.yml`) is acceptable: every file is a bare file name, which electron-updater resolves
+ * inside the release's own download folder on github.com (a scheme, host or path could point anywhere else), and carries
+ * the sha512 the download is checked against.
  */
-export async function checkForUpdate(options: UpdateCheckOptions): Promise<UpdateNotice | undefined> {
-  if (!options.enabled()) return undefined;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-  let release: unknown;
-  try {
-    const response = await options.fetch(`https://api.github.com/repos/${options.repo}/releases/latest`, {
-      headers: { "User-Agent": options.userAgent, Accept: "application/vnd.github+json" },
-      signal: controller.signal,
-    });
-    if (!response.ok) return undefined;
-    release = await response.json();
-  } catch {
-    return undefined;
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!options.enabled() || !release || typeof release !== "object") return undefined;
-  const { tag_name, html_url, draft, prerelease } = release as Record<string, unknown>;
-  if (draft !== false || prerelease !== false || typeof tag_name !== "string" || !isGithubUrl(html_url)) return undefined;
-  const version = tag_name.replace(/^v/, "");
-  if ((compareVersions(version, options.currentVersion) ?? 0) <= 0) return undefined;
-  if (version === options.lastNotified()) return undefined;
-  return { version, url: html_url };
+export function isAcceptableFeed(files: readonly { url?: unknown; sha512?: unknown }[]): boolean {
+  return files.length > 0 && files.every(({ url, sha512 }) =>
+    typeof url === "string" && /^[A-Za-z0-9._-]+$/.test(url) && typeof sha512 === "string" && sha512.length > 0);
 }

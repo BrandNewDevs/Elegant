@@ -57,6 +57,23 @@ mkdir -p "$APP/Contents/Resources/app"
 cp package.json "$APP/Contents/Resources/app/"
 rsync -a --exclude evaluation dist "$APP/Contents/Resources/app/"
 
+# The main process's runtime dependencies (electron-updater and what it needs), installed from the lockfile as plain
+# folders: everything else is bundled by Vite, so it is a devDependency and stays out of the app.
+DEPS=$(mktemp -d)
+trap 'rm -rf "$DEPS"' EXIT
+cp package.json pnpm-lock.yaml "$DEPS/"
+(cd "$DEPS" && pnpm install --prod --frozen-lockfile --ignore-scripts --config.node-linker=hoisted >/dev/null)
+rsync -a --exclude '/.*' "$DEPS/node_modules" "$APP/Contents/Resources/app/"
+
+# Where electron-updater looks for updates: the releases of RELEASES_REPO, whose latest-mac.yml names the .zip.
+REPO=$(node --input-type=module -e 'import { RELEASES_REPO } from "./dist/config.js"; console.log(RELEASES_REPO)')
+cat > "$APP/Contents/Resources/app-update.yml" <<EOF
+provider: github
+owner: ${REPO%%/*}
+repo: ${REPO##*/}
+updaterCacheDirName: $BUNDLE_ID-updater
+EOF
+
 mkdir -p "$APP/Contents/Helpers"
 cp ../engine/.build/release/engine "$APP/Contents/Helpers/engine"
 

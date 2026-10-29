@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { AppCore } from "../core/app-core.js";
 import { formatElapsed } from "../core/elapsed.js";
 import { ignoredAppsFile } from "../core/ignored-apps.js";
-import { checkForUpdate } from "../core/update-check.js";
+import { Updater } from "../core/updater.js";
 import { ProcessEngine } from "../engine/process-engine.js";
 import { createEngineTranscriber } from "../pipeline/engine-transcriber.js";
 import { createMeetingChat } from "../pipeline/meeting-chat.js";
@@ -20,6 +20,7 @@ import { MeetingsWindow } from "./meetings-window.js";
 import { OnboardingWindow } from "./onboarding-window.js";
 import { SetupBridge } from "./setup-bridge.js";
 import { STATUS_LABEL } from "./status-label.js";
+import { createUpdateDriver } from "./update-driver.js";
 
 const RECORDING_SYMBOL = "⏺";
 
@@ -33,6 +34,9 @@ let core: AppCore | undefined;
 let prompt: { close(): void } | undefined;
 let meetingsWindow: MeetingsWindow | undefined;
 let launch: Launch | undefined;
+let updater: Updater | undefined;
+// Set while the app quits to install an update: quitting closes every window, and none may open in its place.
+let quittingForUpdate = false;
 
 let ignoredAppsPath = "";
 
@@ -45,11 +49,18 @@ function applyShowInDock(show: boolean): void {
   else app.dock?.hide();
 }
 
+// The menu bar keeps the Restart item for as long as an update is ready, since the toast is shown only once.
+function restartForUpdate(): void {
+  const result = updater?.restart();
+  if (result && !result.ok) new Notification({ title: `${DISPLAY_NAME} cannot restart yet`, body: result.reason }).show();
+}
+
 function render(): void {
   if (!tray || !core) return;
   const { symbol, text } = STATUS_LABEL[core.status];
   const recording = core.recording;
   const elapsed = recording ? formatElapsed(recording.startedAt) : undefined;
+  const ready = updater?.state.status === "ready" ? updater.state : undefined;
   tray.setTitle(recording ? `${RECORDING_SYMBOL} ${elapsed}` : symbol);
   tray.setToolTip(recording ? `${DISPLAY_NAME}: recording ${recording.app}, ${elapsed}` : `${DISPLAY_NAME}: ${text}`);
   tray.setContextMenu(
@@ -61,6 +72,7 @@ function render(): void {
           ]
         : []),
       { label: text, enabled: false },
+      ...(ready ? [{ label: `Restart to update to version ${ready.version}`, click: restartForUpdate }] : []),
       { type: "separator" },
       { label: `Open ${DISPLAY_NAME}`, click: () => launch?.open() },
       { label: "Settings…", accelerator: "Command+,", click: () => meetingsWindow?.show({ settings: true }) },
@@ -133,9 +145,21 @@ app.whenReady().then(() => {
     done: (sender) => BrowserWindow.fromWebContents(sender)?.close(),
     openSettings: () => meetingsWindow?.show({ settings: true }),
   });
-  meetingsWindow = new MeetingsWindow(core, setup, setupBridge);
+  // A run from source never updates: it would replace the bare Electron binary.
+  if (app.isPackaged) {
+    updater = new Updater({
+      currentVersion: app.getVersion(),
+      repo: RELEASES_REPO,
+      driver: createUpdateDriver({ userAgent: `${DISPLAY_NAME}/${app.getVersion()}` }),
+      enabled: () => core!.checkForUpdates,
+      restartBlock: () => core!.restartBlock,
+      onInstalling: (installing) => { quittingForUpdate = installing; },
+    });
+    updater.onChange(render);
+  }
+  meetingsWindow = new MeetingsWindow(core, setup, setupBridge, updater);
   const onboardingWindow = new OnboardingWindow(setupBridge);
-  launch = new Launch(setup, meetingsWindow, onboardingWindow, app.getLoginItemSettings().wasOpenedAtLogin);
+  launch = new Launch(setup, meetingsWindow, onboardingWindow, app.getLoginItemSettings().wasOpenedAtLogin, () => quittingForUpdate);
 
   // A menu-bar app at start (LSUIElement); the "Show in Dock" setting, on unless turned off, adds a Dock icon, whose click opens the main window ("activate").
   applyShowInDock(core.showInDock);
@@ -197,17 +221,8 @@ app.whenReady().then(() => {
   // Permissions that were granted before are checked silently once the engine is up. Onboarding opens only when one is
   // missing, even at login, and on a first launch it opens before the Meetings window does.
   launch.start();
-  // A run from source never checks. The toast waits for the Meetings window; nothing opens one for it.
-  if (app.isPackaged) {
-    void checkForUpdate({
-      currentVersion: app.getVersion(),
-      repo: RELEASES_REPO,
-      userAgent: `${DISPLAY_NAME}/${app.getVersion()}`,
-      fetch,
-      enabled: () => core!.checkForUpdates,
-      lastNotified: () => core!.lastNotifiedUpdate,
-    }).then((update) => update && meetingsWindow?.offerUpdate(update));
-  }
+  // Checks and downloads in the background. The toast needs the Meetings window, and nothing opens one for it.
+  void updater?.start();
 
   let quitting = false;
   app.on("before-quit", (event) => {

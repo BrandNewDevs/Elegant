@@ -47,7 +47,7 @@ export function createMeetingsApi(overrides: Partial<MeetingsApi> = {}) {
     ready: vi.fn(),
     onState: vi.fn((_callback: Parameters<MeetingsApi["onState"]>[0]) => () => {}),
     settings: vi.fn(), setShowInDock: vi.fn(), setCheckForUpdates: vi.fn(), openRelease: vi.fn(),
-    onUpdateAvailable: vi.fn((_callback: Parameters<MeetingsApi["onUpdateAvailable"]>[0]) => () => {}), select: vi.fn(), search: vi.fn(), rename: vi.fn(), export: vi.fn(),
+    onUpdate: vi.fn((_callback: Parameters<MeetingsApi["onUpdate"]>[0]) => () => {}), restartForUpdate: vi.fn(async () => ({ ok: true as const })), select: vi.fn(), search: vi.fn(), rename: vi.fn(), export: vi.fn(),
     regenerate: vi.fn(async () => {}), delete: vi.fn(async () => {}),
     sendQuestion: vi.fn(async (_payload: Parameters<MeetingsApi["sendQuestion"]>[0]) => {}),
     cancelQuestion: vi.fn(async (_payload: Parameters<MeetingsApi["cancelQuestion"]>[0]) => {}),

@@ -2,7 +2,8 @@ import { BrowserWindow, dialog, ipcMain, shell, type WebContents } from "electro
 import { writeFile } from "node:fs/promises";
 import type { AppCore } from "../core/app-core.js";
 import { DISPLAY_NAME } from "../config.js";
-import { isGithubUrl, type UpdateNotice } from "../core/update-check.js";
+import { isGithubUrl } from "../core/update-check.js";
+import type { Updater, UpdateState } from "../core/updater.js";
 import type { Setup } from "../setup/setup.js";
 import type { MeetingsViewState } from "../shared/meetings-view-state.js";
 import type { SetupBridge } from "./setup-bridge.js";
@@ -50,16 +51,19 @@ export class MeetingsWindow {
   private pageLoaded = false;
   /** Whether the page has subscribed to the push channels, so a message sent now is not lost. */
   private rendererReady = false;
-  /** A release found while no window was open to show it, announced the next time one opens. */
-  private pendingUpdate: UpdateNotice | undefined;
-  /** The release announced last, the only page "View release" opens. */
-  private announcedUpdate: UpdateNotice | undefined;
+  /** The latest news about an update that no window has shown yet, held until one can. */
+  private pendingUpdate: Exclude<UpdateState, { status: "idle" }> | undefined;
+  /** The release page of the update that failed, the only page "View release" opens. */
+  private failedReleaseUrl: string | undefined;
 
+  /** `updater` is absent in a run from source, which never updates. */
   constructor(
     private readonly core: AppCore,
     private readonly setup: Setup,
     private readonly bridge: SetupBridge,
+    private readonly updater?: Updater,
   ) {
+    updater?.onChange(state => this.offerUpdate(state));
     core.onMeetingsChanged(() => this.pushState());
     core.onShowInDockChange(() => this.pushState());
     core.onChatChanged(() => this.pushState());
@@ -97,8 +101,12 @@ export class MeetingsWindow {
       this.pushState();
     });
     ipcMain.on("meetings:open-release", (event) => {
-      if (!this.fromThis(event.sender) || !isGithubUrl(this.announcedUpdate?.url)) return;
-      void shell.openExternal(this.announcedUpdate.url);
+      if (!this.fromThis(event.sender) || !isGithubUrl(this.failedReleaseUrl)) return;
+      void shell.openExternal(this.failedReleaseUrl);
+    });
+    ipcMain.handle("meetings:restart-for-update", (event) => {
+      this.requireFromThis(event.sender);
+      return this.updater?.restart() ?? { ok: false, reason: "This copy of the app does not update itself." };
     });
     ipcMain.on("meetings:select", (event, id: number) => {
       if (!this.fromThis(event.sender) || !validMeetingId(id)) return;
@@ -204,10 +212,12 @@ export class MeetingsWindow {
   }
 
   /**
-   * A newer release was found. The toast needs a visible window, so it goes to the open one now, or waits for the next time one
-   * opens; this never opens a window itself. Once announced, the person has been told about that version.
+   * News about an update: it is downloading, ready to install, or failed. The toast needs a visible window, so it goes to the
+   * open one now, or waits for the next time one opens; this never opens a window itself. Once a release was announced as
+   * ready or failed, the person has been told about that version and it is not announced again.
    */
-  offerUpdate(update: UpdateNotice): void {
+  offerUpdate(update: UpdateState): void {
+    if (update.status === "idle" || update.version === this.core.lastNotifiedUpdate) return;
     this.pendingUpdate = update;
     this.announceUpdate();
   }
@@ -216,9 +226,9 @@ export class MeetingsWindow {
     const update = this.pendingUpdate;
     if (!update || !this.window || this.window.isDestroyed() || !this.rendererReady) return;
     this.pendingUpdate = undefined;
-    this.announcedUpdate = update;
-    this.core.setLastNotifiedUpdate(update.version);
-    this.window.webContents.send("meetings:update-available", update);
+    if (update.status !== "downloading") this.core.setLastNotifiedUpdate(update.version);
+    if (update.status === "failed") this.failedReleaseUrl = update.url;
+    this.window.webContents.send("meetings:update", update);
   }
 
   private setSettingsOpen(open: boolean, push = true): void {

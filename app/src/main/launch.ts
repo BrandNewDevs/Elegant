@@ -28,9 +28,11 @@ export class Launch {
     private readonly meetings: LaunchMeetings,
     private readonly onboarding: LaunchOnboarding,
     private readonly wasOpenedAtLogin: boolean,
+    /** True while the app is quitting to install an update: windows are closing then, and none may open in their place. */
+    private readonly quitting: () => boolean = () => false,
   ) {
     onboarding.onClosed(() => {
-      if (!wasOpenedAtLogin) meetings.show();
+      if (!wasOpenedAtLogin && !quitting()) meetings.show();
     });
   }
 
@@ -60,6 +62,7 @@ export class Launch {
 
   /** The Meetings window for a request to open the app (the menu bar item, a second launch), unless onboarding is still open. */
   open(): void {
+    if (this.quitting()) return;
     if (this.onboarding.isOpen) this.onboarding.show();
     else this.meetings.show();
   }
