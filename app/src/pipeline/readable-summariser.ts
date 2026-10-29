@@ -44,12 +44,15 @@ function parsePoints(text: string, evidence: SummaryPassage[], draft?: Claim[]):
       if (!sources.every(id => allowed.has(id))) return fail('Cite evidence belonging to covered claims');
       covers.forEach(id => covered.add(id));
     }
-    return { speaker, text: nonblank(raw.text), sources, kind: raw.kind };
+    const text = nonblank(raw.text);
+    if (/\[\s*\d+(?:[\s,]+\d+)*\s*\]/u.test(text)) return fail('Citation IDs belong only in sources, never prose');
+    return { speaker, text, sources, kind: raw.kind };
   });
-  if (draft && covered.size !== draft.length) return fail('Cover every supplied claim ID');
+  if (draft && covered.size !== draft.length) return fail('Missing covers IDs: ' + draft.flatMap((c, id) => covered.has(id) ? [] : [`${id}(${c.speaker})`]).join(', ').slice(0, 115));
   return points;
 }
 export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, deadlineMs = 900000 }: { model: TextModel; attempts?: number; maxCalls?: number; deadlineMs?: number }) {
+  for (const [name, value] of Object.entries({ attempts, maxCalls, deadlineMs })) if (!Number.isInteger(value) || value < 1) throw new Error(`${name} must be a positive integer`);
   return async (transcript: Transcript, context: PipelineContext = {}): Promise<Summary> => {
     if (!transcript.segments.length) throw new Error('The Transcript is empty');
     const started = performance.now(), deadline = AbortSignal.timeout(deadlineMs);
@@ -87,7 +90,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       const next: Claim[] = [];
       for (let position = 0; position < claims.length;) {
         const batch: Claim[] = [];
-        const payload = (items: Claim[]) => ({ claims: items.map((c, id) => ({ id, ...c })), evidence: wire(evidenceFor(items)) });
+        const payload = (items: Claim[]) => ({ requiredCoverage: Object.fromEntries([...new Set(items.map(c => c.speaker))].map(speaker => [speaker, items.flatMap((c, id) => c.speaker === speaker ? [id] : [])])), claims: items.map((c, id) => ({ id, ...c })), evidence: wire(evidenceFor(items)) });
         while (position < claims.length && fits('reduce', payload([...batch, claims[position]!]))) batch.push(claims[position++]!);
         if (!batch.length) { next.push(claims[position++]!); continue; }
         next.push(...(batch.length === 1 ? batch : await ask('reduce', payload(batch), text => parsePoints(text, evidenceFor(batch), batch))));
@@ -120,7 +123,9 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
     if (!fits('tldr', payload)) throw new Error('Summary incomplete: final evidence exceeds the TL;DR budget');
     const sentences = await ask('tldr', payload, text => {
       const v = object(text); if (!Array.isArray(v.sentences) || !v.sentences.length || v.sentences.length > 3) return fail('Return one to three supported sentences');
+      if (v.sentences.some(s => !s || typeof s !== 'object')) return fail('Return structured sentences');
       const parsed = v.sentences.map(s => ({ text: nonblank(s.text), sources: ids(s.sources, evidence.map(e => e.id)) }));
+      if (parsed.some(s => /\[\s*\d+(?:[\s,]+\d+)*\s*\]/u.test(s.text))) return fail('Citation IDs belong only in sources, never prose');
       if (parsed.map(s => s.text).join(' ').match(/\S+/gu)!.length > 90) return fail('TL;DR must contain at most 90 words');
       return parsed;
     });

@@ -35,6 +35,13 @@ describe('readable Summary production seam', () => {
   it('rejects foreign speaker evidence', async () => {
     await expect(createReadableSummariser({ attempts: 1, model: model(() => ({ points: [{ speaker: 'You', text: 'Wrong speaker.', kind: 'update', sources: [1] }] })) })(transcript)).rejects.toThrow('own speech');
   });
+  it('rejects missing claim coverage during consolidation', async () => {
+    const fake = model((stage, data) => stage === 'extract' ? { points: [
+      { speaker: 'You', text: 'Runs locally.', sources: [0], kind: 'update' },
+      { speaker: 'You', text: 'No owner assigned.', sources: [0], kind: 'unresolved' },
+    ] } : stage === 'reduce' ? { points: [{ speaker: 'You', text: 'Runs locally.', sources: [0], kind: 'update', covers: [0] }] } : undefined);
+    await expect(createReadableSummariser({ attempts: 1, model: fake })(transcript)).rejects.toThrow('Missing covers IDs');
+  });
   it('honours cancellation before contacting the model', async () => {
     const controller = new AbortController(); controller.abort();
     await expect(createReadableSummariser({ model: model() })(transcript, { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' });
