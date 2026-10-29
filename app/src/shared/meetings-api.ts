@@ -1,4 +1,4 @@
-import type { UpdateNotice } from "../core/update-check.js";
+import type { RestartResult, UpdateState } from "../core/updater.js";
 import type { MeetingsViewState } from "./meetings-view-state.js";
 
 export interface SendQuestionInput { meetingId: number; requestId: string; question: string }
@@ -13,10 +13,14 @@ export interface MeetingsApi {
   settings(open: boolean): void;
   setShowInDock(show: boolean): void;
   setCheckForUpdates(check: boolean): void;
-  /** Runs when a newer release was found, once the window is open to show it. */
-  onUpdateAvailable(callback: (update: UpdateNotice) => void): () => void;
-  /** Opens the release page of the update just announced in the default browser. */
+  /** Runs as an update downloads, is ready or fails, once the window is open to show it. */
+  onUpdate(callback: (update: Exclude<UpdateState, { status: "idle" }>) => void): () => void;
+  /** Quits and installs the ready update, unless a Recording or AI work is going on; says why when it does not. */
+  restartForUpdate(): Promise<RestartResult>;
+  /** Opens the release page of the update that failed in the default browser. */
   openRelease(): void;
+  /** Stops the Recording in progress, as the menu bar's Stop does. */
+  stopRecording(): void;
   select(id: number): void;
   search(query: string): void;
   rename(payload: { meetingId: number; label: string; name: string }): void;

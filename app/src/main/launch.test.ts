@@ -6,6 +6,7 @@ import { Launch } from "./launch.js";
 
 /** Stands in for the onboarding window, so the order in which windows open can be read off one list. */
 function launch({ granted = false, atLogin = false } = {}) {
+  let quitting = false;
   const store = openStore(":memory:");
   if (granted) {
     store.setSetting("permission.microphone", "granted");
@@ -22,7 +23,7 @@ function launch({ granted = false, atLogin = false } = {}) {
     onClosed(listener: () => void) { closedListeners.push(listener); },
   };
   const meetings = { show: () => void opened.push("meetings") };
-  const l = new Launch(setup, meetings, onboarding, atLogin);
+  const l = new Launch(setup, meetings, onboarding, atLogin, () => quitting);
   l.start();
   return {
     l, opened, engine,
@@ -34,6 +35,8 @@ function launch({ granted = false, atLogin = false } = {}) {
       }
     },
     closeOnboarding() { open = false; for (const c of closedListeners) c(); },
+    /** The app starts quitting to install an update. */
+    quitForUpdate() { quitting = true; },
   };
 }
 
@@ -128,5 +131,25 @@ describe("a launch where only the microphone was allowed already", () => {
     const t = launch();
     t.engineReady({ microphone: true });
     expect(t.opened).toEqual(["onboarding"]);
+  });
+});
+
+describe("quitting to install an update", () => {
+  it("opens no window as onboarding closes, or when asked to open the app", () => {
+    const t = launch();
+    t.engineReady({ microphone: false });
+    t.quitForUpdate();
+    t.closeOnboarding(); // quitting closes every window; the Meetings window must not take its place
+    t.l.open();
+    t.l.activate();
+    expect(t.opened).toEqual(["onboarding"]);
+  });
+
+  it("opens no window for a request to open the app", () => {
+    const t = launch({ granted: true });
+    t.quitForUpdate();
+    t.l.open();
+    t.l.activate();
+    expect(t.opened).toEqual(["meetings"]); // only the launch's own
   });
 });

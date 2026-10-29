@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppCore } from "../core/app-core.js";
+import { Updater } from "../core/updater.js";
 import { openStore, type Store } from "../store/store.js";
 import { FakeEngine } from "../testing/fake-engine.js";
 import { fakePipeline, fixtureSummary, fixtureTranscript } from "../testing/fake-pipeline.js";
@@ -132,53 +133,156 @@ describe("Meetings window application bridge", () => {
     expect(ctx.window.webContents.send.mock.calls.some(([channel, value]) => channel === "setup:state" && (value as { userName: string }).userName === "Jordan")).toBe(true);
   });
 
-  it("holds an update toast until a Meetings window is ready, opens no window for it, and announces it once", () => {
+  it("holds update news until a Meetings window is ready, opens no window for it, and announces a ready update once", () => {
     const store = openStore(":memory:");
     const engine = new FakeEngine();
     const core = new AppCore({ engine, store, pipeline: fakePipeline() });
     const setup = new Setup(engine, store, { speechModel: "tiny.en", modelsDirectory: "/tmp/synthetic-models", jobs: core.jobs, checkOllama: async () => ({ status: "ready" }) });
     const view = new MeetingsWindow(core, setup, new SetupBridge(setup, { done: () => {}, openSettings: () => {} }));
-    const update = { version: "0.2.0", url: "https://github.com/BrandNewDevs/Elegant/releases/tag/v0.2.0" };
+    const downloading = { status: "downloading", version: "0.2.0", percent: 40 } as const;
+    const ready = { status: "ready", version: "0.2.0" } as const;
 
-    view.offerUpdate(update);
+    view.offerUpdate(downloading);
+    view.offerUpdate(ready);
     expect(electron.windows).toHaveLength(0);
     expect(core.lastNotifiedUpdate).toBeUndefined();
 
     view.show();
     const window = electron.windows[0]!;
     window.loaded();
-    const updates = () => window.webContents.send.mock.calls.filter(([channel]) => channel === "meetings:update-available");
+    const updates = () => window.webContents.send.mock.calls.filter(([channel]) => channel === "meetings:update");
     expect(updates()).toHaveLength(0); // the page has not subscribed yet
     electron.events.get("meetings:ready")!({ sender: window.webContents });
-    expect(updates()).toEqual([["meetings:update-available", update]]);
+    expect(updates()).toEqual([["meetings:update", ready]]); // only the latest news
     expect(core.lastNotifiedUpdate).toBe("0.2.0");
 
     electron.events.get("meetings:ready")!({ sender: window.webContents });
+    view.offerUpdate(ready); // a later launch finds the same release again
     expect(updates()).toHaveLength(1);
+
+    view.offerUpdate({ status: "ready", version: "0.3.0" });
+    expect(updates()).toHaveLength(2);
+    expect(core.lastNotifiedUpdate).toBe("0.3.0");
 
     window.close();
     store.close();
   });
 
-  it("sends an update straight to the open window, and opens the release page only for an announced github.com URL", () => {
+  it("shows progress to the open window without counting it as told, and does not announce news about an idle updater", () => {
+    const ctx = context();
+    emit(ctx, "meetings:ready");
+    ctx.view.offerUpdate({ status: "idle" });
+    ctx.view.offerUpdate({ status: "downloading", version: "0.2.0", percent: 5 });
+    expect(ctx.window.webContents.send).toHaveBeenCalledWith("meetings:update", { status: "downloading", version: "0.2.0", percent: 5 });
+    expect(ctx.core.lastNotifiedUpdate).toBeUndefined(); // a download that never finishes is not "told"
+    expect(ctx.window.webContents.send.mock.calls.filter(([channel]) => channel === "meetings:update")).toHaveLength(1);
+  });
+
+  it("opens the release page only for a failed update's github.com URL, from the Meetings window", () => {
     const ctx = context();
     emit(ctx, "meetings:ready");
     emit(ctx, "meetings:open-release");
-    expect(electron.shell.openExternal).not.toHaveBeenCalled(); // nothing announced yet
+    expect(electron.shell.openExternal).not.toHaveBeenCalled(); // nothing failed yet
 
-    const update = { version: "0.2.0", url: "https://github.com/BrandNewDevs/Elegant/releases/tag/v0.2.0" };
-    ctx.view.offerUpdate(update);
-    expect(ctx.window.webContents.send).toHaveBeenCalledWith("meetings:update-available", update);
+    const failed = { status: "failed", version: "0.2.0", url: "https://github.com/BrandNewDevs/Elegant/releases/tag/v0.2.0", message: "no" } as const;
+    ctx.view.offerUpdate(failed);
+    expect(ctx.window.webContents.send).toHaveBeenCalledWith("meetings:update", failed);
     expect(ctx.core.lastNotifiedUpdate).toBe("0.2.0");
 
     emit(ctx, "meetings:open-release", undefined, {});
     expect(electron.shell.openExternal).not.toHaveBeenCalled(); // another web contents
     emit(ctx, "meetings:open-release");
-    expect(electron.shell.openExternal).toHaveBeenCalledExactlyOnceWith(update.url);
+    expect(electron.shell.openExternal).toHaveBeenCalledExactlyOnceWith(failed.url);
 
-    ctx.view.offerUpdate({ version: "0.3.0", url: "https://evil.example/x" });
+    ctx.view.offerUpdate({ ...failed, version: "0.3.0", url: "https://evil.example/x" });
     emit(ctx, "meetings:open-release");
     expect(electron.shell.openExternal).toHaveBeenCalledTimes(1);
+  });
+
+  describe("restarting to update", () => {
+    async function withUpdater() {
+      const ctx = context();
+      const driver = { check: vi.fn(async () => "0.2.0"), download: vi.fn(async () => {}), install: vi.fn() };
+      const updater = new Updater({ currentVersion: "0.1.2", repo: "BrandNewDevs/Elegant", driver, enabled: () => true, restartBlock: () => ctx.core.restartBlock });
+      const view = new MeetingsWindow(ctx.core, ctx.setup, new SetupBridge(ctx.setup, { done: () => {}, openSettings: () => {} }), updater);
+      view.show();
+      const window = electron.windows.at(-1)!;
+      window.loaded();
+      emit({ ...ctx, window, view }, "meetings:ready");
+      await updater.start();
+      return { ...ctx, window, view, updater, driver };
+    }
+
+    it("pushes the update's progress and its readiness to the page", async () => {
+      const ctx = await withUpdater();
+      const sent = ctx.window.webContents.send.mock.calls.filter(([channel]) => channel === "meetings:update").map(([, update]) => update);
+      expect(sent).toEqual([{ status: "downloading", version: "0.2.0", percent: 0 }, { status: "ready", version: "0.2.0" }]);
+    });
+
+    it("installs when asked and nothing is going on", async () => {
+      const ctx = await withUpdater();
+      await expect(invoke(ctx, "meetings:restart-for-update")).resolves.toEqual({ ok: true });
+      expect(ctx.driver.install).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses during a Recording and while AI work runs, saying why, and installs nothing", async () => {
+      const ctx = await withUpdater();
+      ctx.engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-27T12:00:00Z" });
+      await expect(invoke(ctx, "meetings:restart-for-update")).resolves.toMatchObject({ ok: false, reason: expect.stringContaining("Recording") });
+      expect(ctx.driver.install).not.toHaveBeenCalled();
+
+      ctx.core.stopRecording();
+      ctx.engine.emit({ type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav", micStartHostTime: 1000.197, systemStartHostTime: 1000 });
+      await expect(invoke(ctx, "meetings:restart-for-update")).resolves.toMatchObject({ ok: false, reason: expect.stringContaining("transcribing or summarising") });
+      expect(ctx.driver.install).not.toHaveBeenCalled();
+
+      await ctx.core.idle();
+      await expect(invoke(ctx, "meetings:restart-for-update")).resolves.toEqual({ ok: true });
+    });
+
+    it("answers a window of another web contents with an error, and a run from source with a refusal", async () => {
+      const ctx = await withUpdater();
+      await expect(invoke(ctx, "meetings:restart-for-update", undefined, {})).rejects.toThrow("cannot access");
+      expect(ctx.driver.install).not.toHaveBeenCalled();
+
+      const fromSource = context();
+      await expect(invoke(fromSource, "meetings:restart-for-update")).resolves.toMatchObject({ ok: false });
+    });
+  });
+
+  it("publishes the Recording, the update and the version in the page's state, and stops the Recording on request", () => {
+    const ctx = context();
+    expect(latest(ctx)).toMatchObject({ recording: undefined, update: { status: "idle" } });
+    ctx.engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-27T12:00:00Z" });
+    expect(latest(ctx).recording).toEqual({ app: "zoom.us", startedAt: "2026-10-27T12:00:00Z" });
+
+    emit(ctx, "meetings:stop-recording", undefined, {}); // another web contents
+    expect(ctx.core.recording).toBeDefined();
+    emit(ctx, "meetings:stop-recording");
+    expect(ctx.core.recording).toBeUndefined();
+    expect(latest(ctx).recording).toBeUndefined();
+    ctx.engine.emit({ type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav", micStartHostTime: 1000.197, systemStartHostTime: 1000 });
+  });
+
+  it("keeps the update in the page's state after its toast, and can still open the release page of a failure it announced earlier", () => {
+    const ctx = context();
+    const driver = { check: vi.fn(async () => "0.2.0"), download: vi.fn(async () => { throw new Error("no"); }), install: vi.fn() };
+    const updater = new Updater({ currentVersion: "0.1.2", repo: "BrandNewDevs/Elegant", driver, enabled: () => true, restartBlock: () => undefined });
+    const view = new MeetingsWindow(ctx.core, ctx.setup, new SetupBridge(ctx.setup, { done: () => {}, openSettings: () => {} }), updater, "0.1.2");
+    ctx.core.setLastNotifiedUpdate("0.2.0"); // an earlier launch already told the person about this version
+    view.show();
+    const window = electron.windows.at(-1)!;
+    window.loaded();
+    const mine = { ...ctx, window, view };
+    emit(mine, "meetings:ready");
+    return updater.start().then(() => {
+      expect(window.webContents.send.mock.calls.some(([channel]) => channel === "meetings:update")).toBe(false); // not toasted again
+      const state = latest(mine);
+      expect(state.update).toMatchObject({ status: "failed", version: "0.2.0" });
+      expect(state.appVersion).toBe("0.1.2");
+      emit(mine, "meetings:open-release");
+      expect(electron.shell.openExternal).toHaveBeenCalledExactlyOnceWith("https://github.com/BrandNewDevs/Elegant/releases/tag/v0.2.0");
+    });
   });
 
   it("stores the Check for updates switch from the page and publishes it", () => {

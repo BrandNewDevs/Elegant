@@ -1,31 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { checkForUpdate, compareVersions, isGithubUrl, type UpdateCheckOptions } from "./update-check.js";
-
-const release = (patch: Record<string, unknown> = {}) => ({
-  tag_name: "v0.2.0",
-  html_url: "https://github.com/BrandNewDevs/Elegant/releases/tag/v0.2.0",
-  draft: false,
-  prerelease: false,
-  ...patch,
-});
-
-function options(body: unknown, patch: Partial<UpdateCheckOptions> = {}, status = 200) {
-  const fetch = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(typeof body === "string" ? body : JSON.stringify(body), { status }));
-  return {
-    fetch,
-    options: {
-      currentVersion: "0.1.2",
-      repo: "BrandNewDevs/Elegant",
-      userAgent: "Elegant/0.1.2",
-      fetch: fetch as unknown as typeof globalThis.fetch,
-      enabled: () => true,
-      lastNotified: () => undefined,
-      ...patch,
-    } satisfies UpdateCheckOptions,
-  };
-}
-
-afterEach(() => vi.useRealTimers());
+import { describe, expect, it } from "vitest";
+import { compareVersions, isAcceptableFeed, isGithubUrl, releasePageUrl } from "./update-check.js";
 
 describe("compareVersions", () => {
   it("compares numbers, not text", () => {
@@ -61,75 +35,30 @@ describe("isGithubUrl", () => {
   });
 });
 
-describe("checkForUpdate", () => {
-  it("returns a newer release, from a plain GET that identifies only the app", async () => {
-    const { fetch, options: o } = options(release());
-    expect(await checkForUpdate(o)).toEqual({ version: "0.2.0", url: "https://github.com/BrandNewDevs/Elegant/releases/tag/v0.2.0" });
-    expect(fetch).toHaveBeenCalledTimes(1);
-    const [url, init] = fetch.mock.calls[0]!;
-    expect(url).toBe("https://api.github.com/repos/BrandNewDevs/Elegant/releases/latest");
-    expect(init?.method).toBeUndefined();
-    expect(init?.body).toBeUndefined();
-    expect(init?.headers).toEqual({ "User-Agent": "Elegant/0.1.2", Accept: "application/vnd.github+json" });
+describe("releasePageUrl", () => {
+  it("is the release's page on github.com, which the app may open", () => {
+    expect(releasePageUrl("BrandNewDevs/Elegant", "0.2.0")).toBe("https://github.com/BrandNewDevs/Elegant/releases/tag/v0.2.0");
+    expect(isGithubUrl(releasePageUrl("BrandNewDevs/Elegant", "0.2.0"))).toBe(true);
+  });
+});
+
+describe("isAcceptableFeed", () => {
+  const file = { url: "Elegant-0.2.0-arm64.zip", sha512: "abc+/==" };
+
+  it("accepts files named bare, each with a sha512", () => {
+    expect(isAcceptableFeed([file])).toBe(true);
   });
 
-  it("says nothing for the same version or an older one", async () => {
-    expect(await checkForUpdate(options(release({ tag_name: "v0.1.2" })).options)).toBeUndefined();
-    expect(await checkForUpdate(options(release({ tag_name: "v0.1.1" })).options)).toBeUndefined();
+  it("refuses a file that is not a bare name, so it cannot point away from the release", () => {
+    for (const url of ["https://evil.example/Elegant.zip", "//evil.example/Elegant.zip", "../Elegant.zip", "dir/Elegant.zip", "file:///tmp/Elegant.zip", "", undefined, 3]) {
+      expect(isAcceptableFeed([{ ...file, url }])).toBe(false);
+    }
   });
 
-  it("ignores a draft or a pre-release", async () => {
-    expect(await checkForUpdate(options(release({ draft: true })).options)).toBeUndefined();
-    expect(await checkForUpdate(options(release({ prerelease: true })).options)).toBeUndefined();
-  });
-
-  it("ignores a response that is not a release", async () => {
-    expect(await checkForUpdate(options("{not json").options)).toBeUndefined();
-    expect(await checkForUpdate(options(null).options)).toBeUndefined();
-    expect(await checkForUpdate(options([release()]).options)).toBeUndefined();
-    expect(await checkForUpdate(options(release({ tag_name: "nightly" })).options)).toBeUndefined();
-    expect(await checkForUpdate(options(release({ tag_name: 2 })).options)).toBeUndefined();
-    expect(await checkForUpdate(options({ tag_name: "v0.2.0", html_url: "https://github.com/x" }).options)).toBeUndefined();
-  });
-
-  it("ignores a release page that is not on github.com", async () => {
-    expect(await checkForUpdate(options(release({ html_url: "https://evil.example/Elegant" })).options)).toBeUndefined();
-    expect(await checkForUpdate(options(release({ html_url: "javascript:alert(1)" })).options)).toBeUndefined();
-  });
-
-  it("is silent on an HTTP error, a network error and an unreadable current version", async () => {
-    expect(await checkForUpdate(options(release(), {}, 403).options)).toBeUndefined();
-    expect(await checkForUpdate(options(release(), {}, 404).options)).toBeUndefined();
-    const offline = options(release(), { fetch: (async () => { throw new TypeError("fetch failed"); }) as typeof fetch });
-    expect(await checkForUpdate(offline.options)).toBeUndefined();
-    expect(await checkForUpdate(options(release(), { currentVersion: "dev" }).options)).toBeUndefined();
-  });
-
-  it("gives up when GitHub does not answer in time", async () => {
-    vi.useFakeTimers();
-    const hanging = (async (_url: string | URL | Request, init?: RequestInit) =>
-      new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener("abort", () => reject(new Error("aborted"))))) as typeof fetch;
-    const result = checkForUpdate(options(release(), { fetch: hanging, timeoutMs: 3000 }).options);
-    await vi.advanceTimersByTimeAsync(3000);
-    expect(await result).toBeUndefined();
-  });
-
-  it("makes no request while the setting is off, and drops an answer that arrives after it was turned off", async () => {
-    let enabled = false;
-    const off = options(release(), { enabled: () => enabled });
-    expect(await checkForUpdate(off.options)).toBeUndefined();
-    expect(off.fetch).not.toHaveBeenCalled();
-
-    enabled = true;
-    const turnedOff = options(release(), {
-      enabled: () => enabled,
-      fetch: (async () => { enabled = false; return new Response(JSON.stringify(release())); }) as typeof fetch,
-    });
-    expect(await checkForUpdate(turnedOff.options)).toBeUndefined();
-  });
-
-  it("does not announce a version the person was already told about, but does announce a newer one", async () => {
-    expect(await checkForUpdate(options(release(), { lastNotified: () => "0.2.0" }).options)).toBeUndefined();
-    expect(await checkForUpdate(options(release({ tag_name: "v0.3.0" }), { lastNotified: () => "0.2.0" }).options)).toMatchObject({ version: "0.3.0" });
+  it("refuses a file with no sha512, or no files at all", () => {
+    expect(isAcceptableFeed([{ url: file.url }])).toBe(false);
+    expect(isAcceptableFeed([{ ...file, sha512: "" }])).toBe(false);
+    expect(isAcceptableFeed([file, { url: "other.zip" }])).toBe(false);
+    expect(isAcceptableFeed([])).toBe(false);
   });
 });

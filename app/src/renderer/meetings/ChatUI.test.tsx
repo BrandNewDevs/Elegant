@@ -111,11 +111,14 @@ it("drops stale RPC errors and resets drafts when changing Meetings", async () =
 it("renders generated and Participant content as plain text and keeps existing actions working", async () => {
   const hostile = '<script>alert("no")</script>';
   const { api } = setup({ chat: { available: true, revision: "revision-a", history: [{ ...record, answer: { text: hostile, refs: [0], sufficient: true } }] } });
+  fireEvent.click(screen.getByRole("button", { name: "Participants" }));
   fireEvent.change(screen.getByLabelText("Speaker 1"), { target: { value: "Alex <PM>" } }); fireEvent.click(screen.getByRole("button", { name: "Rename" }));
   expect(api.rename).toHaveBeenCalledWith({ meetingId: 4, label: "Speaker 1", name: "Alex <PM>" });
-  fireEvent.click(screen.getByRole("button", { name: "Regenerate Summary" })); expect(api.regenerate).toHaveBeenCalledWith(4);
-  fireEvent.click(screen.getByRole("button", { name: "Export to Markdown…" })); expect(api.export).toHaveBeenCalledWith(4);
-  fireEvent.click(screen.getByRole("button", { name: "Delete Meeting" })); expect(api.delete).toHaveBeenCalledWith(4);
+  const openMenu = () => fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  openMenu(); fireEvent.click(screen.getByRole("menuitem", { name: "Regenerate Summary" })); expect(api.regenerate).toHaveBeenCalledWith(4);
+  expect(screen.queryByRole("menu")).toBeNull(); // choosing an item closes the menu
+  openMenu(); fireEvent.click(screen.getByRole("menuitem", { name: "Export to Markdown…" })); expect(api.export).toHaveBeenCalledWith(4);
+  openMenu(); fireEvent.click(screen.getByRole("menuitem", { name: "Delete Meeting…" })); expect(api.delete).toHaveBeenCalledWith(4);
   fireEvent.change(screen.getByRole("searchbox"), { target: { value: "export" } }); fireEvent.blur(screen.getByRole("searchbox")); expect(api.search).toHaveBeenCalledWith("export");
   openChat(); expect(screen.getByText(hostile)).toBeTruthy(); expect(document.querySelector("script")).toBeNull();
 });

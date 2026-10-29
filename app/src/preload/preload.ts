@@ -1,4 +1,4 @@
-import type { UpdateNotice } from "../core/update-check.js";
+import type { UpdateState } from "../core/updater.js";
 import type { MeetingsApi } from "../shared/meetings-api.js";
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import type { MeetingsViewState } from "../shared/meetings-view-state.js";
@@ -18,8 +18,10 @@ const meetings = {
   settings: (open: boolean) => ipcRenderer.send("meetings:settings", open),
   setShowInDock: (show: boolean) => ipcRenderer.send("meetings:show-in-dock", show),
   setCheckForUpdates: (check: boolean) => ipcRenderer.send("meetings:check-for-updates", check),
-  onUpdateAvailable: (callback: (update: UpdateNotice) => void) => subscribe("meetings:update-available", callback),
+  onUpdate: (callback: (update: Exclude<UpdateState, { status: "idle" }>) => void) => subscribe("meetings:update", callback),
+  restartForUpdate: () => ipcRenderer.invoke("meetings:restart-for-update"),
   openRelease: () => ipcRenderer.send("meetings:open-release"),
+  stopRecording: () => ipcRenderer.send("meetings:stop-recording"),
   select: (id: number) => ipcRenderer.send("meetings:select", id),
   search: (query: string) => ipcRenderer.send("meetings:search", query),
   rename: (payload: { meetingId: number; label: string; name: string }) =>

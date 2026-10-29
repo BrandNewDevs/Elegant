@@ -1,6 +1,7 @@
 name: Release
-# A pushed v<version> tag builds the signed .dmg and attaches it to a draft GitHub release; publish the draft once it
-# has been checked. Running the workflow by hand builds the same .dmg as a workflow artifact only, with no release.
+# A pushed v<version> tag builds the signed .dmg, a .zip of the signed app and latest-mac.yml (what the in-app updater
+# reads) and attaches them to a draft GitHub release; publish the draft once it has been checked. Running the workflow by
+# hand builds the same files as a workflow artifact only, with no release.
 on:
   push:
     tags: ["v*"]
@@ -61,17 +62,20 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/dmgbuild"
           "$RUNNER_TEMP/dmgbuild/bin/pip" install --quiet dmgbuild==1.6.7
           echo "$RUNNER_TEMP/dmgbuild/bin" >> "$GITHUB_PATH"
-      - name: Build the .dmg (manual run)
+      - name: Build the .dmg and the update files (manual run)
         if: github.event_name == 'workflow_dispatch'
-        run: scripts/dmg.sh "$SIGNING_IDENTITY_SHA1"
+        run: scripts/dmg.sh "$SIGNING_IDENTITY_SHA1" && scripts/update-archive.sh
         working-directory: app
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'workflow_dispatch'
         with:
-          name: dmg
-          path: app/out/*.dmg
+          name: release-files
+          path: |
+            app/out/*.dmg
+            app/out/*.zip
+            app/out/latest-mac.yml
           if-no-files-found: error
-      - name: Build the .dmg and attach it to a draft release
+      - name: Build the .dmg and the update files and attach them to a draft release
         if: github.ref_type == 'tag'
         run: scripts/release.sh "$SIGNING_IDENTITY_SHA1"
         working-directory: app

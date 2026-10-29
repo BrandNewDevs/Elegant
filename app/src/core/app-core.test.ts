@@ -1655,3 +1655,50 @@ describe("update check settings", () => {
     expect(new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).lastNotifiedUpdate).toBe("0.2.0");
   });
 });
+
+describe("when the app may restart for an update", () => {
+  const startedAt = "2026-10-24T10:00:00.000Z";
+  const tracks = { type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav", micStartHostTime: 1000.197, systemStartHostTime: 1000 } as const;
+
+  it("may when it is idle", () => {
+    const { core } = setup();
+    expect(core.restartBlock).toBeUndefined();
+  });
+
+  it("may not during a Recording, nor after Stop until the engine has handed over the tracks", async () => {
+    const { core, engine } = setup();
+    core.start();
+    engine.emit({ type: "ready", version: "0.1.0" });
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt });
+    expect(core.restartBlock).toBe("recording");
+
+    core.stopRecording();
+    expect(core.recording).toBeUndefined();
+    expect(core.restartBlock).toBe("recording");
+
+    engine.emit(tracks);
+    await core.idle();
+    expect(core.restartBlock).toBeUndefined();
+  });
+
+  it("may not while transcribing or summarising, and may again once that has finished", async () => {
+    let finish!: () => void;
+    const gate = new Promise<void>((resolve) => { finish = resolve; });
+    const pipeline: PipelineStages = {
+      transcribe: async () => { await gate; return fixtureTranscript; },
+      summarise: async () => fixtureSummary,
+    };
+    const engine = new FakeEngine();
+    const core = new AppCore({ engine, store: openStore(":memory:"), pipeline });
+    core.start();
+    engine.emit({ type: "ready", version: "0.1.0" });
+    engine.emit({ type: "recording_started", app: "zoom.us", startedAt });
+    core.stopRecording();
+    engine.emit(tracks);
+    expect(core.restartBlock).toBe("ai-work");
+
+    finish();
+    await core.idle();
+    expect(core.restartBlock).toBeUndefined();
+  });
+});
