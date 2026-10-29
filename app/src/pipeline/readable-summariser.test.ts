@@ -103,6 +103,12 @@ describe('readable Summary production seam', () => {
     expect(result.evidence!.participants.find(p => p.speaker === 'You')!.said).toEqual([[2]]);
     expect(result.participants.find(p => p.speaker === 'Speaker 1')!.said).toContain('No owner assigned.');
   });
+  it('retains explicit unresolved status when the model selects only an implementation update', async () => {
+    const fake = model(stage => stage === 'tldr' ? { sentences: [{ covers: [0] }] } : undefined);
+    const result = await createReadableSummariser({ model: fake })(transcript);
+    expect(result.tldr).toContain('No owner assigned.');
+    expect(result.generation!.requests!.filter(r => r.stage === 'tldr')).toHaveLength(1);
+  });
   it('honours cancellation before contacting the model', async () => {
     const controller = new AbortController(); controller.abort();
     await expect(createReadableSummariser({ model: model() })(transcript, { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' });

@@ -6,7 +6,7 @@ import { summaryPassages, type SummaryPassage } from './summary-passages.js';
 import { sourceStatements, matchStatements, statementKey, UnsupportedSummaryRewrite, type SourceStatement } from './summary-statements.js';
 import { InvalidSummaryError } from './validate-summary.js';
 
-export const SUMMARY_PROMPT_VERSION = 'readable-summary-v11';
+export const SUMMARY_PROMPT_VERSION = 'readable-summary-v12';
 interface Claim { speaker: string; text: string; sources: number[]; kind: string; atoms: SourceStatement[] }
 const kinds = ['update', 'decision', 'commitment', 'proposal', 'disagreement', 'unresolved'];
 const integers = { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'integer' } };
@@ -188,15 +188,23 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       const v = object(text); if (!Array.isArray(v.sentences) || !v.sentences.length || v.sentences.length > 3) return fail('Return one to three supported sentences');
       if (v.sentences.some(s => !s || typeof s !== 'object')) return fail('Return structured sentences');
       const selected = new Set<number>();
-      const parsed = v.sentences.map(s => {
+      const selections = v.sentences.map(s => {
         const covers = ids(s.covers, shortlist.map((_, id) => id));
         if (covers.length !== 1 || covers.some(id => selected.has(id))) return fail('Select distinct whole points, one per sentence');
         covers.forEach(id => selected.add(id));
+        return covers;
+      });
+      const status = attention(shortlist);
+      if (status.length && !status.some(id => selected.has(id))) {
+        // Enforce coverage with an already-supported point, never invented prose.
+        if (selections.length === 3) selections.pop();
+        selections.push([status[0]!]);
+      }
+      const parsed = selections.map(covers => {
         const points = covers.map(id => shortlist[id]!);
         const text = points.map(p => (/^I(?:\b|['’])|^(?:Will|Can|Must|Should)\b/u.test(p.text) ? p.speaker + ': ' + p.text : p.text).replace(/[.!?]+$/u, '')).join('; ') + '.';
         return { text, sources: [...new Set(points.flatMap(point => point.sources))] };
       });
-      if (attention(shortlist).length && !attention(shortlist).some(id => selected.has(id))) return fail('Include an explicit reported work-status point');
       if ([...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(parsed.map(s => s.text).join(' '))].length > 3) return fail('Select at most three complete sentences');
       const wordCount = parsed.map(s => s.text).join(' ').match(/\S+/gu)!.length;
       if (wordCount > 90) return fail(`Selected ${wordCount} words; TL;DR must contain at most 90 words. Use fewer IDs, one per sentence if necessary.`);
