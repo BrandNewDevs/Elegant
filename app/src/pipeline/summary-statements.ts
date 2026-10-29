@@ -14,12 +14,32 @@ export function sourceStatements(evidence: SummaryPassage[]): SourceStatement[] 
   return runs.flatMap(run => {
     let text = '';
     const spans = run.map(p => { const start = text.length; text += (text ? ' ' : '') + p.text; return { id: p.id, start, end: text.length, text: p.text }; });
-    return [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(text)].flatMap(sentence => {
+    const boundaries = new Set([0, text.length]);
+    for (const sentence of new Intl.Segmenter('en', { granularity: 'sentence' }).segment(text)) boundaries.add(sentence.index);
+    for (const transition of text.matchAll(/\b(?:actually\s+)?I(?:['’]m| am) interested in\b/giu)) boundaries.add(transition.index!);
+    const positions = [...boundaries].sort((a, b) => a - b);
+    const statements = positions.slice(0, -1).flatMap((start, index) => {
+      const sentence = { index: start, segment: text.slice(start, positions[index + 1]!) };
       const value = sentence.segment.trim();
       if (!value || isSummaryHousekeeping(value) || bareAcknowledgement.test(value)) return [];
       const supporting = spans.filter(s => s.start < sentence.index + sentence.segment.length && s.end > sentence.index);
       return [{ speaker: run[0]!.speaker, text: value, sources: supporting.map(s => s.id), context: supporting.map(s => s.text).join(' ') }];
     });
+    const joined: SourceStatement[] = [];
+    for (const statement of statements) {
+      const dependent = /^(?:(?:this|that|these|those|it) (?:is|are|was|were) (?:the )?(?:final|a suggestion|test outcomes|synthetic|quoted|not)|this call is one of|one of the tests|(?:do not|don't|don’t) infer (?:either|this|that)|(?:the )?(?:provisional|earlier|previous) plan is withdrawn)/iu.test(statement.text);
+      const previous = joined.at(-1);
+      const revision = previous && /\breplaces?\b/iu.test(statement.text)
+        && tokens(statement.text, statement.speaker).filter(word => tokens(previous.text, previous.speaker).includes(word)).length >= 2;
+      if ((dependent || revision) && previous) {
+        const related = [joined.pop()!];
+        while (joined.length && related[0]!.sources.some(id => statement.sources.includes(id))
+          && joined.at(-1)!.sources.some(id => statement.sources.includes(id))) related.unshift(joined.pop()!);
+        related.push(statement);
+        joined.push({ speaker: statement.speaker, text: related.map(item => item.text).join(' '), sources: [...new Set(related.flatMap(item => item.sources))], context: related.map(item => item.context ?? item.text).join(' ') });
+      } else joined.push(statement);
+    }
+    return joined;
   });
 }
 const grammatical = new Set('a an the i we you he she they it my our your his her their this that these those am is are was were be been being have has had do does did of on in at to for from by with as and or but so yeah okay ok very well good actually basically also team system app application'.split(' '));

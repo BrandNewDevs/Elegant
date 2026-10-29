@@ -6,7 +6,7 @@ import { summaryPassages, type SummaryPassage } from './summary-passages.js';
 import { sourceStatements, matchStatements, statementKey, UnsupportedSummaryRewrite, type SourceStatement } from './summary-statements.js';
 import { InvalidSummaryError } from './validate-summary.js';
 
-export const SUMMARY_PROMPT_VERSION = 'readable-summary-v8';
+export const SUMMARY_PROMPT_VERSION = 'readable-summary-v9';
 interface Claim { speaker: string; text: string; sources: number[]; kind: string; atoms: SourceStatement[] }
 const kinds = ['update', 'decision', 'commitment', 'proposal', 'disagreement', 'unresolved'];
 const integers = { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'integer' } };
@@ -22,7 +22,7 @@ const rules = 'Write an English Meeting Summary using only supplied evidence. Sp
 const objective = 'Write short points, each as one complete sentence, capturing the main subject, important updates, decisions/actions and explicit unresolved issues. Use only clear evidence; preserve speaker, status, stated owner and deadline. Combine fragmented speech. Omit greetings, hopes, generic comments, requests for updates, recording controls and garbled phrases. Never infer a task or intent from unclear speech. Report substantive content instead of narrating who asked or spoke. Keep distinct tasks separate; never repeat facts. Do not output greetings, ready-to-go remarks, requests for updates, or garbled fragments at all. Paraphrase meaningful content in clear full sentences, without copying conversational filler. Testing status and no owner assigned are meaningful updates or unresolved facts.';
 function request(stage: string, data: object, retry = ''): Pick<TextRequest, 'messages' | 'schema'> {
   const instruction = stage === 'select' ? 'Select at most three supplied claim IDs for the main subject, important updates/outcomes and unresolved matters. Prefer informative facts over generic discussion or housekeeping. Return ids only.' : stage === 'tldr'
-    ? 'Select two or three sentences built from whole POINT IDs for a concise TLDR about the main subject and important updates/outcomes, guided by the opening topic. Include explicit completion status or unresolved issues when significant. Prefer the latest final decisions over initial or superseded positions. Prefer substantive facts, never greetings, hopes, recording controls or unclear fragments. The app copies selected rewritten point sentences and references. Total selected text must be at most 90 words, usually 40–70. Do not select overlapping repetitions. Prefer three sentences when at least three points are available. Each sentence may cover one to three related point IDs, combined as clauses by the app. Include at least one supplied statusPointId when that list is nonempty. Use one sentence on the main subject, one on key capabilities/contributions, and one on explicit work status or decisions when available. Never select generic praise or closing chatter. Return covers IDs only, never new prose.'
+    ? 'Select two or three sentences built from whole POINT IDs for a concise TLDR about the main subject and important updates/outcomes, guided by the opening topic. Include explicit completion status or unresolved issues when significant. Prefer the latest final decisions over initial or superseded positions. Prefer substantive facts, never greetings, hopes, recording controls or unclear fragments. The app copies selected rewritten point sentences and references. Sum the supplied wordCount values. Total selected text must be at most 90 words, usually 40–70; use fewer point IDs rather than exceeding the limit. Do not select overlapping repetitions. Prefer three sentences when at least three points are available. Each sentence may cover one to three related point IDs, combined as clauses by the app. Include at least one supplied statusPointId when that list is nonempty. Use one sentence on the main subject, one on key capabilities/contributions, and one on explicit work status or decisions when available. Never select generic praise or closing chatter. Return covers IDs only, never new prose.'
     : objective + (stage === 'reduce' ? ' Consolidate supplied claims using original evidence. Return covers claim IDs, not source IDs; code derives evidence from covers. Every claim ID must appear in covers under its original speaker, including superseded positions: describe their replacement explicitly. Preserve every distinct action, deadline and critical fact; combine only related claims.' : ' Extract supported claims with their actual speaker, type and evidence IDs.');
   return { messages: [{ role: 'system', content: rules }, { role: 'user', content: JSON.stringify({ instruction: instruction + retry, data }) }], schema: outputSchema(stage, data) };
 }
@@ -81,7 +81,7 @@ function parsePoints(text: string, evidence: SummaryPassage[], draft?: Claim[], 
   }
   return points.filter(point => !/^(?:yes|yeah|sure|okay|ok|absolutely|all good(?:,? all good)?)[.!\s]*$/iu.test(point.text));
 }
-function originalClaim(atom: SourceStatement): Claim { const cleaned = atom.text.replace(/^(?:(?:yeah|okay|so|in fact|actually|and)[,\s]+)+/iu, ''); return { speaker: atom.speaker, text: cleaned.charAt(0).toUpperCase() + cleaned.slice(1), sources: atom.sources, kind: 'update', atoms: [atom] }; }
+function originalClaim(atom: SourceStatement): Claim { const cleaned = atom.text.replace(/\.(?=\s+[A-Z])/gu, ';').replace(/^(?:(?:yeah|okay|so|in fact|actually|and)[,\s]+)+/iu, ''); return { speaker: atom.speaker, text: cleaned.charAt(0).toUpperCase() + cleaned.slice(1), sources: atom.sources, kind: 'update', atoms: [atom] }; }
 function distinctClaims(claims: Claim[]): Claim[] {
   const unique = new Map<string, Claim>();
   for (const claim of [...claims].sort((a, b) => Math.max(...a.sources) - Math.max(...b.sources))) {
@@ -119,7 +119,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
     const evidenceFor = (claims: Claim[]) => passages.filter(e => claims.some(c => c.sources.includes(e.id)));
     const openingTopic = transcript.segments.slice(0, 3).filter(s => Buffer.byteLength(s.text, 'utf8') <= 250).map(s => s.text);
     const attention = (items: Claim[]) => { const hard = items.flatMap((p, id) => /\b(?:unassigned|undecided|pending|not (?:yet )?(?:done|finished|complete)|yet to be done|no .*(?:owner|date|measur))\b/iu.test(p.text) ? [id] : []); return hard.length ? hard : items.flatMap((p, id) => /\b(?:testing|demo) call\b/iu.test(p.text) ? [id] : []); };
-    const overview = (items: Claim[]) => ({ openingTopic, statusPointIds: attention(items), points: items.map(claimData), evidence: wire(evidenceFor(items)) });
+    const overview = (items: Claim[]) => ({ openingTopic, statusPointIds: attention(items), points: items.map((point, id) => ({ id, speaker: point.speaker, text: point.text, kind: point.kind, lastMention: Math.max(...point.sources), wordCount: point.text.match(/\S+/gu)?.length ?? 0 })) });
     let claims: Claim[] = [];
     for (const speaker of [...new Set(passages.map(p => p.speaker))]) {
       const owned = passages.filter(p => p.speaker === speaker);
@@ -191,7 +191,8 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       });
       if (attention(shortlist).length && !attention(shortlist).some(id => selected.has(id))) return fail('Include an explicit reported work-status point');
       if ([...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(parsed.map(s => s.text).join(' '))].length > 3) return fail('Select at most three complete sentences');
-      if (parsed.map(s => s.text).join(' ').match(/\S+/gu)!.length > 90) return fail('TL;DR must contain at most 90 words');
+      const wordCount = parsed.map(s => s.text).join(' ').match(/\S+/gu)!.length;
+      if (wordCount > 90) return fail(`Selected ${wordCount} words; TL;DR must contain at most 90 words. Use fewer IDs, one per sentence if necessary.`);
       return parsed;
     });
     const refs = (sources: number[]) => [...new Set(sources.flatMap(id => passages[id]!.refs))].sort((a, b) => a - b);

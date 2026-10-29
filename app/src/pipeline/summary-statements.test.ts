@@ -25,3 +25,13 @@ it('keeps original evidence identities when a sentence crosses adjacent fragment
   expect(atoms[0]).toMatchObject({ text: 'The model runs locally.', sources: [0, 1] });
   expect(matchStatements('The model runs locally.', 'You', [atoms[0]!], 'update')).toHaveLength(1);
 });
+it('keeps finality and synthetic qualifiers attached to the facts they qualify', () => {
+  const final = sourceStatements([{ id: 0, speaker: 'You', refs: [0], text: 'Friday replaces Monday, and Markdown replaces PDF. These are the final decisions.' }]);
+  expect(final).toHaveLength(1);
+  expect(final[0]!.text).toContain('Friday replaces Monday');
+  expect(final[0]!.text).toContain('final decisions');
+  const synthetic = sourceStatements([{ id: 0, speaker: 'You', refs: [0], text: 'PDF failed. Markdown passed. These are test outcomes for this synthetic discussion, not measurements of the actual app.' }]);
+  expect(synthetic).toHaveLength(1);
+  expect(synthetic[0]!.text).toContain('PDF failed');
+  expect(synthetic[0]!.text).toContain('not measurements');
+});

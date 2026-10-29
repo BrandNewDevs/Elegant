@@ -1,3 +1,4 @@
+import { isBareAgendaHeading } from './sentence-claims.js';
 import type { Transcript } from './pipeline.js';
 
 export interface SummaryPassage { id: number; speaker: string; text: string; refs: number[] }
@@ -6,7 +7,8 @@ export function isSummaryHousekeeping(text: string): boolean {
   const value = text.trim().replace(/^(?:yeah|well|and)[,\s]+/iu, '');
   const words = value.toLowerCase().match(/[\p{L}]+/gu) ?? [];
   const functionWords = new Set('i you we they he she it this that these those my your our their have has had to be is are was were am a an the of in on for and or but with by so just only now then here there go going went can could will would should may might please very'.split(' '));
-  return /^(?:now|only)\b/iu.test(value) && words.length >= 4 && words.every(word => functionWords.has(word))
+  return isBareAgendaHeading(value)
+    || /^(?:now|only)\b/iu.test(value) && words.length >= 4 && words.every(word => functionWords.has(word))
     || /^(\p{L}+)(?:\s+and\s+\1)+\s+and\s+cut[.!]*$/iu.test(value)
     || /^(?:all good[,\s]*)+[.!]*$/iu.test(value)
     || /^everything (?:is )?(?:working|going|progressing) (?:very )?(?:good|well|fine)[.!]*$/iu.test(value)
@@ -16,6 +18,8 @@ export function isSummaryHousekeeping(text: string): boolean {
     || /^(?:so )?let me[.!]*$/iu.test(value)
     || /^(?:I['’]ll get into the key functionalities|dive deep into what .+ does right now)[.!]*$/iu.test(value)
     || /^and (?:the )?(?:core engine|ui|user interface) specifically[.!]*$/iu.test(value)
+    || /^(?:actually )?I(?:['’]m| am) interested in .+\b(?:please|put some light|tell me|explain)\b.+$/iu.test(value)
+    || /^(?:so )?(?:let me )?dive (?:deep )?into what .+ does(?: right now)?[.!]*$/iu.test(value)
     || /^(?:thanks|thank you|bye|end|hopefully|is|now)[.!?,\s]*$/iu.test(value)
     || /^(?:so[,\s]+)?what (?:are|is) the updates? (?:on|for) .+\?$/iu.test(value)
     || /^let['’]s talk about .+ updates? .*[.!?]*$/iu.test(value)
