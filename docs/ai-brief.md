@@ -88,7 +88,7 @@ Output: a Summary as JSON.
 
 ## Evidence-backed Summary implementation
 
-The app and evaluation command use `createReadableSummariser` with prompt version `readable-summary-v2`. The earlier `createGroundedSummariser` remains for historical comparison and its structural regression tests.
+The app and evaluation command use `createReadableSummariser` with prompt version `readable-summary-v3`. The earlier `createGroundedSummariser` remains for historical comparison and its structural regression tests.
 
 Working passages combine consecutive same-speaker segments separated by at most two seconds. Sentence and word boundaries bound evidence size; original stored Transcript content, speaker labels and ordinal references remain unchanged. Model evidence contains only IDs, speakers and text.
 

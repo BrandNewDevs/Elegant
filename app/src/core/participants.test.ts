@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PipelineStages, Summary, Transcript } from "../pipeline/pipeline.js";
 import { openStore } from "../store/store.js";
 import { FakeEngine } from "../testing/fake-engine.js";
+import { canonicaliseParticipantMentions } from "./participants.js";
 import { AppCore } from "./app-core.js";
 
 const transcript: Transcript = {
@@ -205,5 +206,6 @@ describe("the person's own name", () => {
   store.renameParticipant(id, 'Speaker 1', 'Alex');
   const shown = core.getMeetingForDisplay(id)!;
   expect(shown.transcript.segments.map(s => s.speaker)).toContain('Alex (You)');
+  expect(canonicaliseParticipantMentions('What did Alex (You) say?', shown.participants)).toBe('What did You say?');
   expect(core.exportMeeting(id).markdown).toContain('### Alex (Speaker 1)');
  });

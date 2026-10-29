@@ -82,9 +82,12 @@ export function canonicaliseParticipantMentions(text: string, participants: Part
     aliases.set(key, entry);
   }
   if (!aliases.size) return text;
-  const escaped = [...aliases.values()].map((p) => p.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).sort((a, b) => b.length - a.length);
+  const explicit = new Map([...displayNames(participants)].filter(([label, display]) => display !== (participants.find(p => p.label === label)?.name || label)).map(([label, display]) => [display.toLowerCase(), label]));
+  const escaped = [...aliases.values()].map(p => p.name).concat([...displayNames(participants).values()].filter(display => explicit.has(display.toLowerCase()))).map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).sort((a, b) => b.length - a.length);
   const expression = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${escaped.join("|")})(?![\\p{L}\\p{N}_])`, "giu");
   return text.replace(expression, name => {
+    const selected = explicit.get(name.toLowerCase());
+    if (selected) return selected;
     const entry = aliases.get(name.toLowerCase())!;
     const canonical = [...entry.labels][0]!;
     const collidingLabel = labels.get(name.toLowerCase());
