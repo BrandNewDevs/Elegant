@@ -5,6 +5,8 @@ export interface SummaryPassage { id: number; speaker: string; text: string; ref
 /** Narrow conversation-management rules; short substantive negatives are retained. */
 export function isSummaryHousekeeping(text: string): boolean {
   const value = text.trim().replace(/^(?:yeah|well|and)[,\s]+/iu, '');
+  // A conversation-management sentence must not discard a neighbouring commitment.
+  if ([...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(value)].length > 1) return false;
   const words = value.toLowerCase().match(/[\p{L}]+/gu) ?? [];
   const functionWords = new Set('i you we they he she it this that these those my your our their have has had to be is are was were am a an the of in on for and or but with by so just only now then here there go going went can could will would should may might please very'.split(' '));
   return isBareAgendaHeading(value)

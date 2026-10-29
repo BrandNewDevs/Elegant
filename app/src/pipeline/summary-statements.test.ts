@@ -53,3 +53,9 @@ it('omits a bare acknowledgement without losing adjacent unresolved ownership', 
   expect(result.participants[0]!.said).toEqual(['No owner assigned.']);
   expect(result.tldr).not.toContain('Understood');
 });
+
+it('preserves a commitment sharing a segment with a request for updates', async () => {
+  const result = await summarise(['I wanted to know the progress in the UI. I will write the permission guide by Thursday.'], 'I will write the permission guide by Thursday.');
+  expect(result.participants[0]!.said).toEqual(['I will write the permission guide by Thursday.']);
+  expect(result.evidence!.participants[0]!.said).toEqual([[0]]);
+});

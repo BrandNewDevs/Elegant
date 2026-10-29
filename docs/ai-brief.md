@@ -173,3 +173,5 @@ These are release gates, not verified claims. Fix and rerun failed gates and rep
 Test audio comes mostly from recordings made with people who have agreed to be recorded. You'll need to correct reference transcripts by hand for any recording used to measure accuracy.
 
 **Audio never goes into git.** The repository ignores common audio formats. Keep recordings outside the repo, and commit only a manifest that says what each recording is and how to get it. Do not commit recordings of anyone who has not agreed, and do not use real work meetings.
+
+Whole-segment housekeeping filtering applies only to single sentences. For mixed segments, sentence-level filtering removes conversation-management requests while preserving neighbouring updates or commitments.

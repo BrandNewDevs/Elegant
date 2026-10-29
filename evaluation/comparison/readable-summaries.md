@@ -55,7 +55,9 @@ Generation, source-coverage, critical-fact, attribution, reference, private TL;D
 
 ## Verification and limits
 
-Local typechecking, the production build, **621 app/renderer tests across 42 files**, and **45 Python evaluation-tool tests** pass. The PR's app and native macOS CI checks also pass on the implementation and seam-test commits. Native CI runs Swift tests and engine integration; it does not measure an M4's app performance.
+After the recorded model runs, a seam test exposed a mixed segment containing both a request for updates and a commitment. Whole-segment housekeeping filtering now applies only to single sentences; individual sentences are filtered later. A before/after check found identical working evidence and source statements for all nine synthetic inputs and both private inputs, so the recorded model comparisons remain applicable. The new mixed-segment regression passes.
+
+Local typechecking, the production build, **622 app/renderer tests across 42 files**, and **45 Python evaluation-tool tests** pass. The PR's app and native macOS CI checks also pass on the implementation and seam-test commits. Native CI runs Swift tests and engine integration; it does not measure an M4's app performance.
 
 The strict verifier falls back frequently: four times per private Summary. It can reject valid paraphrases, retain conversational first-person wording, paraphrased repetition and occasional agreement acknowledgements among Participant points. Existing Transcript spellings remain unchanged. This improves the supplied results, but fluent concise paraphrasing and complete noise removal are still limitations. Structural checks and lexical support do not prove factual correctness; source review remains necessary.
 
