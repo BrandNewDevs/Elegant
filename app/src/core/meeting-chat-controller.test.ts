@@ -286,7 +286,7 @@ describe("Meeting chat through AppCore", () => {
     const ctx = context();
     const id = ctx.saved();
     ctx.store.setSetting("userName", "Alex");
-    ctx.core.renameParticipant(id, "Speaker 1", "alex");
+    ctx.store.renameParticipant(id, "Speaker 1", "alex");
     expect(() => ctx.core.sendQuestion(id, "own_ambiguous", "What did Alex say?")).toThrow("ambiguous");
     expect(ctx.core.getChatHistory(id)).toEqual([]);
   });
@@ -297,7 +297,7 @@ describe("Meeting chat through AppCore", () => {
     ctx.core.renameParticipant(id, "Speaker 1", "A+B");
     ctx.core.sendQuestion(id, "escaped", "What did a+b say about A+Beta?"); await ctx.core.idle();
     expect(ctx.core.getChatHistory(id)[0]?.question).toBe("What did Speaker 1 say about A+Beta?");
-    ctx.core.renameParticipant(id, "You", "Alex"); ctx.core.renameParticipant(id, "Speaker 1", "alex");
+    ctx.core.renameParticipant(id, "You", "Alex"); ctx.store.renameParticipant(id, "Speaker 1", "alex");
     expect(() => ctx.core.sendQuestion(id, "ambiguous", "What did Alex say?")).toThrow("ambiguous");
   });
 

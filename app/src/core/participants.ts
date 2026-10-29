@@ -14,6 +14,17 @@ export function effectiveParticipants(participants: Participant[], ownName?: str
     : participants;
 }
 
+/** Disambiguate legacy collisions without merging stable Participant identities. */
+export function displayNames(participants: Participant[]): Map<string, string> {
+  const normalized = (value: string) => value.trim().toLocaleLowerCase('en');
+  const counts = new Map<string, number>();
+  for (const p of participants) { const key = normalized(p.name || p.label); counts.set(key, (counts.get(key) ?? 0) + 1); }
+  return new Map(participants.map(p => {
+    const value = p.name?.trim() || p.label;
+    return [p.label, (counts.get(normalized(value)) ?? 0) > 1 ? `${value} (${p.label})` : value];
+  }));
+}
+
 /**
  * A copy of the Meeting with each renamed Participant's name in place of their label. Unnamed ones keep their label,
  * except the person's own, which takes `ownName` (when there is one) unless it was renamed in this Meeting.
@@ -25,8 +36,7 @@ export function applyNames(meeting: Meeting, ownName?: string): Meeting {
       participants: effectiveParticipants(meeting.participants, ownName),
     };
   }
-  const names = new Map<string, string>();
-  for (const p of meeting.participants) if (p.name) names.set(p.label, p.name);
+  const names = displayNames(meeting.participants);
   if (names.size === 0) return meeting;
   const name = (label: string): string => names.get(label) ?? label;
   const mentions = mentionsOf(meeting.participants);
@@ -56,7 +66,7 @@ function mentionsOf(participants: Participant[]): RegExp {
 /** Display generated text using current names; stored labels and source references stay stable. */
 export function displayParticipantMentions(text: string, participants: Participant[]): string {
   if (!participants.length) return text;
-  const names = new Map(participants.filter(participant => participant.name).map(participant => [participant.label, participant.name!]));
+  const names = displayNames(participants);
   return text.replace(mentionsOf(participants), label => names.get(label) ?? label);
 }
 

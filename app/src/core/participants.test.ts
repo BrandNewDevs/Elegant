@@ -80,16 +80,16 @@ describe("renaming a Participant", () => {
 
   it("does not chain when a name is another Participant's label", async () => {
     const { core, id } = await recordedMeeting();
-    core.renameParticipant(id, "Speaker 1", "Speaker 2");
     core.renameParticipant(id, "Speaker 2", "Sam");
+    core.renameParticipant(id, "Speaker 1", "Speaker 2");
     const shown = core.getMeetingForDisplay(id)!;
     expect(shown.summary!.tldr).toBe("Speaker 2 says the launch is nearly there while Sam waits on legal. Speaker 10 is not here.");
   });
 
   it("uses the displayed names in exported Summary prose without chaining labels", async () => {
     const { core, id } = await recordedMeeting();
-    core.renameParticipant(id, "Speaker 1", "Speaker 2");
     core.renameParticipant(id, "Speaker 2", "Sam");
+    core.renameParticipant(id, "Speaker 1", "Speaker 2");
 
     await core.regenerateSummary(id);
     const { markdown } = core.exportMeeting(id);
@@ -197,3 +197,13 @@ describe("the person's own name", () => {
     expect(core.getMeetingForDisplay(id)!.transcript.segments[0]!.speaker).toBe("You");
   });
 });
+
+ it('rejects duplicate effective names and disambiguates legacy collisions', async () => {
+  const { core, store, id } = await recordedMeeting();
+  store.setSetting('userName', 'Alex');
+  expect(() => core.renameParticipant(id, 'Speaker 1', ' alex ')).toThrow('distinct name');
+  store.renameParticipant(id, 'Speaker 1', 'Alex');
+  const shown = core.getMeetingForDisplay(id)!;
+  expect(shown.transcript.segments.map(s => s.speaker)).toContain('Alex (You)');
+  expect(core.exportMeeting(id).markdown).toContain('### Alex (Speaker 1)');
+ });

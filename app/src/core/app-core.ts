@@ -6,7 +6,7 @@ import type { Engine } from "../engine/protocol.js";
 import type { PipelineContext, PipelineStages } from "../pipeline/pipeline.js";
 import { exportFileName, meetingToMarkdown } from "./export-markdown.js";
 import { DEFAULT_DETECTION, MicWatcher, type DetectionSettings } from "./detection.js";
-import { applyNames, USER_NAME_SETTING } from "./participants.js";
+import { applyNames, effectiveParticipants, USER_NAME_SETTING } from "./participants.js";
 import { MeetingChatController } from "./meeting-chat-controller.js";
 import type { MeetingChatGenerator } from "../pipeline/meeting-chat.js";
 import type { ChatRecord } from "../shared/meeting-chat.js";
@@ -298,6 +298,13 @@ export class AppCore {
    * Transcript and Summary keep the labels, so a regenerated Summary is unaffected.
    */
   renameParticipant(meetingId: number, label: string, name: string): void {
+    const meeting = this.store.getMeeting(meetingId);
+    if (!meeting) throw new Error('Meeting not found');
+    const proposed = name.trim() || (label === 'You' ? this.userName : undefined) || label;
+    const participants = effectiveParticipants(meeting.participants, this.userName);
+    if (participants.some(p => p.label !== label && (p.name || p.label).trim().toLowerCase() === proposed.toLowerCase())) {
+      throw new Error('Give each Participant a distinct name');
+    }
     this.store.renameParticipant(meetingId, label, name.trim() || null);
     this.chatController.refresh(meetingId);
   }
