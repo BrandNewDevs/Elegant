@@ -1,37 +1,49 @@
 import { it, expect } from 'vitest';
-import { matchStatements, sourceStatements } from './summary-statements.js';
+import { createReadableSummariser } from './readable-summariser.js';
+import type { TextModel } from './language-model.js';
+import type { Transcript } from './pipeline.js';
 
-it('rejects moved deadlines and omitted conditions even when the same words occur elsewhere', () => {
-  const atoms = [
-    { speaker: 'You', text: 'I will write the guide by Thursday.', sources: [0] },
-    { speaker: 'You', text: 'I will review the tests by Friday.', sources: [1] },
-  ];
-  expect(() => matchStatements('I will write the guide by Friday and review the tests by Thursday.', 'You', atoms, 'commitment')).toThrow();
-  expect(() => matchStatements('We will launch Monday.', 'You', [{ speaker: 'You', text: 'If the test passes, we will launch Monday.', sources: [0] }], 'decision')).toThrow();
+/** Exercise verification through the production Summary interface, with a model that proposes a rewrite. */
+async function summarise(texts: string[], rewrite: string, kind = 'commitment') {
+  const model: TextModel = { async complete(request) {
+    const { data } = JSON.parse(request.messages[1]!.content);
+    const result = data.points ? { sentences: [{ covers: [data.statusPointIds?.[0] ?? 0] }] }
+      : data.claims ? { points: data.claims.map((claim: object, id: number) => ({ ...claim, covers: [id] })) }
+      : { points: [{ speaker: 'You', text: rewrite, sources: data.evidence.map((e: { id: number }) => e.id), kind }] };
+    return { text: JSON.stringify(result), metadata: { model: 'fake', elapsedMs: 1 } };
+  } };
+  const transcript: Transcript = { segments: texts.map((text, i) => ({ start: i * 4, end: i * 4 + 3, speaker: 'You', text })) };
+  return createReadableSummariser({ model })(transcript);
+}
+
+it('preserves task deadlines and conditions when a proposed rewrite moves or omits them', async () => {
+  const result = await summarise(['I will write the guide by Thursday.', 'I will review the tests by Friday.'], 'I will write the guide by Friday and review the tests by Thursday.');
+  expect(result.participants[0]!.said.join(' ')).toContain('write the guide by Thursday');
+  expect(result.participants[0]!.said.join(' ')).toContain('review the tests by Friday');
+  const conditional = await summarise(['If the test passes, we will launch Monday.'], 'We will launch Monday.', 'decision');
+  expect(conditional.participants[0]!.said.join(' ')).toContain('If the test passes');
 });
-it('does not infer an individual owner from a collective commitment', () => {
-  expect(() => matchStatements('You will update the guide Thursday.', 'You', [{ speaker: 'You', text: 'We will update the guide Thursday.', sources: [0] }], 'commitment')).toThrow();
+it('does not assign a collective commitment to an individual Participant', async () => {
+  const result = await summarise(['We will update the guide Thursday.'], 'You will update the guide Thursday.');
+  expect(result.participants[0]!.said).toEqual(['We will update the guide Thursday.']);
 });
-it('rejects unsupported revision and completion claims', () => {
-  expect(() => matchStatements('Both PDF and Markdown require revision.', 'You', [{ speaker: 'You', text: 'Friday replaces Monday and Markdown replaces PDF.', sources: [0] }], 'decision')).toThrow();
-  expect(() => matchStatements('Kenny completed his work.', 'Kenny', [{ speaker: 'Kenny', text: "It's done. I'm done.", sources: [0] }], 'update')).toThrow();
+it('does not publish unsupported revision or completion claims', async () => {
+  const revision = await summarise(['Friday replaces Monday and Markdown replaces PDF.'], 'Both PDF and Markdown require revision.', 'decision');
+  expect(revision.participants[0]!.said).toEqual(['Friday replaces Monday and Markdown replaces PDF.']);
+  const completion = await summarise(["It's done. I'm done."], 'You completed all the work.', 'update');
+  expect(completion.participants[0]!.said.join(' ')).not.toContain('completed all the work');
 });
-it('keeps original evidence identities when a sentence crosses adjacent fragments', () => {
-  const atoms = sourceStatements([
-    { id: 0, speaker: 'You', text: 'The model runs', refs: [0] },
-    { id: 1, speaker: 'You', text: 'locally.', refs: [1] },
-    { id: 2, speaker: 'Speaker 1', text: 'No owner assigned.', refs: [2] },
-  ]);
-  expect(atoms[0]).toMatchObject({ text: 'The model runs locally.', sources: [0, 1] });
-  expect(matchStatements('The model runs locally.', 'You', [atoms[0]!], 'update')).toHaveLength(1);
+it('keeps original ordinal evidence when a supported sentence crosses adjacent fragments', async () => {
+  const result = await summarise(['The model runs', 'locally.'], 'The model runs locally.', 'update');
+  expect(result.participants[0]!.said).toEqual(['The model runs locally.']);
+  expect(result.evidence!.participants[0]!.said).toEqual([[0, 1]]);
 });
-it('keeps finality and synthetic qualifiers attached to the facts they qualify', () => {
-  const final = sourceStatements([{ id: 0, speaker: 'You', refs: [0], text: 'Friday replaces Monday, and Markdown replaces PDF. These are the final decisions.' }]);
-  expect(final).toHaveLength(1);
-  expect(final[0]!.text).toContain('Friday replaces Monday');
-  expect(final[0]!.text).toContain('final decisions');
-  const synthetic = sourceStatements([{ id: 0, speaker: 'You', refs: [0], text: 'PDF failed. Markdown passed. These are test outcomes for this synthetic discussion, not measurements of the actual app.' }]);
-  expect(synthetic).toHaveLength(1);
-  expect(synthetic[0]!.text).toContain('PDF failed');
-  expect(synthetic[0]!.text).toContain('not measurements');
+it('keeps finality and test-scope qualifiers with the facts they qualify', async () => {
+  const final = await summarise(['Friday replaces Monday, and Markdown replaces PDF. These are the final decisions.'], 'These are the final decisions.', 'decision');
+  expect(final.participants[0]!.said).toHaveLength(1);
+  expect(final.participants[0]!.said[0]).toContain('Friday replaces Monday');
+  expect(final.participants[0]!.said[0]).toContain('final decisions');
+  const synthetic = await summarise(['PDF failed. Markdown passed. These are test outcomes for this synthetic discussion, not measurements of the actual app.'], 'PDF failed and Markdown passed.', 'update');
+  expect(synthetic.participants[0]!.said).toHaveLength(1);
+  expect(synthetic.participants[0]!.said[0]).toContain('not measurements');
 });
