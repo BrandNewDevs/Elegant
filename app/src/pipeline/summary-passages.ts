@@ -4,7 +4,11 @@ export interface SummaryPassage { id: number; speaker: string; text: string; ref
 /** Narrow conversation-management rules; short substantive negatives are retained. */
 export function isSummaryHousekeeping(text: string): boolean {
   const value = text.trim().replace(/^(?:yeah|well)[,\s]+/iu, '');
-  return /^(?:thanks|thank you|bye|end|hopefully|is|now)[.!?,\s]*$/iu.test(value)
+  const words = value.toLowerCase().match(/[\p{L}]+/gu) ?? [];
+  const functionWords = new Set('i you we they he she it this that these those my your our their have has had to be is are was were am a an the of in on for and or but with by so just only now then here there go going went can could will would should may might please very'.split(' '));
+  return /^(?:now|only)\b/iu.test(value) && words.length >= 4 && words.every(word => functionWords.has(word))
+    || /^(\p{L}+)(?:\s+and\s+\1)+\s+and\s+cut[.!]*$/iu.test(value)
+    || /^(?:thanks|thank you|bye|end|hopefully|is|now)[.!?,\s]*$/iu.test(value)
     || /^(?:so[,\s]+)?what (?:are|is) the updates? (?:on|for) .+\?$/iu.test(value)
     || /^let['’]s talk about .+ updates? .*[.!?]*$/iu.test(value)
     || /^I wanted to know (?:our |the )?progress .+$/iu.test(value)
