@@ -81,6 +81,7 @@ export class AppCore {
   private engineProblemListeners: ((message: string) => void)[] = [];
   private stopNudgeListeners: ((app: string) => void)[] = [];
   private showInDockListeners: ((show: boolean) => void)[] = [];
+  private keepAudioListeners: ((keep: boolean) => void)[] = [];
   private recordingSettledWaiters: (() => void)[] = [];
   private stopTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -307,9 +308,15 @@ export class AppCore {
     return this.deps.store.getSetting(KEEP_AUDIO_SETTING) === "true";
   }
 
-  /** Applies from the next transcription on. */
+  /** Applies from the next transcription on. Tells the listeners, so the menu bar and the Settings page agree. */
   setKeepAudio(keep: boolean): void {
+    if (keep === this.keepAudio) return;
     this.deps.store.setSetting(KEEP_AUDIO_SETTING, String(keep));
+    for (const l of this.keepAudioListeners) l(keep);
+  }
+
+  onKeepAudioChange(listener: (keep: boolean) => void): void {
+    this.keepAudioListeners.push(listener);
   }
 
   /** Whether the app shows in the Dock as well as the menu bar. On unless the user turned it off. */

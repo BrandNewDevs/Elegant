@@ -79,7 +79,7 @@ function NameForm({ userName }: { userName: string }) {
   );
 }
 
-function General({ showInDock, name, userName }: { showInDock: boolean; name: string; userName: string }) {
+function General({ showInDock, keepAudio, name, userName }: { showInDock: boolean; keepAudio: boolean; name: string; userName: string }) {
   return (
     <div className="divide-y">
       <SettingRow stacked title="Your name" htmlFor="user-name" description={<>Shown in place of &ldquo;You&rdquo; in transcripts, summaries and exports, in every Meeting. It is kept on this Mac only.</>}>
@@ -88,6 +88,9 @@ function General({ showInDock, name, userName }: { showInDock: boolean; name: st
       </SettingRow>
       <SettingRow title="Show in Dock" htmlFor="show-in-dock" description={`${name} always has its menu bar icon. With this on, it also shows in the Dock: click the icon to open ${name}, and minimised windows go there.`}>
         <Switch id="show-in-dock" checked={showInDock} onCheckedChange={(checked) => window.electron.meetings.setShowInDock(checked)} />
+      </SettingRow>
+      <SettingRow title="Keep audio after transcription" htmlFor="keep-audio" description="Off by default: a Recording's audio is deleted once its Transcript exists. With this on, the audio stays on this Mac until you delete the Meeting. It applies from the next transcription on.">
+        <Switch id="keep-audio" checked={keepAudio} onCheckedChange={(checked) => window.electron.meetings.setKeepAudio(checked)} />
       </SettingRow>
     </div>
   );
@@ -240,6 +243,7 @@ export function SettingsPage({
   onSectionChange,
   onBack,
   showInDock = true,
+  keepAudio = false,
   checkForUpdates = true,
   update = { status: "idle" },
   appVersion,
@@ -248,6 +252,7 @@ export function SettingsPage({
   onSectionChange: (section: SettingsSection) => void;
   onBack: () => void;
   showInDock?: boolean;
+  keepAudio?: boolean;
   checkForUpdates?: boolean;
   update?: UpdateState;
   appVersion?: string;
@@ -292,7 +297,7 @@ export function SettingsPage({
         <h1 className="mb-2 text-xl font-semibold tracking-tight">{section}</h1>
         {view && (
           <>
-            {section === "General" && <General showInDock={showInDock} name={view.name} userName={view.userName} />}
+            {section === "General" && <General showInDock={showInDock} keepAudio={keepAudio} name={view.name} userName={view.userName} />}
             {section === "Permissions" && <Permissions state={view.state} name={view.name} />}
             {section === "Models" && <Models models={view.state.models} ollama={view.state.ollama} name={view.name} />}
             {section === "Updates" && <Updates checkForUpdates={checkForUpdates} update={update} appVersion={appVersion} name={view.name} />}

@@ -9,6 +9,8 @@ export type MeetingsViewState = {
   settingsOpen: boolean;
   /** The "Show in Dock" setting, shown in Settings. */
   showInDock: boolean;
+  /** The "Keep audio after transcription" setting, shown in Settings. Absent in older renderer state fixtures. */
+  keepAudio?: boolean;
   /** The "Check for updates" setting, shown in Settings. */
   checkForUpdates: boolean;
   meetings: MeetingListItem[];
