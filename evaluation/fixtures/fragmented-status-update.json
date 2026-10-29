@@ -39,6 +39,24 @@
         0
       ],
       "critical": true
+    },
+    {
+      "id": "features",
+      "text": "AI creates a TL;DR, speaker points and answers with Transcript references.",
+      "speaker": "You",
+      "refs": [
+        1
+      ],
+      "critical": true
+    },
+    {
+      "id": "tests",
+      "text": "Tests are unfinished and this call is one of the tests.",
+      "speaker": "Speaker 1",
+      "refs": [
+        2
+      ],
+      "critical": true
     }
   ],
   "questions": [
@@ -51,5 +69,14 @@
       ],
       "critical": true
     }
+  ],
+  "tldrTopics": [
+    "local Gemma via Ollama",
+    "Summary, speaker points and grounded questions",
+    "unfinished testing"
+  ],
+  "unwantedContent": [
+    "Summary and Summary and Cut",
+    "bare acknowledgements as takeaways"
   ]
 }

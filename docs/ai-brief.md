@@ -76,7 +76,7 @@ Output: a Summary as JSON.
 - Keep `Summary.tldr` and `Summary.participants[].said` compatible. Store supporting references per TL;DR and point, plus revision and generation metadata, alongside those fields. Save replacements atomically. Failed regeneration preserves the previous Summary and evidence. Legacy Summaries remain readable without evidence.
 - Reject unknown speaker labels, unknown references, duplicate Participant entries, blank points and malformed output. Per-Participant evidence must include that Participant's speech. These checks establish structure, not factual support.
 - Short Transcripts use one bounded Summary request, with optional bounded refinement of repeated points against original evidence. Long Transcripts use extraction, then bounded consolidation with original source passages and references. Preserve proposals, commitments, disagreement, unresolved matters and later corrections. Never silently truncate or publish an incomplete result as complete.
-- Historical long-Meeting consolidation grouped immutable extracted claims rather than asking a reducer to rewrite them. Every candidate has a required integer group assignment under its original speaker; code retains the original extracted clauses and their evidence. The TL;DR uses complete, ranked original claim-and-source bundles independently of the full point list. Group assignments establish bookkeeping, not extraction accuracy or factual support: review final decisions and ownership against the Transcript.
+- Long-Meeting consolidation rewrites concise supported claims using original evidence and required claim coverage. The separate TL;DR generator cites selected original evidence. Structural checks do not establish semantic correctness; review final decisions and ownership against the Transcript.
 - Start with 8,192 context tokens, at most 2,048 response tokens and a conservative 5,500 UTF-8 byte serialized-input budget. Count instructions, evidence, history and retry messages together; check the margin against actual prompt-token counts. Use temperature zero, disable thinking explicitly within the bounded response budget, and allow at most three total attempts for invalid output. Connection errors are actionable failures, not blind retries.
 - Centralize model settings and readiness checks. Support system/user messages, JSON Schema, timeouts, cancellation and operational metadata without logging Transcript content or prompts by default. Serialize AI jobs, release idle speech models before Gemma and cancel work before closing storage.
 
@@ -88,7 +88,7 @@ Output: a Summary as JSON.
 
 ## Evidence-backed Summary implementation
 
-The app and evaluation command use `createReadableSummariser` with prompt version `readable-summary-v1`. The earlier `createGroundedSummariser` remains for historical comparison and its structural regression tests.
+The app and evaluation command use `createReadableSummariser` with prompt version `readable-summary-v2`. The earlier `createGroundedSummariser` remains for historical comparison and its structural regression tests.
 
 Working passages combine consecutive same-speaker segments separated by at most two seconds. Sentence and word boundaries bound evidence size; original stored Transcript content, speaker labels and ordinal references remain unchanged. Model evidence contains only IDs, speakers and text.
 

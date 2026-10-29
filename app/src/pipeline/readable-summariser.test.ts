@@ -11,6 +11,7 @@ const transcript = { segments: [
 function model(override?: (stage: string, data: any) => unknown): TextModel {
   return { async complete(request) {
     expect(requestBytes(request)).toBeLessThanOrEqual(5500);
+    expect(JSON.stringify(request.schema)).toContain('enum');
     const { instruction, data } = JSON.parse(request.messages[1]!.content);
     const stage = instruction.includes('Write 2–3') ? 'tldr' : instruction.includes('Consolidate supplied') ? 'reduce' : 'extract';
     const point = { speaker: 'You', text: 'The model runs locally; ownership is unassigned.', sources: [0], kind: 'unresolved' };
@@ -41,6 +42,13 @@ describe('readable Summary production seam', () => {
       { speaker: 'You', text: 'No owner assigned.', sources: [0], kind: 'unresolved' },
     ] } : stage === 'reduce' ? { points: [{ speaker: 'You', text: 'Runs locally.', sources: [0], kind: 'update', covers: [0] }] } : undefined);
     await expect(createReadableSummariser({ attempts: 1, model: fake })(transcript)).rejects.toThrow('Missing covers IDs');
+  });
+  it('removes redundant known citation markers while rejecting unknown markers', async () => {
+    const known = model(stage => stage === 'tldr' ? { sentences: [{ text: 'The model runs locally [0].', sources: [0] }] } : undefined);
+    const result = await createReadableSummariser({ model: known })(transcript);
+    expect(result.tldr).toBe('The model runs locally.');
+    const unknown = model(stage => stage === 'tldr' ? { sentences: [{ text: 'The model runs locally [999].', sources: [0] }] } : undefined);
+    await expect(createReadableSummariser({ attempts: 1, model: unknown })(transcript)).rejects.toThrow('all cited evidence IDs');
   });
   it('honours cancellation before contacting the model', async () => {
     const controller = new AbortController(); controller.abort();
