@@ -18,6 +18,7 @@ export interface SummaryEvidence {
   participants: { speaker: string; said: number[][] }[];
 }
 export interface SummaryGeneration {
+  requests?: { stage: string; bytes: number; attempt: number; elapsedMs: number }[];
   promptVersion: string;
   model: string;
   elapsedMs: number;

@@ -8,7 +8,7 @@ import type { Transcript } from "../pipeline/pipeline.js";
 import { openStore } from "../store/store.js";
 import { BaselineOllamaClient } from "./baseline-model.js";
 import { createBaselineSummariser } from "./baseline.js";
-import { createGroundedSummariser } from "../pipeline/grounded-summariser.js";
+import { createReadableSummariser } from "../pipeline/readable-summariser.js";
 import { OllamaClient, DEFAULT_SUMMARY_MODEL } from "../pipeline/ollama.js";
 import type { LanguageModel, TextModel } from "../pipeline/language-model.js";
 import { evaluateFixture, validateFixture } from "./runner.js";
@@ -73,7 +73,7 @@ const model: LanguageModel & TextModel = {
     } catch (error) { observation.failed = true; throw error; }
   },
 };
-const summarise = implementation === "baseline" ? createBaselineSummariser({ model }) : createGroundedSummariser({ model, deadlineMs: summaryDeadlineMs });
+const summarise = implementation === "baseline" ? createBaselineSummariser({ model }) : createReadableSummariser({ model, deadlineMs: summaryDeadlineMs });
 const store = openStore(":memory:");
 const meetingIds = new WeakMap<Transcript, number>();
 const chat = createMeetingChat({ store, model, modelName });
