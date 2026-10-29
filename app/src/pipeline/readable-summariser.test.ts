@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createReadableSummariser } from './readable-summariser.js';
-import { summaryPassages } from './summary-passages.js';
+import { summaryPassages, isSummaryHousekeeping } from './summary-passages.js';
 import type { TextModel } from './language-model.js';
 import { requestBytes } from './model-request.js';
 const transcript = { segments: [
@@ -59,6 +59,19 @@ describe('readable Summary production seam', () => {
     const result = await createReadableSummariser({ model: fake })(transcript);
     expect(result.participants).toEqual([{ speaker: 'You', said: ['No owner assigned.'] }]);
     expect(JSON.stringify(transcript)).toBe(before);
+  });
+  it('filters only unambiguous housekeeping, preserving short negatives', () => {
+    expect(isSummaryHousekeeping('So what are the updates on the app?')).toBe(true);
+    expect(isSummaryHousekeeping('I wanted to know our progress in the UI field')).toBe(true);
+    for (const text of ['No owner assigned.', 'No.', 'Tests are not finished.', 'Friday replaces Monday.']) expect(isSummaryHousekeeping(text)).toBe(false);
+  });
+  it('retains an omitted supported claim after bounded consolidation retries', async () => {
+    const fake = model(stage => stage === 'extract' ? { points: [
+      { speaker: 'You', text: 'Runs locally.', sources: [0], kind: 'update' },
+      { speaker: 'You', text: 'No owner assigned.', sources: [0], kind: 'unresolved' },
+    ] } : stage === 'reduce' ? { points: [{ speaker: 'You', text: 'Runs locally.', kind: 'update', covers: [0] }] } : undefined);
+    const result = await createReadableSummariser({ model: fake })(transcript);
+    expect(result.participants[0]!.said).toContain('No owner assigned.');
   });
   it('honours cancellation before contacting the model', async () => {
     const controller = new AbortController(); controller.abort();

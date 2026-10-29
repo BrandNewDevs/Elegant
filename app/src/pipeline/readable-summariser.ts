@@ -5,7 +5,7 @@ import { transcriptRevision } from './evidence.js';
 import { summaryPassages, type SummaryPassage } from './summary-passages.js';
 import { InvalidSummaryError } from './validate-summary.js';
 
-export const SUMMARY_PROMPT_VERSION = 'readable-summary-v3';
+export const SUMMARY_PROMPT_VERSION = 'readable-summary-v4';
 interface Claim { speaker: string; text: string; sources: number[]; kind: string }
 const kinds = ['update', 'decision', 'commitment', 'proposal', 'disagreement', 'unresolved', 'housekeeping', 'noise'];
 const integers = { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'integer' } };
@@ -41,7 +41,7 @@ function object(text: string): Record<string, unknown> { try { const v = JSON.pa
 function nonblank(v: unknown): string { return typeof v === 'string' && v.trim() ? v.trim() : fail('Text must be nonblank'); }
 function ids(v: unknown, available: number[]): number[] { if (!Array.isArray(v) || !v.length || !v.every(id => Number.isInteger(id) && available.includes(id))) return fail('Use supplied evidence or claim IDs'); return [...new Set(v)] as number[]; }
 function prose(text: string, sources: number[], evidence: { id: number; text: string }[], citationIds = sources): string {
-  const cleaned = text.replace(/\[\s*\d+(?:[\s,]+\d+)*\s*\]/gu, marker => {
+  const cleaned = text.replace(/\[\s*\d+(?:[\s,]+\d+)*\s*\]|\((?:IDs?|sources?|refs?):\s*\d+(?:[\s,]+\d+)*\s*\)/giu, marker => {
     if (evidence.some(e => sources.includes(e.id) && e.text.includes(marker))) return marker;
     const cited = marker.match(/\d+/gu)!.map(Number);
     if (!cited.every(id => citationIds.includes(id))) return fail('Put all cited evidence IDs in sources');
@@ -50,7 +50,7 @@ function prose(text: string, sources: number[], evidence: { id: number; text: st
   if ([...cleaned].some(c => /[\[\]{}]/u.test(c) && !evidence.some(e => sources.includes(e.id) && e.text.includes(c)))) return fail('Return readable prose without JSON or citation markup');
   return cleaned;
 }
-function parsePoints(text: string, evidence: SummaryPassage[], draft?: Claim[]): Claim[] {
+function parsePoints(text: string, evidence: SummaryPassage[], draft?: Claim[], retainMissing = false): Claim[] {
   const v = object(text); if (!Array.isArray(v.points)) return fail('Return points');
   const covered = new Set<number>();
   const points = v.points.map(raw => {
@@ -67,7 +67,10 @@ function parsePoints(text: string, evidence: SummaryPassage[], draft?: Claim[]):
     const text = nonblank(prose(nonblank(raw.text), sources, evidence, [...sources, ...covers]));
     return { speaker, text, sources, kind: raw.kind };
   });
-  if (draft && covered.size !== draft.length) return fail('Missing covers IDs: ' + draft.flatMap((c, id) => covered.has(id) ? [] : [`${id}(${c.speaker})`]).join(', ').slice(0, 115));
+  if (draft && covered.size !== draft.length) {
+    if (!retainMissing) return fail('Missing covers IDs: ' + draft.flatMap((c, id) => covered.has(id) ? [] : [`${id}(${c.speaker})`]).join(', ').slice(0, 115));
+    points.push(...draft.filter((_, id) => !covered.has(id)));
+  }
   return draft ? points : points.filter(point => !['housekeeping', 'noise'].includes(point.kind));
 }
 export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, deadlineMs = 900000 }: { model: TextModel; attempts?: number; maxCalls?: number; deadlineMs?: number }) {
@@ -80,7 +83,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
     let calls = 0, modelName = 'unknown', promptTokens = 0, outputTokens = 0;
     const check = () => { signal.throwIfAborted(); if (calls >= maxCalls) throw new Error('Summary incomplete: model-call limit reached'); };
     const fits = (stage: string, data: object) => requestBytes(request(stage, data, ' Validation: ' + 'x'.repeat(160))) <= AI_SETTINGS.maxInputBytes;
-    async function ask<T>(stage: string, data: object, parse: (text: string) => T): Promise<T> {
+    async function ask<T>(stage: string, data: object, parse: (text: string, attempt: number) => T): Promise<T> {
       let feedback = '';
       for (let attempt = 0; attempt < Math.min(attempts, 3); attempt++) {
         check(); const req = request(stage, data, feedback); assertRequestBudget(req); calls++;
@@ -89,7 +92,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
         const result = await model.complete({ ...req, signal, timeoutMs: Math.max(1, Math.min(AI_SETTINGS.timeoutMs, deadlineMs - (performance.now() - started))), maxOutputTokens: stage === 'tldr' ? 512 : stage === 'select' ? 256 : AI_SETTINGS.maxOutputTokens });
         observation.elapsedMs = performance.now() - callStarted;
         signal.throwIfAborted(); modelName = result.metadata.model; promptTokens += result.metadata.promptTokens ?? 0; outputTokens += result.metadata.outputTokens ?? 0;
-        try { return parse(result.text); } catch (error) { if (!(error instanceof InvalidSummaryError)) throw error; feedback = ' Validation: ' + error.message.slice(0, 160); }
+        try { return parse(result.text, attempt); } catch (error) { if (!(error instanceof InvalidSummaryError)) throw error; feedback = ' Validation: ' + error.message.slice(0, 160); }
       }
       throw new InvalidSummaryError('Summary incomplete after bounded validation retries' + feedback);
     }
@@ -121,7 +124,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
           if (!candidate) break;
           batch.push(candidate.claim); remaining.splice(candidate.index, 1);
         }
-        next.push(...(batch.length === 1 ? batch : await ask('reduce', payload(batch), text => parsePoints(text, evidenceFor(batch), batch))));
+        next.push(...(batch.length === 1 ? batch : await ask('reduce', payload(batch), (text, attempt) => parsePoints(text, evidenceFor(batch), batch, attempt === 2))));
       }
       const changed = next.length < claims.length; claims = next;
       if (fits('tldr', overview(claims))) break;

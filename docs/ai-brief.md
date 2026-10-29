@@ -88,11 +88,11 @@ Output: a Summary as JSON.
 
 ## Evidence-backed Summary implementation
 
-The app and evaluation command use `createReadableSummariser` with prompt version `readable-summary-v3`. The earlier `createGroundedSummariser` remains for historical comparison and its structural regression tests.
+The app and evaluation command use `createReadableSummariser` with prompt version `readable-summary-v4`. The earlier `createGroundedSummariser` remains for historical comparison and its structural regression tests.
 
 Working passages combine consecutive same-speaker segments separated by at most two seconds. Sentence and word boundaries bound evidence size; original stored Transcript content, speaker labels and ordinal references remain unchanged. Model evidence contains only IDs, speakers and text.
 
-Extraction writes concise supported claims, omitting filler and unintelligible fragments while preserving meaningful short negatives. Bounded consolidation receives original evidence and must cover every extracted claim under its original speaker, including explaining superseded positions. Coverage is bookkeeping, not proof of semantic fidelity. The model writes readable prose instead of concatenating original clauses.
+Extraction writes concise supported claims, omitting filler and unintelligible fragments while preserving meaningful short negatives. Bounded consolidation receives original evidence and must cover every extracted claim under its original speaker, including explaining superseded positions. After three attempts, missing coverage is repaired by retaining the original supported claims unchanged. Unknown IDs or incorrect speakers still fail. Coverage is bookkeeping, not proof of semantic fidelity. The model writes readable prose instead of concatenating original clauses.
 
 A separate generation request writes a supported TL;DR of usually 40–70 words and at most 90 words. For long Meetings, bounded selection requests choose representative claims for the overview; the full per-Participant list remains intact. All requests include complete schema and retry overhead in the 5,500-byte bound. Invalid output receives at most three attempts; cancellation, timeout and transport failures propagate. Unfinishable evidence produces a clear failure and cannot replace the previous saved Summary.
 
