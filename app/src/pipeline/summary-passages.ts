@@ -17,7 +17,7 @@ export function isSummaryHousekeeping(text: string): boolean {
     || /^(?:alright[,\s]+)?(?:so )?what about the .+ part\?$/iu.test(value)
     || /^(?:so )?let me[.!]*$/iu.test(value)
     || /^(?:I['’]ll get into the key functionalities|dive deep into what .+ does right now)[.!]*$/iu.test(value)
-    || /^and (?:the )?(?:core engine|ui|user interface) specifically[.!]*$/iu.test(value)
+    || /^(?:and )?(?:the )?(?:core engine|ui|user interface) specifically[.!]*$/iu.test(value)
     || /^(?:actually )?I(?:['’]m| am) interested in .+\b(?:please|put some light|tell me|explain)\b.+$/iu.test(value)
     || /^(?:so )?(?:let me )?dive (?:deep )?into what .+ does(?: right now)?[.!]*$/iu.test(value)
     || /^(?:thanks|thank you|bye|end|hopefully|is|now)[.!?,\s]*$/iu.test(value)

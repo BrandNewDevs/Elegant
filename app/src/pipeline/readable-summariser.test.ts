@@ -71,6 +71,7 @@ describe('readable Summary production seam', () => {
     expect(isSummaryHousekeeping('now you have to go on that only you and I have to go on this')).toBe(true);
     expect(isSummaryHousekeeping('Summary and Summary and Cut')).toBe(true);
     expect(isSummaryHousekeeping('I wanted to know our progress in the UI field')).toBe(true);
+    expect(isSummaryHousekeeping('and the core engine specifically.')).toBe(true);
     for (const text of ['No owner assigned.', 'No.', 'Tests are not finished.', 'Friday replaces Monday.']) expect(isSummaryHousekeeping(text)).toBe(false);
   });
   it('retains an omitted supported claim after bounded consolidation retries', async () => {
