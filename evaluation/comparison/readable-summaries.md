@@ -14,7 +14,7 @@ Participant renames reject duplicate effective names, including the profile name
 
 ## Supplied private examples
 
-Only operational metadata and aggregate review counts are committed in [the private metrics](gemma3-readable-v12-private-metrics.json). The supplied exports, replay fixtures, prompts and generated text remain outside Git. Expected points and unwanted content were prepared before tuning. Each example has seven expected important points, all designated critical, and each was run three times before and after the change.
+Only operational metadata and aggregate review counts are committed in [the private metrics](gemma3-readable-v12-private-metrics.json). The supplied exports, replay fixtures, prompts and generated text remain outside Git. The full expected-point lists and unwanted-content criteria were finalized during early implementation, before final evaluation. These examples were used for tuning, not held out. Each example has seven expected important points, all designated critical, and each was run three times before and after the change.
 
 | Example | Baseline median | Current median | Calls before → after | Points before → after | Current TL;DR words |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -56,6 +56,8 @@ Generation, source-coverage, critical-fact, attribution, reference, private TL;D
 ## Verification and limits
 
 After the recorded model runs, a seam test exposed a mixed segment containing both a request for updates and a commitment. Whole-segment housekeeping filtering now applies only to single sentences; individual sentences are filtered later. A before/after check found identical working evidence and source statements for all nine synthetic inputs and both private inputs, so the recorded model comparisons remain applicable. The new mixed-segment regression passes.
+
+Final-head CI also exposed a Sonner exit-animation timer updating React after the renderer test window had been destroyed, despite all assertions passing. Renderer test cleanup now cancels timers created during each test after unmounting components; this changes no production UI behavior.
 
 Local typechecking, the production build, **622 app/renderer tests across 42 files**, and **45 Python evaluation-tool tests** pass. The PR's app and native macOS CI checks also pass on the implementation and seam-test commits. Native CI runs Swift tests and engine integration; it does not measure an M4's app performance.
 
