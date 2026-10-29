@@ -157,7 +157,7 @@ app.whenReady().then(() => {
     });
     updater.onChange(render);
   }
-  meetingsWindow = new MeetingsWindow(core, setup, setupBridge, updater);
+  meetingsWindow = new MeetingsWindow(core, setup, setupBridge, updater, app.getVersion());
   const onboardingWindow = new OnboardingWindow(setupBridge);
   launch = new Launch(setup, meetingsWindow, onboardingWindow, app.getLoginItemSettings().wasOpenedAtLogin, () => quittingForUpdate);
 

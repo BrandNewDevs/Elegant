@@ -10,7 +10,7 @@ A personal macOS menu-bar app that notices when you are in an online call, offer
 - **Summarises locally.** A local model served by Ollama (default `gemma3:4b`) writes a TL;DR and what each participant said. Every point links to the transcript passage that supports it, and clicking a timestamp jumps to and highlights that passage. Long meetings are handled in bounded chunks.
 - **Chat with a meeting.** Ask questions about one meeting in the Chat view. Answers cite transcript segments, history is saved per meeting, and you can cancel, retry or clear a chat.
 - **Meetings window.** Browse, full-text search, and open a meeting in its Summary, Transcript or Chat view. Regenerate a summary, export a meeting to Markdown (summary, transcript and supporting timestamps), or delete a meeting and all its data.
-- **Profile.** Set your name once on the local Profile page and it replaces "You" in transcripts, summaries and exports.
+- **Your name.** Set it once in Settings → General and it replaces "You" in transcripts, summaries and exports.
 - **Menu-bar controls.** Open the app, Settings (⌘,), keep audio after transcription (off by default; audio is otherwise deleted once transcription succeeds), show in Dock (on by default), ignored apps, and apps you chose "Never" for.
 - **Launches at login** when installed as the packaged app.
 - **AI work is queued.** Model preparation, transcription, summaries and chat run one at a time, shown as toasts. Detection and recording stay responsive.
@@ -54,7 +54,7 @@ xattr -dr com.apple.quarantine /Applications/Elegant.app
 
 ### Updates
 
-From version 0.1.3 on, Elegant updates itself. At launch it asks GitHub whether a newer release is published, downloads it in the background and shows **Version X is ready. Restart to update**; **Restart** (also in the menu bar) installs it and reopens the app. It never restarts by itself, and it refuses while a Recording is running or a Meeting is being processed. Updating sends nothing about you or your Meetings, and updates are accepted only if they are signed with the same certificate as the installed app. The **Check for updates** switch in Settings turns the check off. If an update fails, the toast links to the release page.
+From version 0.1.3 on, Elegant updates itself. At launch it asks GitHub whether a newer release is published, downloads it in the background and shows **Version X is ready. Restart to update**; **Restart** (in the sidebar, Settings → Updates and the menu bar) installs it and reopens the app. It never restarts by itself, and it refuses while a Recording is running or a Meeting is being processed. Updating sends nothing about you or your Meetings, and updates are accepted only if they are signed with the same certificate as the installed app. The **Check for updates** switch in Settings turns the check off. If an update fails, the toast links to the release page.
 
 Earlier versions have no updater, so the first update (to 0.1.3 or later) is installed by hand: download the `.dmg` as above and replace the app in Applications.
 
@@ -80,7 +80,7 @@ macOS ties the microphone and system-audio permissions to the signing identity, 
 ### First run
 
 1. **Onboarding** asks for your name (optional) and walks through the two macOS permissions, one screen each: **Microphone** and **System audio capture**. Nothing is requested until you press its button.
-2. **Settings** (⌘, or the Settings button in the sidebar) shows each permission, the **Show in Dock** switch, the speech and speaker model downloads, and the Ollama check. If Ollama isn't running or lacks the model, Settings tells you the command to run. Missing models also download on first use, so none of this blocks recording.
+2. **Settings** (⌘, or the Settings entry in the sidebar) is a page with sections: General (your name, **Show in Dock**), Permissions, Models (the speech and speaker model downloads and the Ollama check) and Updates. If Ollama isn't running or lacks the model, Settings tells you the command to run. Missing models also download on first use, so none of this blocks recording.
 
 If you turn a permission off later, Settings reports where to turn it back on in System Settings, and **Check again** picks it up.
 

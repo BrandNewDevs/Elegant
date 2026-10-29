@@ -250,6 +250,41 @@ describe("Meetings window application bridge", () => {
     });
   });
 
+  it("publishes the Recording, the update and the version in the page's state, and stops the Recording on request", () => {
+    const ctx = context();
+    expect(latest(ctx)).toMatchObject({ recording: undefined, update: { status: "idle" } });
+    ctx.engine.emit({ type: "recording_started", app: "zoom.us", startedAt: "2026-10-27T12:00:00Z" });
+    expect(latest(ctx).recording).toEqual({ app: "zoom.us", startedAt: "2026-10-27T12:00:00Z" });
+
+    emit(ctx, "meetings:stop-recording", undefined, {}); // another web contents
+    expect(ctx.core.recording).toBeDefined();
+    emit(ctx, "meetings:stop-recording");
+    expect(ctx.core.recording).toBeUndefined();
+    expect(latest(ctx).recording).toBeUndefined();
+    ctx.engine.emit({ type: "tracks_ready", micPath: "/tmp/mic.wav", systemPath: "/tmp/system.wav", micStartHostTime: 1000.197, systemStartHostTime: 1000 });
+  });
+
+  it("keeps the update in the page's state after its toast, and can still open the release page of a failure it announced earlier", () => {
+    const ctx = context();
+    const driver = { check: vi.fn(async () => "0.2.0"), download: vi.fn(async () => { throw new Error("no"); }), install: vi.fn() };
+    const updater = new Updater({ currentVersion: "0.1.2", repo: "BrandNewDevs/Elegant", driver, enabled: () => true, restartBlock: () => undefined });
+    const view = new MeetingsWindow(ctx.core, ctx.setup, new SetupBridge(ctx.setup, { done: () => {}, openSettings: () => {} }), updater, "0.1.2");
+    ctx.core.setLastNotifiedUpdate("0.2.0"); // an earlier launch already told the person about this version
+    view.show();
+    const window = electron.windows.at(-1)!;
+    window.loaded();
+    const mine = { ...ctx, window, view };
+    emit(mine, "meetings:ready");
+    return updater.start().then(() => {
+      expect(window.webContents.send.mock.calls.some(([channel]) => channel === "meetings:update")).toBe(false); // not toasted again
+      const state = latest(mine);
+      expect(state.update).toMatchObject({ status: "failed", version: "0.2.0" });
+      expect(state.appVersion).toBe("0.1.2");
+      emit(mine, "meetings:open-release");
+      expect(electron.shell.openExternal).toHaveBeenCalledExactlyOnceWith("https://github.com/BrandNewDevs/Elegant/releases/tag/v0.2.0");
+    });
+  });
+
   it("stores the Check for updates switch from the page and publishes it", () => {
     const ctx = context();
     expect(latest(ctx).checkForUpdates).toBe(true);

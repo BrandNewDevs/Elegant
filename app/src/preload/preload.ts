@@ -21,6 +21,7 @@ const meetings = {
   onUpdate: (callback: (update: Exclude<UpdateState, { status: "idle" }>) => void) => subscribe("meetings:update", callback),
   restartForUpdate: () => ipcRenderer.invoke("meetings:restart-for-update"),
   openRelease: () => ipcRenderer.send("meetings:open-release"),
+  stopRecording: () => ipcRenderer.send("meetings:stop-recording"),
   select: (id: number) => ipcRenderer.send("meetings:select", id),
   search: (query: string) => ipcRenderer.send("meetings:search", query),
   rename: (payload: { meetingId: number; label: string; name: string }) =>

@@ -19,6 +19,8 @@ export interface MeetingsApi {
   restartForUpdate(): Promise<RestartResult>;
   /** Opens the release page of the update that failed in the default browser. */
   openRelease(): void;
+  /** Stops the Recording in progress, as the menu bar's Stop does. */
+  stopRecording(): void;
   select(id: number): void;
   search(query: string): void;
   rename(payload: { meetingId: number; label: string; name: string }): void;

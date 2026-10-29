@@ -62,6 +62,7 @@ it("offers a rename field for each Participant, showing their label and current 
     return () => {};
   });
   render(<MeetingsApp />);
+  fireEvent.click(screen.getByRole("button", { name: "Participants" }));
   expect(screen.getByDisplayValue("Priya <PM>")).toBeTruthy();
   expect(screen.getByText("Speaker 1")).toBeTruthy();
 });
@@ -77,56 +78,99 @@ it("opens Settings from the sidebar", () => {
   expect(window.electron.meetings.settings).toHaveBeenCalledWith(true);
 });
 
-it("shows Settings as a dialog over the Meetings when it is open, and asks to close it", () => {
+function showState(patch: Partial<MeetingsViewState>) {
   window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
-    callback({ settingsOpen: true, showInDock: true, checkForUpdates: true, meetings: [], selected: undefined, query: "" });
+    callback({ settingsOpen: false, showInDock: true, checkForUpdates: true, meetings: [], selected: undefined, query: "", ...patch });
     return () => {};
   });
-  window.electron.setup = {
-    ready: vi.fn(),
-    onState: (callback) => {
-      callback(nothingDone);
-      return () => {};
-    },
-    act: vi.fn(),
-    setUserName: vi.fn(),
-  };
-  render(<MeetingsApp />);
-  expect(screen.getByRole("dialog", { name: "Settings" })).toBeTruthy();
-  expect(screen.getByPlaceholderText("Search meetings")).toBeTruthy();
-  expect(screen.getByRole("switch", { name: "Show in Dock" }).getAttribute("aria-checked")).toBe("true");
+}
 
-  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+function showSetup(view = nothingDone) {
+  window.electron.setup = { ready: vi.fn(), onState: (callback) => { callback(view); return () => {}; }, act: vi.fn(), setUserName: vi.fn() };
+}
+
+it("shows Settings as a page in the main area when it is open, and asks to close it from Back", () => {
+  showState({ settingsOpen: true, appVersion: "0.1.3" });
+  showSetup();
+  render(<MeetingsApp />);
+  expect(screen.getByRole("region", { name: "Settings" })).toBeTruthy();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(screen.getByPlaceholderText("Search meetings")).toBeTruthy(); // the sidebar stays
+  expect(screen.getByRole("switch", { name: "Show in Dock" }).getAttribute("aria-checked")).toBe("true");
+  expect(screen.getByLabelText("Name")).toBeTruthy(); // the name lives in General now
+
+  fireEvent.click(screen.getByRole("button", { name: "Meetings" }));
   expect(window.electron.meetings.settings).toHaveBeenCalledWith(false);
 });
 
-it("opens the Profile page from the sidebar and goes back to the Meeting when one is picked", () => {
-  window.electron.meetings.onState = vi.fn((callback: (state: MeetingsViewState) => void) => {
-    callback({ settingsOpen: false, showInDock: false, checkForUpdates: true, meetings: [meeting], selected: meeting, query: "" });
-    return () => {};
-  });
-  window.electron.setup = {
-    ready: vi.fn(),
-    onState: (callback) => {
-      callback({ ...nothingDone, userName: "Kenny" });
-      return () => {};
-    },
-    act: vi.fn(),
-    setUserName: vi.fn(),
-  };
+it("picks the Meeting and leaves Settings when one is chosen in the sidebar", () => {
+  showState({ settingsOpen: true, meetings: [meeting], selected: meeting });
+  showSetup();
   render(<MeetingsApp />);
-  expect(screen.getByRole("heading", { name: "zoom.us" })).toBeTruthy();
-
-  fireEvent.click(screen.getByRole("button", { name: "Profile" }));
-  expect(screen.getByRole("heading", { name: "Profile" })).toBeTruthy();
-  expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Kenny");
-  expect(screen.queryByRole("heading", { name: "zoom.us" })).toBeNull();
-  expect(window.electron.meetings.settings).not.toHaveBeenCalled(); // a page, not the Settings dialog
-
-  // The Meeting is already the selected one, so the main process sends nothing new; the click alone must bring it back.
   fireEvent.click(screen.getByRole("button", { name: /zoom\.us/ }));
-  expect(screen.getByRole("heading", { name: "zoom.us" })).toBeTruthy();
-  expect(screen.queryByRole("heading", { name: "Profile" })).toBeNull();
+  expect(window.electron.meetings.settings).toHaveBeenCalledWith(false);
+  expect(window.electron.meetings.select).toHaveBeenCalledWith(4);
+});
+
+it("has no Profile entry: the name is in Settings", () => {
+  showState({ meetings: [meeting], selected: meeting });
+  render(<MeetingsApp />);
+  expect(screen.queryByRole("button", { name: "Profile" })).toBeNull();
+});
+
+it("groups the Meetings by day and does not split search results", () => {
+  const now = new Date();
+  const earlier = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 15, 0).toISOString();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0).toISOString();
+  const list = [{ id: 2, app: "Slack", startedAt: today, state: "done" as const }, { id: 1, app: "Zoom", startedAt: earlier, state: "failed" as const }];
+  showState({ meetings: list });
+  const { unmount } = render(<MeetingsApp />);
+  expect(screen.getByRole("heading", { name: "Today" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Yesterday" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: /Zoom.*Failed/ })).toBeTruthy();
+  unmount();
+
+  showState({ meetings: list, query: "o" });
+  render(<MeetingsApp />);
+  expect(screen.queryByRole("heading", { name: "Today" })).toBeNull();
+  expect(screen.getAllByRole("button", { name: /Slack|Zoom/ })).toHaveLength(2);
+});
+
+it("shows the Recording in progress at the foot of the sidebar, with a Stop button", () => {
+  showState({ recording: { app: "zoom.us", startedAt: new Date(Date.now() - 65_000).toISOString() } });
+  render(<MeetingsApp />);
+  expect(screen.getByText(/Recording zoom\.us · 1:0\d/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+  expect(window.electron.meetings.stopRecording).toHaveBeenCalledTimes(1);
+});
+
+it("shows a ready update in the sidebar until it is installed: Restart restarts, the text opens its Settings section", () => {
+  showState({ update: { status: "ready", version: "0.1.4" } });
+  render(<MeetingsApp />);
+  fireEvent.click(screen.getByRole("button", { name: "Restart" }));
+  expect(window.electron.meetings.restartForUpdate).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole("button", { name: "Version 0.1.4 is ready" }));
+  expect(window.electron.meetings.settings).toHaveBeenCalledWith(true);
+});
+
+it("shows an update that is downloading or failed, and links a failed one to its release page", () => {
+  showState({ update: { status: "downloading", version: "0.1.4", percent: 30 } });
+  const { unmount } = render(<MeetingsApp />);
+  expect(screen.getByText("Downloading 0.1.4… 30%")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Restart" })).toBeNull();
+  unmount();
+
+  showState({ update: { status: "failed", version: "0.1.4", url: "https://github.com/BrandNewDevs/Elegant/releases/tag/v0.1.4", message: "no" } });
+  render(<MeetingsApp />);
+  fireEvent.click(screen.getByRole("button", { name: "View release" }));
+  expect(window.electron.meetings.openRelease).toHaveBeenCalledTimes(1);
+});
+
+it("shows nothing about updates or Recordings when there are none", () => {
+  showState({});
+  render(<MeetingsApp />);
+  expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Restart" })).toBeNull();
 });
 
 type UpdateNews = Exclude<UpdateState, { status: "idle" }>;

@@ -62,8 +62,13 @@ export class MeetingsWindow {
     private readonly setup: Setup,
     private readonly bridge: SetupBridge,
     private readonly updater?: Updater,
+    private readonly appVersion?: string,
   ) {
-    updater?.onChange(state => this.offerUpdate(state));
+    updater?.onChange(state => {
+      this.offerUpdate(state);
+      this.pushState();
+    });
+    core.onRecordingChange(() => this.pushState());
     core.onMeetingsChanged(() => this.pushState());
     core.onShowInDockChange(() => this.pushState());
     core.onChatChanged(() => this.pushState());
@@ -99,6 +104,9 @@ export class MeetingsWindow {
       if (!this.fromThis(event.sender) || typeof check !== "boolean") return;
       this.core.setCheckForUpdates(check);
       this.pushState();
+    });
+    ipcMain.on("meetings:stop-recording", (event) => {
+      if (this.fromThis(event.sender)) this.core.stopRecording();
     });
     ipcMain.on("meetings:open-release", (event) => {
       if (!this.fromThis(event.sender) || !isGithubUrl(this.failedReleaseUrl)) return;
@@ -217,6 +225,7 @@ export class MeetingsWindow {
    * ready or failed, the person has been told about that version and it is not announced again.
    */
   offerUpdate(update: UpdateState): void {
+    if (update.status === "failed") this.failedReleaseUrl = update.url; // the page may ask for it again after the toast is gone
     if (update.status === "idle" || update.version === this.core.lastNotifiedUpdate) return;
     this.pendingUpdate = update;
     this.announceUpdate();
@@ -227,7 +236,6 @@ export class MeetingsWindow {
     if (!update || !this.window || this.window.isDestroyed() || !this.rendererReady) return;
     this.pendingUpdate = undefined;
     if (update.status !== "downloading") this.core.setLastNotifiedUpdate(update.version);
-    if (update.status === "failed") this.failedReleaseUrl = update.url;
     this.window.webContents.send("meetings:update", update);
   }
 
@@ -292,6 +300,9 @@ export class MeetingsWindow {
       selected,
       query: this.query,
       jobs: this.core.jobs.snapshot,
+      recording: this.core.recording,
+      update: this.updater?.state ?? { status: "idle" },
+      appVersion: this.appVersion,
       ...(selected ? { chat: { history: this.core.getChatHistoryForDisplay(selected.id),
         available: this.core.isChatAvailable(selected.id), revision: this.core.getTranscriptRevision(selected.id) } } : {}),
     };
