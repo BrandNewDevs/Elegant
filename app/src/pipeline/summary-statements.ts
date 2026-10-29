@@ -1,7 +1,7 @@
 import { isSummaryHousekeeping, type SummaryPassage } from './summary-passages.js';
 
 export interface SourceStatement { speaker: string; text: string; sources: number[]; context?: string }
-const bareAcknowledgement = /^(?:yes|yeah|sure|okay|ok|absolutely)[.!\s]*$/iu;
+const bareAcknowledgement = /^(?:yes|yeah|sure|okay|ok|absolutely|understood)[.!\s]*$/iu;
 /** Recover sentences spanning adjacent fragments, without crossing another speaker's evidence. */
 export function sourceStatements(evidence: SummaryPassage[]): SourceStatement[] {
   const runs: SummaryPassage[][] = [];

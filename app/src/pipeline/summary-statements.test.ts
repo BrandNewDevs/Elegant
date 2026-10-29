@@ -47,3 +47,9 @@ it('keeps finality and test-scope qualifiers with the facts they qualify', async
   expect(synthetic.participants[0]!.said).toHaveLength(1);
   expect(synthetic.participants[0]!.said[0]).toContain('not measurements');
 });
+
+it('omits a bare acknowledgement without losing adjacent unresolved ownership', async () => {
+  const result = await summarise(['Understood. No owner assigned.'], 'Understood.', 'update');
+  expect(result.participants[0]!.said).toEqual(['No owner assigned.']);
+  expect(result.tldr).not.toContain('Understood');
+});
