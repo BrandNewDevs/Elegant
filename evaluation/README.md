@@ -24,7 +24,7 @@ The default `gemma3:4b` tag was not installed. The explicitly selected installed
 
 ## Evaluation examples
 
-`fixtures/` contains eight entirely synthetic Transcripts with expected important points, source references and questions: straightforward discussion, proposal versus decision, changed decision, ambiguous ownership, disagreement, repetition, spoken misleading instructions and a long discussion. The long fixture contains over 50,000 characters and constructed timestamps covering 60 minutes. It is not an audio Recording or evidence that a real 60-minute workflow passes.
+`fixtures/` contains nine entirely synthetic Transcripts with expected important points, source references and questions: straightforward discussion, proposal versus decision, changed decision, ambiguous ownership, disagreement, repetition, spoken misleading instructions, a long discussion, and fragmented status updates with a noisy ending. The long fixture contains over 50,000 characters and constructed timestamps covering 60 minutes. It is not an audio Recording or evidence that a real 60-minute workflow passes.
 
 Fixtures use this shared shape:
 
@@ -118,3 +118,5 @@ AI_MODEL=gemma3:4b-it-q4_K_M python3 evaluation/measure.py --output /tmp/resourc
 Omit `--nvidia` on the Mac. The wrapper discards command stdout/stderr and does not store command arguments. The evaluation command writes its own result file, so private outputs must still stay outside Git. The wrapper samples summed process-tree RSS, optional separate Ollama RSS, system swap and optional NVIDIA memory; these are not a unique physical-memory total. Missing measurements are null with warnings. Use Activity Monitor on the Mac to inspect memory pressure and retained Swift models too. See [device testing and recovery](../docs/ai-testing.md) for the full procedure.
 
 Pass `--label cold` or `--label warm` only after establishing that condition yourself. The label does not prepare it. To compare models, use identical fixture files, generation settings and production commit, unload the previous model, verify Ollama has no resident model before the cold run, then immediately repeat after verifying the selected model remains resident. Record the digest and quantization on each machine: matching tag names alone do not establish matching weights. Keep the baseline unless the candidate meets quality and target-M4 gates.
+
+The readable Summary regression also supports optional `tldrTopics` and `unwantedContent` review criteria. These are never sent to the model. See the [current comparison](comparison/readable-summaries.md) for measured results and limits.
