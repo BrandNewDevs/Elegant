@@ -3,11 +3,19 @@ import type { Transcript } from './pipeline.js';
 export interface SummaryPassage { id: number; speaker: string; text: string; refs: number[] }
 /** Narrow conversation-management rules; short substantive negatives are retained. */
 export function isSummaryHousekeeping(text: string): boolean {
-  const value = text.trim().replace(/^(?:yeah|well)[,\s]+/iu, '');
+  const value = text.trim().replace(/^(?:yeah|well|and)[,\s]+/iu, '');
   const words = value.toLowerCase().match(/[\p{L}]+/gu) ?? [];
   const functionWords = new Set('i you we they he she it this that these those my your our their have has had to be is are was were am a an the of in on for and or but with by so just only now then here there go going went can could will would should may might please very'.split(' '));
   return /^(?:now|only)\b/iu.test(value) && words.length >= 4 && words.every(word => functionWords.has(word))
     || /^(\p{L}+)(?:\s+and\s+\1)+\s+and\s+cut[.!]*$/iu.test(value)
+    || /^(?:all good[,\s]*)+[.!]*$/iu.test(value)
+    || /^everything (?:is )?(?:working|going|progressing) (?:very )?(?:good|well|fine)[.!]*$/iu.test(value)
+    || /^that is (?:very )?(?:nice|good|great|elegant)[.!]*$/iu.test(value)
+    || /^(?:isn['’]t|is not) it fun[.!?]*$/iu.test(value)
+    || /^(?:alright[,\s]+)?(?:so )?what about the .+ part\?$/iu.test(value)
+    || /^(?:so )?let me[.!]*$/iu.test(value)
+    || /^(?:I['’]ll get into the key functionalities|dive deep into what .+ does right now)[.!]*$/iu.test(value)
+    || /^and (?:the )?(?:core engine|ui|user interface) specifically[.!]*$/iu.test(value)
     || /^(?:thanks|thank you|bye|end|hopefully|is|now)[.!?,\s]*$/iu.test(value)
     || /^(?:so[,\s]+)?what (?:are|is) the updates? (?:on|for) .+\?$/iu.test(value)
     || /^let['’]s talk about .+ updates? .*[.!?]*$/iu.test(value)
@@ -21,7 +29,11 @@ export function isSummaryHousekeeping(text: string): boolean {
 export function summaryPassages(transcript: Transcript): SummaryPassage[] {
   const turns: { speaker: string; text: string; refs: number[]; end: number }[] = [];
   let barrier = false;
+  let closingSpeaker: string | undefined;
   transcript.segments.forEach((segment, ref) => {
+    if (closingSpeaker !== segment.speaker) closingSpeaker = undefined;
+    if (/^(?:end|(?:now )?(?:you have to |please )?stop recording)[.!\s]*$/iu.test(segment.text)) closingSpeaker = segment.speaker;
+    if (closingSpeaker === segment.speaker && /^(?:it['’]s done|I['’]m done)[.!\s]*$/iu.test(segment.text)) { barrier = true; return; }
     if (isSummaryHousekeeping(segment.text)) { barrier = true; return; }
     const previous = turns.at(-1);
     if (!barrier && previous && previous.speaker === segment.speaker && segment.start - previous.end <= 2) {
