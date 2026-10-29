@@ -154,7 +154,8 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       if (fits('tldr', overview(claims))) break;
       if (!changed || round >= 1) break;
     }
-    let shortlist = claims;
+    let shortlist = claims.filter(claim => !/^(?:yes|yeah|sure|okay|ok|absolutely|agreed)[.!\s]*$/iu.test(claim.text));
+    if (!shortlist.length) throw new Error('No substantive point is available for a TL;DR');
     for (let round = 0; !fits('tldr', overview(shortlist)) && round < 8; round++) {
       const next: Claim[] = [];
       for (let position = 0; position < shortlist.length;) {

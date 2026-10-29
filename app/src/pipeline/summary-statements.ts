@@ -1,7 +1,7 @@
 import { isSummaryHousekeeping, type SummaryPassage } from './summary-passages.js';
 
-export interface SourceStatement { speaker: string; text: string; sources: number[] }
-const bareAcknowledgement = /^(?:yes|yeah|sure|okay|ok|absolutely|agreed)[.!\s]*$/iu;
+export interface SourceStatement { speaker: string; text: string; sources: number[]; context?: string }
+const bareAcknowledgement = /^(?:yes|yeah|sure|okay|ok|absolutely)[.!\s]*$/iu;
 /** Recover sentences spanning adjacent fragments, without crossing another speaker's evidence. */
 export function sourceStatements(evidence: SummaryPassage[]): SourceStatement[] {
   const runs: SummaryPassage[][] = [];
@@ -13,11 +13,12 @@ export function sourceStatements(evidence: SummaryPassage[]): SourceStatement[] 
   }
   return runs.flatMap(run => {
     let text = '';
-    const spans = run.map(p => { const start = text.length; text += (text ? ' ' : '') + p.text; return { id: p.id, start, end: text.length }; });
+    const spans = run.map(p => { const start = text.length; text += (text ? ' ' : '') + p.text; return { id: p.id, start, end: text.length, text: p.text }; });
     return [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(text)].flatMap(sentence => {
       const value = sentence.segment.trim();
       if (!value || isSummaryHousekeeping(value) || bareAcknowledgement.test(value)) return [];
-      return [{ speaker: run[0]!.speaker, text: value, sources: spans.filter(s => s.start < sentence.index + sentence.segment.length && s.end > sentence.index).map(s => s.id) }];
+      const supporting = spans.filter(s => s.start < sentence.index + sentence.segment.length && s.end > sentence.index);
+      return [{ speaker: run[0]!.speaker, text: value, sources: supporting.map(s => s.id), context: supporting.map(s => s.text).join(' ') }];
     });
   });
 }
@@ -64,4 +65,4 @@ export function matchStatements(text: string, speaker: string, available: Source
   if (!matched.length || [...remaining.values()].some(count => count !== 0)) throw new UnsupportedSummaryRewrite('Keep the complete original subject, action, conditions and values; avoid unsupported paraphrases');
   return matched;
 }
-export const statementKey = (statement: SourceStatement) => JSON.stringify([statement.speaker, statement.text.replace(/\s+/gu, ' ').trim()]);
+export const statementKey = (statement: SourceStatement) => JSON.stringify([statement.speaker, statement.text.replace(/\s+/gu, ' ').trim(), /\b(?:i|we|you|it|this|that|these|those|they|them|its|their)\b/iu.test(statement.text) ? statement.context ?? statement.sources.join(',') : '']);
