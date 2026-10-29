@@ -5,7 +5,7 @@ import { transcriptRevision } from './evidence.js';
 import { summaryPassages, type SummaryPassage } from './summary-passages.js';
 import { InvalidSummaryError } from './validate-summary.js';
 
-export const SUMMARY_PROMPT_VERSION = 'readable-summary-v5';
+export const SUMMARY_PROMPT_VERSION = 'readable-summary-v6';
 interface Claim { speaker: string; text: string; sources: number[]; kind: string }
 const kinds = ['update', 'decision', 'commitment', 'proposal', 'disagreement', 'unresolved', 'housekeeping', 'noise'];
 const integers = { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'integer' } };
@@ -41,7 +41,7 @@ function object(text: string): Record<string, unknown> { try { const v = JSON.pa
 function nonblank(v: unknown): string { return typeof v === 'string' && v.trim() ? v.trim() : fail('Text must be nonblank'); }
 function ids(v: unknown, available: number[]): number[] { if (!Array.isArray(v) || !v.length || !v.every(id => Number.isInteger(id) && available.includes(id))) return fail('Use supplied evidence or claim IDs'); return [...new Set(v)] as number[]; }
 function prose(text: string, sources: number[], evidence: { id: number; text: string }[], citationIds = sources): string {
-  const cleaned = text.replace(/\[\s*\d+(?:[\s,]+\d+)*\s*\]|\((?:IDs?|sources?|refs?):\s*\d+(?:[\s,]+\d+)*\s*\)/giu, marker => {
+  const cleaned = text.replace(/\[\s*\d+(?:[\s,]+\d+)*\s*\]|\((?:(?:IDs?|sources?|refs?):\s*)?\d+(?:[\s,]+\d+)*\s*\)/giu, marker => {
     if (evidence.some(e => sources.includes(e.id) && e.text.includes(marker))) return marker;
     const cited = marker.match(/\d+/gu)!.map(Number);
     if (!cited.every(id => citationIds.includes(id))) return fail('Put all cited evidence IDs in sources');
@@ -101,11 +101,14 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
     const evidenceFor = (claims: Claim[]) => passages.filter(e => claims.some(c => c.sources.includes(e.id)));
     const overview = (items: Claim[]) => ({ points: items.map((point, id) => ({ id, ...point })), evidence: wire(evidenceFor(items)) });
     let claims: Claim[] = [];
-    for (let position = 0; position < passages.length;) {
-      const batch: SummaryPassage[] = [];
-      while (position < passages.length && fits('extract', { evidence: wire([...batch, passages[position]!]) })) batch.push(passages[position++]!);
-      if (!batch.length) throw new Error('Summary incomplete: evidence cannot fit');
-      claims.push(...await ask('extract', { evidence: wire(batch) }, text => parsePoints(text, batch)));
+    for (const speaker of [...new Set(passages.map(p => p.speaker))]) {
+      const owned = passages.filter(p => p.speaker === speaker);
+      for (let position = 0; position < owned.length;) {
+        const batch: SummaryPassage[] = [];
+        while (position < owned.length && fits('extract', { evidence: wire([...batch, owned[position]!]) })) batch.push(owned[position++]!);
+        if (!batch.length) throw new Error('Summary incomplete: evidence cannot fit');
+        claims.push(...await ask('extract', { evidence: wire(batch) }, text => parsePoints(text, batch)));
+      }
     }
     if (!claims.length) throw new Error('No meaningful speech was found to summarise');
     // Bound every reduction with original evidence; never silently discard a claim.
@@ -120,7 +123,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
           const topic = new Set(batch.flatMap(claim => [...terms(claim)]));
           const ranked = remaining.map((claim, index) => ({ claim, index, score: [...terms(claim)].filter(word => topic.has(word)).length }))
             .sort((a, b) => b.score - a.score || a.index - b.index);
-          const candidate = ranked.find(({ claim }) => fits('reduce', payload([...batch, claim])));
+          const candidate = ranked.find(({ claim }) => claim.speaker === batch[0]!.speaker && fits('reduce', payload([...batch, claim])));
           if (!candidate) break;
           batch.push(candidate.claim); remaining.splice(candidate.index, 1);
         }

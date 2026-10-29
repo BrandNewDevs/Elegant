@@ -15,6 +15,10 @@ function model(override?: (stage: string, data: any) => unknown): TextModel {
     const { instruction, data } = JSON.parse(request.messages[1]!.content);
     const stage = instruction.includes('Write 2–3') ? 'tldr' : instruction.includes('Consolidate supplied') ? 'reduce' : 'extract';
     const point = { speaker: 'You', text: 'The model runs locally; ownership is unassigned.', sources: [0], kind: 'unresolved' };
+    if (stage === 'extract') {
+      expect(new Set(data.evidence.map((e: { speaker: string }) => e.speaker)).size).toBe(1);
+      if (data.evidence.every((e: { speaker: string }) => e.speaker !== 'You')) return { text: JSON.stringify({ points: [] }), metadata: { model: 'fake', elapsedMs: 1 } };
+    }
     const result = override?.(stage, data) ?? (stage === 'tldr' ? { sentences: [{ text: 'The model runs locally. Ownership is unassigned.', covers: [0] }] } : { points: [{ ...point, ...(stage === 'reduce' ? { covers: data.claims.map((_: unknown, i: number) => i) } : {}) }] });
     return { text: JSON.stringify(result), metadata: { model: 'fake', elapsedMs: 1 } };
   } };
@@ -34,7 +38,7 @@ describe('readable Summary production seam', () => {
     await expect(createReadableSummariser({ attempts: 1, model: model(stage => stage === 'tldr' ? { sentences: [{ text: 'word '.repeat(91), covers: [0] }] } : undefined) })(transcript)).rejects.toThrow('90 words');
   });
   it('rejects foreign speaker evidence', async () => {
-    await expect(createReadableSummariser({ attempts: 1, model: model(() => ({ points: [{ speaker: 'You', text: 'Wrong speaker.', kind: 'update', sources: [1] }] })) })(transcript)).rejects.toThrow('own speech');
+    await expect(createReadableSummariser({ attempts: 1, model: model(() => ({ points: [{ speaker: 'You', text: 'Wrong speaker.', kind: 'update', sources: [1] }] })) })(transcript)).rejects.toThrow(/supplied evidence|own speech/);
   });
   it('rejects missing claim coverage during consolidation', async () => {
     const fake = model((stage, data) => stage === 'extract' ? { points: [
@@ -53,7 +57,7 @@ describe('readable Summary production seam', () => {
   it('omits classified noise but retains a short substantive negative', async () => {
     const fake = model(stage => stage === 'extract' ? { points: [
       { speaker: 'You', text: 'No owner assigned.', sources: [0], kind: 'unresolved' },
-      { speaker: 'Speaker 1', text: 'Agreed.', sources: [1], kind: 'housekeeping' },
+      { speaker: 'You', text: 'Hopefully.', sources: [0], kind: 'housekeeping' },
     ] } : undefined);
     const before = JSON.stringify(transcript);
     const result = await createReadableSummariser({ model: fake })(transcript);
