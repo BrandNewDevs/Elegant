@@ -91,7 +91,7 @@ describe('readable Summary production seam', () => {
     const fake: TextModel = { async complete(request) {
       const { data } = JSON.parse(request.messages[1]!.content);
       copiesSent += data.evidence?.filter((e: { text: string }) => e.text === repeated).length ?? 0;
-      return { text: JSON.stringify(data.points ? { sentences: [{ covers: [0] }] } : { points: [] }), metadata: { model: 'fake', elapsedMs: 1 } };
+      return { text: JSON.stringify(data.points ? { sentences: [{ covers: [data.statusPointIds?.[0] ?? 0] }] } : { points: [] }), metadata: { model: 'fake', elapsedMs: 1 } };
     } };
     const result = await createReadableSummariser({ model: fake })({ segments: [
       { start: 0, end: 5, speaker: 'You', text: repeated },
