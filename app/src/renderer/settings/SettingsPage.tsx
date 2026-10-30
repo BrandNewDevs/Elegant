@@ -261,11 +261,7 @@ function Updates({ checkForUpdates, update, appVersion, name }: { checkForUpdate
         )}
         {update.status === "idle" && <Status label={checkForUpdates ? "No update waiting" : "Checks are off"} variant="secondary" />}
       </SettingRow>
-      <SettingRow
-        title="Check for updates"
-        htmlFor="check-for-updates"
-        description="Asks GitHub for a newer release when it starts. Nothing about you or your Meetings is sent."
-      >
+      <SettingRow title="Check for updates" htmlFor="check-for-updates">
         <Switch id="check-for-updates" checked={checkForUpdates} onCheckedChange={(checked) => window.electron.meetings.setCheckForUpdates(checked)} />
       </SettingRow>
     </div>
