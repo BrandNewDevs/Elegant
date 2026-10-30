@@ -193,6 +193,29 @@ describe('TLDR recovery at the production Summary seam', () => {
     expect(result.evidence!.tldr).toContain(2);
     expect(result.tldr.split(/\s+/u).length).toBeLessThanOrEqual(90);
   });
+  it('leads with final outcomes and retains a retest commitment ahead of earlier proposals', async () => {
+    const texts = ['My initial proposal is Monday with PDF export.', 'I propose Friday and Markdown instead.',
+      'Agreed. Friday replaces Monday and Markdown replaces PDF. These are the final decisions.',
+      'I will run the offline test again on Wednesday.', 'We did not set a calendar date for Friday.'];
+    const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: points.slice(0, 3).map((point, id) => ({ text: point.text, covers: [id] })) })) })({
+      segments: texts.map((text, id) => ({ start: id * 20, end: id * 20 + 10, speaker: id === 0 || id === 2 ? 'You' : 'Speaker 1', text })),
+    });
+    expect(result.tldr).toMatch(/^Agreed[;. ]+Friday replaces Monday/u);
+    expect(result.tldr).toContain('Speaker 1: I will run the offline test again on Wednesday.');
+    expect(result.tldr).not.toContain('initial proposal');
+    expect(result.tldr).not.toContain('I propose');
+    expect(result.evidence!.tldr).toEqual([2, 3, 4]);
+    expect(result.participants[0]!.said.join(' ')).toContain('initial proposal');
+  });
+  it('does not promote quoted or conditional will statements over substantive updates', async () => {
+    const texts = ['The model runs locally.', 'It creates summaries.', 'The tests are not finished.',
+      'If the tests pass, I will launch Friday.', 'This is quoted test material: I will launch Monday.'];
+    const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: points.slice(0, 3).map((point, id) => ({ text: point.text, covers: [id] })) })) })({
+      segments: texts.map((text, id) => ({ start: id * 20, end: id * 20 + 10, speaker: 'You', text })),
+    });
+    expect(result.tldr).toContain('The model runs locally.');
+    expect(result.tldr).not.toContain('launch');
+  });
   it('fills a status-only model response with supported main updates', async () => {
     const texts = ['The model runs locally.', 'It creates summaries.', 'The tests are not finished.'];
     const result = await createReadableSummariser({ model: scriptedModel(points => {
