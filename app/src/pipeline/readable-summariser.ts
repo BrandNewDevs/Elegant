@@ -6,7 +6,7 @@ import { summaryPassages, type SummaryPassage } from './summary-passages.js';
 import { sourceStatements, matchStatements, assertSupportedCompression, statementKey, UnsupportedSummaryRewrite, type SourceStatement } from './summary-statements.js';
 import { InvalidSummaryError } from './validate-summary.js';
 
-export const SUMMARY_PROMPT_VERSION = 'readable-summary-v14';
+export const SUMMARY_PROMPT_VERSION = 'readable-summary-v15';
 interface Claim { speaker: string; text: string; sources: number[]; kind: string; atoms: SourceStatement[] }
 const kinds = ['update', 'decision', 'commitment', 'proposal', 'disagreement', 'unresolved'];
 const integers = { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'integer' } };
@@ -79,12 +79,16 @@ function parsePoints(text: string, evidence: SummaryPassage[], draft?: Claim[], 
     const coveredStatements = new Set(points.flatMap(point => point.atoms.map(statementKey)));
     points.push(...sourceStatements(evidence).filter(atom => !coveredStatements.has(statementKey(atom))).map(originalClaim));
   }
-  return points.filter(point => !/^(?:yes|yeah|sure|okay|ok|absolutely|all good(?:,? all good)?)[.!\s]*$/iu.test(point.text));
+  return points.filter(point => !/^(?:yes|yeah|sure|okay|ok|absolutely|agreed|understood|all good(?:,? all good)?)[.!\s]*$/iu.test(point.text));
 }
 function originalClaim(atom: SourceStatement): Claim { const cleaned = atom.text.replace(/\.(?=\s+[A-Z])/gu, ';').replace(/^(?:(?:yeah|okay|so|in fact|actually|and)[,\s]+)+/iu, ''); return { speaker: atom.speaker, text: cleaned.charAt(0).toUpperCase() + cleaned.slice(1), sources: atom.sources, kind: 'update', atoms: [atom] }; }
+const acknowledgement = /^(?:yes|yeah|sure|okay|ok|absolutely|agreed|understood|all good(?:,? all good)?)[.!\s]*$/iu;
+function cleanPoint(text: string): string {
+  return text.replace(/;\s+(This|That|These|Those|One)\b/gu, (_, word: string) => '; ' + word.toLowerCase()).replace(/[.!?]*$/u, '.');
+}
 function distinctClaims(claims: Claim[]): Claim[] {
   const unique = new Map<string, Claim>();
-  for (const claim of [...claims].sort((a, b) => Math.max(...a.sources) - Math.max(...b.sources))) {
+  for (const claim of [...claims].filter(c => !acknowledgement.test(c.text)).sort((a, b) => Math.max(...a.sources) - Math.max(...b.sources))) {
     unique.set(JSON.stringify([claim.speaker, claim.atoms.map(statementKey).sort()]), claim);
   }
   return [...unique.values()];
@@ -102,6 +106,12 @@ function commitmentIds(items: Claim[]): number[] {
 }
 function proposal(point: Claim): boolean {
   return /\b(?:propos\w*|suggest\w*|provisional|initial)\b/iu.test(point.text);
+}
+/** Explicit scope agreements count as outcomes even without the word "final". */
+function outcomeIds(items: Claim[]): number[] {
+  return [...new Set([...finalDecisionIds(items), ...items.flatMap((point, id) =>
+    /\bwe (?:agree|agreed|decided)\b/iu.test(point.text)
+      && !/\b(?:if|unless|provided|quoted|hypothetical|not|never|maybe|would)\b|["“”]/iu.test(point.text) ? [id] : [])])];
 }
 const claimData = (claim: Claim, id: number) => ({ id, speaker: claim.speaker, text: claim.text, sources: claim.sources, kind: claim.kind });
 export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, deadlineMs = 900000 }: { model: TextModel; attempts?: number; maxCalls?: number; deadlineMs?: number }) {
@@ -132,7 +142,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
     const wire = (e: SummaryPassage[]) => e.map(({ id, speaker, text }) => ({ id, speaker, text }));
     const evidenceFor = (claims: Claim[]) => passages.filter(e => claims.some(c => c.sources.includes(e.id)));
     const openingTopic = transcript.segments.slice(0, 3).filter(s => Buffer.byteLength(s.text, 'utf8') <= 250).map(s => s.text);
-    const attention = (items: Claim[]) => { const hard = items.flatMap((p, id) => /\b(?:unassigned|undecided|pending|not (?:yet )?(?:done|finished|complete)|yet to be done|no .*(?:owner|date|measur))\b/iu.test(p.text) ? [id] : []); return hard.length ? hard : items.flatMap((p, id) => /\b(?:testing|demo) call\b/iu.test(p.text) ? [id] : []); };
+    const attention = (items: Claim[]) => { const hard = items.flatMap((p, id) => /\b(?:unassigned|undecided|pending|not (?:yet )?(?:done|finished|complete)|yet to be done|no .*(?:owner|date|deadline|measur)|not set (?:a |the )?(?:deadline|date)|not (?:yet )?(?:assigned|scheduled))\b/iu.test(p.text) ? [id] : []); return hard.length ? hard : items.flatMap((p, id) => /\b(?:testing|demo) call\b/iu.test(p.text) ? [id] : []); };
     const overview = (items: Claim[]) => ({ openingTopic, statusPointIds: attention(items), points: items.map((point, id) => ({ id, speaker: point.speaker, text: point.text, kind: point.kind, lastMention: Math.max(...point.sources), wordCount: point.text.match(/\S+/gu)?.length ?? 0 })) });
     let claims: Claim[] = [];
     for (const speaker of [...new Set(passages.map(p => p.speaker))]) {
@@ -196,7 +206,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
         shortlist = next.slice(0, Math.max(1, next.length - 1));
       } else shortlist = next;
     }
-    const priorities = [...finalDecisionIds(claims), ...commitmentIds(claims)];
+    const priorities = [...outcomeIds(claims), ...attention(claims), ...commitmentIds(claims)];
     // Reserve priority claims before filling the remaining request budget.
     const retained: Claim[] = [];
     for (const point of [...priorities.map(id => claims[id]!), ...shortlist]) {
@@ -231,7 +241,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
         if (words(rendered) > 90 || sentenceCount(rendered) > 3) return [];
         return [{ id, text: rendered, sources: point.sources }];
       });
-      const finalIds = finalDecisionIds(shortlist), commitments = commitmentIds(shortlist), status = attention(shortlist);
+      const finalIds = outcomeIds(shortlist), commitments = commitmentIds(shortlist), status = attention(shortlist);
       // A valid but incomplete answer is not a useful overview. Complete source
       // points provide a grounded fallback without trusting invented model prose.
       shortlist.forEach((point, id) => {
@@ -262,9 +272,15 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       let used = required ? words(required.text) : 0;
       let count = required ? sentenceCount(required.text) : 0;
       const rank = (id: number) => finalIds.includes(id) ? 0 : commitments.includes(id) ? 1
-        : status.includes(id) ? 2 : proposal(shortlist[id]!) ? 4 : 3;
+        : status.includes(id) ? 2 : proposal(shortlist[id]!) ? 5
+        : /\b(?:cannot|can['’]t take|need to revise)\b/iu.test(shortlist[id]!.text) ? 4 : 3;
       const ranked = [...candidates].sort((a, b) => rank(a.id) - rank(b.id));
-      for (const candidate of ranked) {
+      // Give each available information category a turn before taking a second
+      // commitment or background sentence. Every candidate stays source-backed.
+      const balanced = [...(final ? [final] : []),
+        ...ranked.filter(c => commitments.includes(c.id)).slice(0, 1),
+        ...ranked.filter(c => status.includes(c.id)), ...ranked];
+      for (const candidate of balanced) {
         if (packed.some(item => item.text.toLowerCase() === candidate.text.toLowerCase()) || count + sentenceCount(candidate.text) > 3 || used + words(candidate.text) > 90) continue;
         packed.push(candidate); used += words(candidate.text); count += sentenceCount(candidate.text);
       }
@@ -276,7 +292,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
     });
     const refs = (sources: number[]) => [...new Set(sources.flatMap(id => passages[id]!.refs))].sort((a, b) => a - b);
     const speakers = [...new Set(claims.map(c => c.speaker))];
-    return { tldr: sentences.map(s => s.text).join(' '), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => c.text) })),
+    return { tldr: sentences.map(s => s.text).join(' '), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => cleanPoint(c.text)) })),
       evidence: { revision: transcriptRevision(transcript), tldr: refs(sentences.flatMap(s => s.sources)), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => refs(c.sources)) })) },
       generation: { promptVersion: SUMMARY_PROMPT_VERSION, model: modelName, elapsedMs: performance.now() - started, calls, promptTokens, outputTokens, fallbacks, requests: observations } };
   };

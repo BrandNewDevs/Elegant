@@ -88,7 +88,7 @@ Output: a Summary as JSON.
 
 ## Evidence-backed Summary implementation
 
-The app and evaluation command use `createReadableSummariser` with prompt version `readable-summary-v14`. The earlier `createGroundedSummariser` remains for historical comparison and its structural regression tests.
+The app and evaluation command use `createReadableSummariser` with prompt version `readable-summary-v15`. The earlier `createGroundedSummariser` remains for historical comparison and its structural regression tests.
 
 Working passages combine consecutive same-speaker segments separated by at most two seconds. Sentence and word boundaries bound evidence size; original stored Transcript content, speaker labels and ordinal references remain unchanged. Model evidence contains only IDs, speakers and text.
 
@@ -183,3 +183,7 @@ Test audio comes mostly from recordings made with people who have agreed to be r
 ### TL;DR priority refinement
 
 The overview reserves explicit affirmed final decisions, then explicit first-person commitments, before filling space with updates and unresolved status. Conditional, negated and quoted commitments are not automatically promoted. Earlier proposals have lower packing priority; they remain available in Participant points. Ranking uses narrow English cues and does not establish semantic supersession or guarantee every action fits the three-sentence/90-word limit. Source validation, cancellation and request budgets remain unchanged. Presentation removes a leading acknowledgement and lowercases selected sentence-internal pronouns after semicolons. No extra inference stage is added.
+
+### Balanced overview coverage
+
+The TL;DR gives explicit outcomes (including direct scope agreements), one next-step commitment and unresolved status a turn before filling remaining space. Narrow cues recognize unassigned work, undecided dates and explicitly unset deadlines. Redundant inability/revision background and proposals rank below substantive updates. This is bounded selection, not semantic supersession: no source claim is deleted from Participant points, and three sentences may still omit important details. Participant presentation removes standalone acknowledgements after consolidation, adds terminal punctuation and cleans sentence-internal capitalization while keeping evidence aligned. No extra model call is introduced.
