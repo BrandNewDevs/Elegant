@@ -86,7 +86,7 @@ function showState(patch: Partial<MeetingsViewState>) {
 }
 
 function showSetup(view = nothingDone) {
-  window.electron.setup = { ready: vi.fn(), onState: (callback) => { callback(view); return () => {}; }, act: vi.fn(), setUserName: vi.fn() };
+  window.electron.setup = { ready: vi.fn(), onState: (callback) => { callback(view); return () => {}; }, act: vi.fn(), setUserName: vi.fn(), configureAI: vi.fn(async () => "Saved") };
 }
 
 it("shows Settings as a page in the main area when it is open, and asks to close it from Back", () => {

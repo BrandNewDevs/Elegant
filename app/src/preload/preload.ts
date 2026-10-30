@@ -5,6 +5,7 @@ import type { MeetingsViewState } from "../shared/meetings-view-state.js";
 import type { PromptChoice } from "../shared/prompt-choice.js";
 import type { SetupAction } from "../shared/setup-actions.js";
 import type { SetupViewState } from "../shared/setup-view-state.js";
+import type { AISettingsAction } from "../shared/ai-settings.js";
 
 function subscribe<T>(channel: string, callback: (payload: T) => void): () => void {
   const handler = (_event: IpcRendererEvent, payload: T) => callback(payload);
@@ -44,6 +45,7 @@ contextBridge.exposeInMainWorld("electron", {
     onState: (callback: (state: SetupViewState) => void) => subscribe("setup:state", callback),
     act: (action: SetupAction) => ipcRenderer.send("setup:act", action),
     setUserName: (name: string) => ipcRenderer.send("setup:set-user-name", name),
+    configureAI: (action: AISettingsAction): Promise<string> => ipcRenderer.invoke("setup:configure-ai", action),
   },
   prompt: {
     ready: () => ipcRenderer.send("prompt:ready"),

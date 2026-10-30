@@ -3,8 +3,22 @@ import { execFileSync } from "node:child_process";
 import { SUMMARY_PROMPT_VERSION } from "../pipeline/readable-summariser.js";
 import { DEFAULT_OLLAMA_URL } from "../pipeline/ollama.js";
 import { AI_SETTINGS } from "../pipeline/model-request.js";
+import { GEMINI_INPUT_BYTES } from "../pipeline/gemini.js";
+import { GEMINI_SUMMARY_VERSION } from "../pipeline/gemini-pipeline.js";
 
-export async function evaluationMetadata(model: string, implementation: string) {
+export async function evaluationMetadata(model: string, implementation: string, provider: "ollama" | "gemini" = "ollama") {
+  if (provider === "gemini") {
+    let sourceCommit = "unknown", sourceDirty: boolean | undefined;
+    try {
+      sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+      sourceDirty = !!execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).trim();
+    } catch { /* Operational metadata only. */ }
+    return { provider, implementation, sourceCommit, sourceDirty, recordedAt: new Date().toISOString(), model: { name: model },
+      hardware: { platform: platform(), release: release(), cpu: cpus()[0]?.model, memoryBytes: totalmem() },
+      settings: { temperature: 0, maxInputBytes: GEMINI_INPUT_BYTES, maxOutputTokens: 16384 }, promptVersion: GEMINI_SUMMARY_VERSION,
+      memoryScope: "Client Node RSS only; inference runs at Google. No local-model digest or inference-memory comparison is available.",
+      runCondition: "remote" };
+  }
   const json = async (path: string) => {
     const response = await fetch(DEFAULT_OLLAMA_URL + path, { signal: AbortSignal.timeout(10_000) });
     if (!response.ok) throw new Error(`Ollama metadata request failed (${response.status})`);

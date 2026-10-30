@@ -1,4 +1,5 @@
 import type { SetupState } from "../setup/setup.js";
+import type { AISettingsView } from "./ai-settings.js";
 
 export type SetupViewState = {
   /** The app's display name. */
@@ -7,4 +8,5 @@ export type SetupViewState = {
   userName: string;
   permissionsGranted: boolean;
   state: SetupState;
+  ai?: AISettingsView;
 };

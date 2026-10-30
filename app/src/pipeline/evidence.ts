@@ -18,6 +18,8 @@ export interface SummaryEvidence {
   participants: { speaker: string; said: number[][] }[];
 }
 export interface SummaryGeneration {
+  /** Missing on legacy local results. */
+  provider?: "ollama" | "gemini";
   fallbacks?: number;
   requests?: { stage: string; bytes: number; attempt: number; elapsedMs: number }[];
   promptVersion: string;
@@ -26,6 +28,7 @@ export interface SummaryGeneration {
   calls: number;
   promptTokens?: number;
   outputTokens?: number;
+  thinkingTokens?: number;
 }
 export interface TranscriptReference { revision: string; refs: number[] }
 
