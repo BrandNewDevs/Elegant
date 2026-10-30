@@ -55,6 +55,8 @@ contextBridge.exposeInMainWorld("electron", {
     setUserName: (name: string) => ipcRenderer.send("setup:set-user-name", name),
     configureAI: (action: AISettingsAction): Promise<string> => ipcRenderer.invoke("setup:configure-ai", action),
     geminiModels: (): Promise<GeminiModelOption[]> => ipcRenderer.invoke("setup:gemini-models"),
+    findGeminiModels: (): Promise<string> => ipcRenderer.invoke("setup:gemini-find-models"),
+    stopFindingGeminiModels: (): Promise<void> => ipcRenderer.invoke("setup:gemini-stop-finding"),
   },
   prompt: {
     ready: () => ipcRenderer.send("prompt:ready"),

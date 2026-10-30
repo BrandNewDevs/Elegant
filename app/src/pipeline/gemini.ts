@@ -11,7 +11,11 @@ export function validGeminiModel(model: string): boolean {
   return /^gemini-[a-z0-9][a-z0-9.-]{0,99}$/.test(model);
 }
 
-class GeminiError extends Error {}
+/** What Google said, in terms the app can act on. `status` is absent for a reply that came back 200 but was not a finished answer. */
+interface GeminiErrorDetail { status?: number; limitZero?: boolean; retryDelaySeconds?: number }
+export class GeminiError extends Error {
+  constructor(message: string, readonly detail: GeminiErrorDetail = {}) { super(message); }
+}
 
 /** The reply's first bytes only: a quota error is small, and nothing else is read. */
 async function readSmall(response: Response, limit = 16 * 1024): Promise<string> {
@@ -38,7 +42,7 @@ const safeToken = (value: unknown): string | undefined => (typeof value === "str
  * whether the limit is zero (the model is not on the plan at all). Its free-text message is never forwarded, because an
  * error body can echo what was sent; each value taken is a short token that passes a strict pattern.
  */
-export function quotaMessage(body: string, requestedModel?: string): string {
+export function parseQuota(body: string, requestedModel?: string): { message: string; limitZero: boolean; retryDelaySeconds?: number } {
   let error: { message?: unknown; details?: unknown } | undefined;
   try { error = (JSON.parse(body) as { error?: typeof error }).error; } catch { /* Not JSON: say the general thing. */ }
   const details = Array.isArray(error?.details) ? (error.details as Record<string, unknown>[]) : [];
@@ -47,21 +51,26 @@ export function quotaMessage(body: string, requestedModel?: string): string {
   const quota = safeToken(violation?.quotaId);
   const model = safeToken(dimensions?.model) ?? safeToken(requestedModel);
   const retry = details.map(d => safeToken(d?.retryDelay)).find(Boolean);
+  const retryDelaySeconds = retry && /^\d+(\.\d+)?s$/.test(retry) ? Number.parseFloat(retry) : undefined;
   const text = typeof error?.message === "string" ? error.message : "";
   const limitZero = /limit:\s*0\b/.test(text);
   const where = [model && `for ${model}`, quota && `(${quota})`].filter(Boolean).join(" ");
-  return `Gemini quota or rate limit reached${where ? ` ${where}` : ""}. ` +
+  const message = `Gemini quota or rate limit reached${where ? ` ${where}` : ""}. ` +
     (limitZero ? "This model has no quota on your plan: choose another model, or enable billing in Google AI Studio. " : "") +
     (retry ? `Retry in ${retry}.` : "Check your Google account usage and retry later.");
+  return { message, limitZero, retryDelaySeconds };
 }
+
+export const quotaMessage = (body: string, requestedModel?: string): string => parseQuota(body, requestedModel).message;
 
 /** The message for a refused request. Only a 429 is read, for the quota it names; every other reply is dropped unread. */
 async function refusal(response: Response, model?: string): Promise<GeminiError> {
   if (response.status !== 429) {
     await response.body?.cancel();
-    return new GeminiError(failure(response.status));
+    return new GeminiError(failure(response.status), { status: response.status });
   }
-  return new GeminiError(quotaMessage(await readSmall(response), model));
+  const { message, limitZero, retryDelaySeconds } = parseQuota(await readSmall(response), model);
+  return new GeminiError(message, { status: 429, limitZero, retryDelaySeconds });
 }
 const failure = (status: number): string => {
   if (status === 400) return "Gemini rejected the request. Check the API key, model and supported settings.";
@@ -184,4 +193,27 @@ export async function listGeminiModels({ apiKey, signal, fetch: fetcher = fetch 
     throw new Error("Could not reach Gemini. Check your connection and retry.");
   }
   return [...found].map(([id, label]) => ({ id, label })).sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/** How one model answered a tiny test request: it did, Google has no quota for it on this plan, it is rate-limited right now, or it is unavailable. */
+export type ModelProbe = "ok" | "no-quota" | "busy" | "unavailable";
+
+/**
+ * Sends one synthetic request (never Meeting content) to see whether this key can use the model. A model that answers, even
+ * with an unfinished reply, is usable; a 429 with a limit of zero means it is not on the plan. Anything that is not about the
+ * model itself, such as no network, is thrown so the caller stops instead of calling every model unavailable.
+ */
+export async function probeGeminiModel({ apiKey, model, signal, fetch: fetcher }: { apiKey: string; model: string; signal?: AbortSignal; fetch?: typeof fetch }): Promise<ModelProbe> {
+  try {
+    await new GeminiClient({ apiKey, model, fetch: fetcher }).complete({
+      messages: [{ role: "user", content: 'Connection test only. Return {"ok":true}.' }],
+      schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] }, signal, timeoutMs: 30_000, maxOutputTokens: 1024 });
+    return "ok";
+  } catch (error) {
+    if (signal?.aborted || !(error instanceof GeminiError)) throw error;
+    const { status, limitZero } = error.detail;
+    if (status === undefined) return "ok"; // a 200 that was not a finished answer: the model is there
+    if (status === 429) return limitZero ? "no-quota" : "busy";
+    return "unavailable";
+  }
 }

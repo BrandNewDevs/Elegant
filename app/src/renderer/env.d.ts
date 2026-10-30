@@ -18,6 +18,9 @@ declare global {
         configureAI(action: AISettingsAction): Promise<string>;
         /** The Gemini text models the saved key can use. */
         geminiModels(): Promise<GeminiModelOption[]>;
+        /** Tries each model with a tiny synthetic request and remembers the ones that answer; resolves when done or stopped. */
+        findGeminiModels(): Promise<string>;
+        stopFindingGeminiModels(): Promise<void>;
       };
       prompt: {
         ready(): void;

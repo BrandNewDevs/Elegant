@@ -34,6 +34,8 @@ export function pushSetupState(view: SetupViewState) {
       setUserName,
       configureAI: vi.fn(async () => "AI settings saved"),
       geminiModels: vi.fn(async () => [] as { id: string; label: string }[]),
+      findGeminiModels: vi.fn(async () => "Found 0 models that work on your key."),
+      stopFindingGeminiModels: vi.fn(async () => {}),
     },
     meetings: createMeetingsApi({ setShowInDock, setAppearance, setSummaryModel, setKeepAudio, setCheckForUpdates }),
     prompt: {} as Window["electron"]["prompt"],

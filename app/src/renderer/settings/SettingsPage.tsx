@@ -1,4 +1,4 @@
-import { Bell, CheckCircle2, Cpu, Download, ExternalLink, Loader2, Monitor, Moon, RefreshCw, ShieldCheck, SlidersHorizontal, Sparkles, Sun, Trash2, XCircle, AlertCircle, type LucideIcon } from "lucide-react";
+import { Bell, CheckCircle2, Cpu, Download, ExternalLink, Loader2, Monitor, Moon, RefreshCw, ShieldCheck, Search, SlidersHorizontal, Sparkles, Sun, Trash2, XCircle, AlertCircle, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { UpdateState } from "../../core/updater";
@@ -386,12 +386,17 @@ function OllamaCard({ ollama, summaryModel, active, busy, onUse }: { ollama: Ste
   );
 }
 
-/** Picks the Gemini text model from the ones Google says this key can use, loaded when a key is saved and on request. */
+/**
+ * Picks the Gemini text model from the ones Google says this key can see, loaded when a key is saved and on request. Google
+ * lists every model, usable or not on the person's plan, so "Find usable models" tries each with one tiny synthetic request
+ * and the picker then offers only those that answered.
+ */
 function GeminiModelPicker({ ai, busy, configure }: { ai: AISettingsView; busy: boolean; configure: (action: AISettingsAction) => Promise<boolean> }) {
   const [models, setModels] = useState<GeminiModelOption[]>();
   const [loading, setLoading] = useState(false);
   const [problem, setProblem] = useState("");
   const [reload, setReload] = useState(0);
+  const [showAll, setShowAll] = useState(false);
   useEffect(() => {
     if (!ai.hasGeminiKey) {
       setModels(undefined);
@@ -410,9 +415,19 @@ function GeminiModelPicker({ ai, busy, configure }: { ai: AISettingsView; busy: 
       current = false;
     };
   }, [ai.hasGeminiKey, reload]); // a saved or replaced key, or the Refresh button, asks Google again
-  const options = models ?? [];
+  const finding = ai.finding;
+  const usable = ai.usableModels;
+  const filtered = usable !== undefined && !showAll;
+  const options = (models ?? []).filter((m) => !filtered || usable.includes(m.id));
   const saved = ai.geminiModel;
-  const listed = options.some((m) => m.id === saved); // the saved model is shown even before the list arrives, or if Google no longer lists it
+  const listed = options.some((m) => m.id === saved); // the saved model is shown even before the list arrives, or if it is not offered any more
+  const find = async () => {
+    try {
+      toast.success(await window.electron.setup.findGeminiModels());
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The models could not be tried");
+    }
+  };
   return (
     <div className="space-y-2">
       <Label htmlFor="gemini-model">Gemini text model</Label>
@@ -430,17 +445,47 @@ function GeminiModelPicker({ ai, busy, configure }: { ai: AISettingsView; busy: 
             {!listed && (
               <SelectItem value={saved}>
                 {saved}
-                {models ? " (not listed)" : ""}
+                {models ? (filtered ? " (didn't answer)" : " (not listed)") : ""}
               </SelectItem>
             )}
           </SelectContent>
         </Select>
-        <Button type="button" size="icon" variant="ghost" aria-label="Refresh models" title="Refresh models" disabled={!ai.hasGeminiKey || loading} onClick={() => setReload((n) => n + 1)}>
+        <Button type="button" size="icon" variant="ghost" aria-label="Refresh models" title="Refresh models" disabled={!ai.hasGeminiKey || loading || !!finding} onClick={() => setReload((n) => n + 1)}>
           <RefreshCw className={loading ? "animate-spin" : undefined} aria-hidden />
         </Button>
       </div>
       {problem && <p className="text-sm text-destructive">{problem}</p>}
       {!problem && models && models.length === 0 && <p className="text-sm text-muted-foreground">This key has no Gemini text models available.</p>}
+      <div className="flex flex-wrap items-center gap-2">
+        {finding ? (
+          <>
+            <Progress value={finding.total ? Math.round((finding.done / finding.total) * 100) : 0} aria-label="Trying models" className="w-40" />
+            <span role="status" className="text-sm text-muted-foreground">
+              Trying models… {finding.done} of {finding.total || "?"}
+            </span>
+            <Button type="button" size="sm" variant="outline" onClick={() => void window.electron.setup.stopFindingGeminiModels()}>
+              Stop
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button type="button" size="sm" variant="outline" disabled={busy || !ai.hasGeminiKey} onClick={() => void find()}>
+              <Search aria-hidden />
+              {usable ? "Find usable models again" : "Find usable models"}
+            </Button>
+            {usable && (
+              <Button type="button" size="sm" variant="ghost" onClick={() => setShowAll((all) => !all)}>
+                {showAll ? "Show only usable models" : "Show all models"}
+              </Button>
+            )}
+          </>
+        )}
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {usable
+          ? `${usable.length} of the listed models answered on your key.`
+          : "Google lists every model, whether or not your plan can use it. Finding usable models tries each with one tiny test request and no Meeting content."}
+      </p>
     </div>
   );
 }

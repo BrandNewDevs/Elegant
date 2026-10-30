@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { GeminiClient, GEMINI_INPUT_BYTES, listGeminiModels, quotaMessage } from "./gemini.js";
+import { GeminiClient, GEMINI_INPUT_BYTES, listGeminiModels, parseQuota, probeGeminiModel, quotaMessage } from "./gemini.js";
 import type { TextRequest } from "./language-model.js";
 
 const request: TextRequest = { messages: [{ role: "system", content: "Rules" }, { role: "user", content: "Synthetic evidence" }], schema: { type: "object" } };
@@ -154,4 +154,33 @@ it("reports the quota detail through a real 429 from generation and from the mod
     expect(String(error)).not.toContain("private-key");
     expect(String(error)).not.toContain("Synthetic evidence");
   });
+});
+
+it("reads the retry delay as seconds and whether the limit is zero", () => {
+  expect(parseQuota(quotaBody({ limit: 0 }))).toMatchObject({ limitZero: true, retryDelaySeconds: 28 });
+  expect(parseQuota(quotaBody({ limit: 20 }))).toMatchObject({ limitZero: false, retryDelaySeconds: 28 });
+  expect(parseQuota("not json")).toMatchObject({ limitZero: false, retryDelaySeconds: undefined });
+});
+
+const probe = (fetcher: typeof fetch, signal?: AbortSignal) => probeGeminiModel({ apiKey: "private-key", model: "gemini-test", fetch: fetcher, signal });
+
+it("finds a model usable when it answers, even with an unfinished answer, since the model is there", async () => {
+  expect(await probe(async () => reply())).toBe("ok");
+  expect(await probe(async () => new Response(JSON.stringify({ candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [{ text: "{" }] } }] })))).toBe("ok");
+});
+
+it("sorts a refusal into no quota on the plan, rate-limited right now, or unavailable", async () => {
+  expect(await probe(async () => new Response(quotaBody({ limit: 0 }), { status: 429 }))).toBe("no-quota");
+  expect(await probe(async () => new Response(quotaBody({ limit: 20 }), { status: 429 }))).toBe("busy");
+  for (const status of [400, 401, 403, 404, 500]) expect(await probe(async () => new Response("x", { status }))).toBe("unavailable");
+});
+
+it("sends only a synthetic request when probing, and stops on no network or on cancel instead of calling the model unavailable", async () => {
+  const fetcher = vi.fn<typeof fetch>(async () => reply());
+  await probe(fetcher);
+  expect(String(JSON.parse(String(fetcher.mock.calls[0]![1]?.body)).contents[0].parts[0].text)).toBe('Connection test only. Return {"ok":true}.');
+  await expect(probe(async () => { throw new Error("offline"); })).rejects.toThrow("Could not reach Gemini");
+  const controller = new AbortController();
+  controller.abort();
+  await expect(probe(async () => reply(), controller.signal)).rejects.toMatchObject({ name: "AbortError" });
 });
