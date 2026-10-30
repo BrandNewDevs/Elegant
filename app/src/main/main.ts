@@ -19,7 +19,7 @@ import { Launch } from "./launch.js";
 import { MeetingsWindow } from "./meetings-window.js";
 import { OnboardingWindow } from "./onboarding-window.js";
 import { SetupBridge } from "./setup-bridge.js";
-import { STATUS_LABEL } from "./status-label.js";
+import { STATUS_LABEL, trayTitle } from "./status-label.js";
 import { createUpdateDriver } from "./update-driver.js";
 
 const RECORDING_SYMBOL = "⏺";
@@ -28,6 +28,9 @@ const RECORDING_SYMBOL = "⏺";
 const engineCommand = app.isPackaged
   ? join(process.resourcesPath, "../Helpers/engine")
   : fileURLToPath(new URL("../../../engine/.build/release/engine", import.meta.url));
+
+// The icons ship in the app bundle's Resources when packaged, and are read from the repo's assets folder from source.
+const assetsDirectory = app.isPackaged ? process.resourcesPath : fileURLToPath(new URL("../../assets", import.meta.url));
 
 let tray: Tray | undefined;
 let core: AppCore | undefined;
@@ -45,8 +48,11 @@ let elapsedTimer: ReturnType<typeof setInterval> | undefined;
 // The packaged Info.plist sets LSUIElement, so the app starts with no Dock icon; showing it switches the running app to
 // a regular one, and hiding it switches it back, with no restart.
 function applyShowInDock(show: boolean): void {
-  if (show) void app.dock?.show();
-  else app.dock?.hide();
+  if (show) {
+    void app.dock?.show();
+    // Run from source, the Dock shows Electron's own icon; the packaged app gets its icon from its bundle.
+    if (!app.isPackaged) app.dock?.setIcon(join(assetsDirectory, "icon.png"));
+  } else app.dock?.hide();
 }
 
 // The menu bar keeps the Restart item for as long as an update is ready, since the toast is shown only once.
@@ -57,11 +63,11 @@ function restartForUpdate(): void {
 
 function render(): void {
   if (!tray || !core) return;
-  const { symbol, text } = STATUS_LABEL[core.status];
+  const { text } = STATUS_LABEL[core.status];
   const recording = core.recording;
   const elapsed = recording ? formatElapsed(recording.startedAt) : undefined;
   const ready = updater?.state.status === "ready" ? updater.state : undefined;
-  tray.setTitle(recording ? `${RECORDING_SYMBOL} ${elapsed}` : symbol);
+  tray.setTitle(trayTitle(core.status, recording && elapsed ? { symbol: RECORDING_SYMBOL, elapsed } : undefined));
   tray.setToolTip(recording ? `${DISPLAY_NAME}: recording ${recording.app}, ${elapsed}` : `${DISPLAY_NAME}: ${text}`);
   tray.setContextMenu(
     Menu.buildFromTemplate([
@@ -173,7 +179,8 @@ app.whenReady().then(() => {
     render();
   });
 
-  tray = new Tray(nativeImage.createEmpty());
+  // A template image, so macOS draws it black or white to suit the menu bar; the @2x file beside it is used on Retina screens.
+  tray = new Tray(nativeImage.createFromPath(join(assetsDirectory, "tray", "iconTemplate.png")));
   core.onDetectedMeetingChange((meeting) => {
     prompt?.close(); // the Meeting was answered or ended; the old overlay is stale
     prompt = undefined;
