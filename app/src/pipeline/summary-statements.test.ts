@@ -7,7 +7,7 @@ import type { Transcript } from './pipeline.js';
 async function summarise(texts: string[], rewrite: string, kind = 'commitment') {
   const model: TextModel = { async complete(request) {
     const { data } = JSON.parse(request.messages[1]!.content);
-    const result = data.points ? { sentences: [{ covers: [data.statusPointIds?.[0] ?? 0] }] }
+    const result = data.points ? { sentences: [{ text: data.points[data.statusPointIds?.[0] ?? 0].text, covers: [data.statusPointIds?.[0] ?? 0] }] }
       : data.claims ? { points: data.claims.map((claim: object, id: number) => ({ ...claim, covers: [id] })) }
       : { points: [{ speaker: 'You', text: rewrite, sources: data.evidence.map((e: { id: number }) => e.id), kind }] };
     return { text: JSON.stringify(result), metadata: { model: 'fake', elapsedMs: 1 } };

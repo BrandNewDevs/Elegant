@@ -1,0 +1,76 @@
+{
+  "id": "run-on-local-summary",
+  "split": "tuning",
+  "synthetic": true,
+  "transcript": {
+    "segments": [
+      {
+        "start": 0,
+        "end": 20,
+        "speaker": "You",
+        "text": "The app records meetings locally and produces summaries using Gemma 3 4B through Ollama with supporting transcript references for readers who want to inspect the original discussion alongside the generated overview and participant points within the same desktop experience with a separate transcript view for reading the captured conversation in chronological order and checking which person spoke"
+      },
+      {
+        "start": 20,
+        "end": 40,
+        "speaker": "You",
+        "text": "about each topic during the discussion with local meeting history available after the recording has ended and a summary organized around meaningful updates rather than every greeting in the conversation with timestamps attached to the relevant passages for navigation from the overview into the full transcript and a clear distinction between recorded words and generated descriptions of"
+      },
+      {
+        "start": 40,
+        "end": 60,
+        "speaker": "You",
+        "text": "the meeting content for someone reviewing a longer discussion after it has finished with the ability to return to the original passages whenever more context is needed about the summary points and the subjects discussed by participants during that meeting on their own computer."
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "local-recording",
+      "text": "The app records Meetings locally.",
+      "speaker": "You",
+      "refs": [
+        0
+      ],
+      "critical": true
+    },
+    {
+      "id": "local-model",
+      "text": "Gemma 3 4B runs through Ollama for Summaries.",
+      "speaker": "You",
+      "refs": [
+        0
+      ],
+      "critical": true
+    },
+    {
+      "id": "references",
+      "text": "Summary references support inspecting the original Transcript.",
+      "speaker": "You",
+      "refs": [
+        0,
+        1
+      ],
+      "critical": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "model",
+      "question": "Which model produces the Summaries?",
+      "answer": "Gemma 3 4B through Ollama.",
+      "refs": [
+        0
+      ],
+      "critical": true
+    }
+  ],
+  "tldrTopics": [
+    "local Meeting summaries",
+    "Gemma 3 4B through Ollama"
+  ],
+  "unwantedContent": [
+    "garbled closing phrases",
+    "invented commitments"
+  ]
+}

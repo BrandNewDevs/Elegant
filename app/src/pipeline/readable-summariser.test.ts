@@ -20,7 +20,7 @@ function model(override?: (stage: string, data: any) => unknown): TextModel {
       expect(new Set(data.evidence.map((e: { speaker: string }) => e.speaker)).size).toBe(1);
       if (data.evidence.every((e: { speaker: string }) => e.speaker !== 'You')) return { text: JSON.stringify({ points: [] }), metadata: { model: 'fake', elapsedMs: 1 } };
     }
-    const result = override?.(stage, data) ?? (stage === 'tldr' ? { sentences: [{ covers: [data.statusPointIds?.[0] ?? 0] }] } : { points: [{ ...point, ...(stage === 'reduce' ? { covers: data.claims.map((_: unknown, i: number) => i) } : {}) }] });
+    const result = override?.(stage, data) ?? (stage === 'tldr' ? { sentences: [{ text: data.points[data.statusPointIds?.[0] ?? 0].text, covers: [data.statusPointIds?.[0] ?? 0] }] } : { points: [{ ...point, ...(stage === 'reduce' ? { covers: data.claims.map((_: unknown, i: number) => i) } : {}) }] });
     return { text: JSON.stringify(result), metadata: { model: 'fake', elapsedMs: 1 } };
   } };
 }
@@ -35,7 +35,7 @@ describe('readable Summary production seam', () => {
   it('never joins across another speaker or a long pause', () => {
     expect(summaryPassages({ segments: [...transcript.segments, { start: 15, end: 16, speaker: 'You', text: 'Later.' }] })).toHaveLength(3);
   });
-  it('rejects a selection exceeding the TLDR word budget', async () => {
+  it('fails clearly when every attempt still supplies only an oversized sentence', async () => {
     const fake = model(stage => stage === 'extract' ? { points: [{ speaker: 'You', text: 'word '.repeat(91), sources: [0], kind: 'update' }] } : undefined);
     await expect(createReadableSummariser({ attempts: 1, model: fake })({ segments: [{ start: 0, end: 1, speaker: 'You', text: 'word '.repeat(91) + '.' }] })).rejects.toThrow('90 words');
   });
@@ -91,7 +91,7 @@ describe('readable Summary production seam', () => {
     const fake: TextModel = { async complete(request) {
       const { data } = JSON.parse(request.messages[1]!.content);
       copiesSent += data.evidence?.filter((e: { text: string }) => e.text === repeated).length ?? 0;
-      return { text: JSON.stringify(data.points ? { sentences: [{ covers: [data.statusPointIds?.[0] ?? 0] }] } : { points: [] }), metadata: { model: 'fake', elapsedMs: 1 } };
+      return { text: JSON.stringify(data.points ? { sentences: [{ text: data.points[data.statusPointIds?.[0] ?? 0].text, covers: [data.statusPointIds?.[0] ?? 0] }] } : { points: [] }), metadata: { model: 'fake', elapsedMs: 1 } };
     } };
     const result = await createReadableSummariser({ model: fake })({ segments: [
       { start: 0, end: 5, speaker: 'You', text: repeated },
@@ -104,7 +104,7 @@ describe('readable Summary production seam', () => {
     expect(result.participants.find(p => p.speaker === 'Speaker 1')!.said).toContain('No owner assigned.');
   });
   it('retains explicit unresolved status when the model selects only an implementation update', async () => {
-    const fake = model(stage => stage === 'tldr' ? { sentences: [{ covers: [0] }] } : undefined);
+    const fake = model(stage => stage === 'tldr' ? { sentences: [{ text: 'The model runs locally.', covers: [0] }] } : undefined);
     const result = await createReadableSummariser({ model: fake })(transcript);
     expect(result.tldr).toContain('No owner assigned.');
     expect(result.generation!.requests!.filter(r => r.stage === 'tldr')).toHaveLength(1);
@@ -112,5 +112,113 @@ describe('readable Summary production seam', () => {
   it('honours cancellation before contacting the model', async () => {
     const controller = new AbortController(); controller.abort();
     await expect(createReadableSummariser({ model: model() })(transcript, { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' });
+  });
+});
+
+describe('TLDR recovery at the production Summary seam', () => {
+  function scriptedModel(overview: (points: any[]) => unknown, extraction?: (evidence: any[]) => unknown): TextModel {
+    return { async complete(request) {
+      const { data } = JSON.parse(request.messages[1]!.content);
+      if (data.points) {
+        const schema = request.schema as { properties: { sentences: { minItems: number; maxItems: number; items: { required: string[] } } } };
+        expect(schema.properties.sentences.minItems).toBe(1);
+        expect(schema.properties.sentences.maxItems).toBe(3);
+        expect(schema.properties.sentences.items.required).toEqual(expect.arrayContaining(['text', 'covers']));
+      }
+      const result = data.points ? overview(data.points)
+        : data.claims ? { points: data.claims.map((p: any, id: number) => ({ speaker: p.speaker, text: p.text, kind: p.kind, covers: [id] })) }
+        : extraction?.(data.evidence) ?? { points: [] };
+      return { text: JSON.stringify(result), metadata: { model: 'schema-recovery', elapsedMs: 0 } };
+    } };
+  }
+  it('recovers from three valid 57-word selections instead of rejecting 171 words', async () => {
+    const segments = ['Alpha', 'Beta', 'Gamma'].map((name, id) => ({ start: id * 20, end: id * 20 + 15, speaker: 'You', text: `${name} ${Array(56).fill('progress').join(' ')}.` }));
+    const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: points.map((p, id) => ({ text: p.text, covers: [id] })) })) })({ segments });
+    expect(result.tldr.split(/\s+/u).length).toBeLessThanOrEqual(90);
+    expect(result.tldr).toContain('Alpha');
+    expect(result.participants[0]!.said).toHaveLength(3);
+    expect(result.generation!.requests!.filter(r => r.stage === 'tldr')).toHaveLength(1);
+  });
+  it('compresses one oversized source point without truncating its supported sentence', async () => {
+    const text = `The app runs locally ${Array(167).fill('carefully').join(' ')}.`;
+    const result = await createReadableSummariser({ model: scriptedModel(() => ({ sentences: [{ text: 'The app runs locally.', covers: [0] }] })) })({ segments: [{ start: 0, end: 90, speaker: 'You', text }] });
+    expect(result.tldr).toBe('The app runs locally.');
+    expect(result.participants[0]!.said[0]!.split(/\s+/u).length).toBeGreaterThan(90);
+    expect(result.evidence!.tldr).toEqual([0]);
+    const commitment = `I will review the guide Thursday ${Array(150).fill('carefully').join(' ')}.`;
+    const owned = await createReadableSummariser({ model: scriptedModel(() => ({ sentences: [{ text: 'I will review the guide Thursday.', covers: [0] }] })) })({ segments: [{ start: 0, end: 90, speaker: 'You', text: commitment }] });
+    expect(owned.tldr).toBe('You: I will review the guide Thursday.');
+  });
+  it('accepts separate supported facts from unpunctuated independent clauses', async () => {
+    const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: points.map((p, id) => ({ text: p.text, covers: [id] })) }), evidence => ({ points: [
+      { speaker: 'You', text: 'The app runs locally.', sources: [evidence[0].id], kind: 'update' },
+      { speaker: 'You', text: 'It records meetings.', sources: [evidence[0].id], kind: 'update' },
+      { speaker: 'You', text: 'It produces summaries.', sources: [evidence[0].id], kind: 'update' },
+    ] })) })({ segments: [{ start: 0, end: 30, speaker: 'You', text: 'The app runs locally and it records meetings and it produces summaries' }] });
+    expect(result.participants[0]!.said).toHaveLength(3);
+    expect(result.evidence!.participants[0]!.said).toEqual([[0], [0], [0]]);
+  });
+  it('reserves status within the total word budget instead of overflowing after insertion', async () => {
+    const texts = ['Alpha', 'Beta', 'Gamma'].map(name => `${name} ${Array(29).fill('progress').join(' ')}.`);
+    texts.push(`No owner assigned ${Array(32).fill('progress').join(' ')}.`);
+    const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: points.slice(0, 3).map((p, id) => ({ text: p.text, covers: [id] })) })) })({ segments: texts.map((text, id) => ({ start: id * 20, end: id * 20 + 15, speaker: 'You', text })) });
+    expect(result.tldr).toContain('No owner assigned');
+    expect(result.tldr).toContain('Alpha');
+    expect(result.tldr.split(/\s+/u).length).toBeLessThanOrEqual(90);
+    expect(result.participants[0]!.said).toHaveLength(4);
+  });
+  it('derives citations from validated covers rather than model-added prose annotations', async () => {
+    const result = await createReadableSummariser({ model: scriptedModel(() => ({ sentences: [{ text: 'No owner assigned [covers: 999].', covers: [0] }] })) })({ segments: [{ start: 0, end: 10, speaker: 'You', text: 'No owner assigned.' }] });
+    expect(result.tldr).toBe('No owner assigned.');
+    expect(result.evidence!.tldr).toEqual([0]);
+  });
+  it('rejects an unknown citation before discarding any over-budget sentence', async () => {
+    await expect(createReadableSummariser({ model: scriptedModel(() => ({ sentences: [{ text: 'The app runs locally.', covers: [999] }] })) })({ segments: [{ start: 0, end: 1, speaker: 'You', text: 'The app runs locally.' }] })).rejects.toThrow('Use supplied evidence or claim IDs');
+  });
+  it('allows distinct supported sentences to refer to the same long point', async () => {
+    const result = await createReadableSummariser({ model: scriptedModel(() => ({ sentences: [
+      { text: 'The app records meetings.', covers: [0] },
+      { text: 'The app produces summaries.', covers: [0] },
+    ] })) })({ segments: [{ start: 0, end: 20, speaker: 'You', text: 'The app records meetings and produces summaries.' }] });
+    expect(result.tldr).toBe('The app records meetings. The app produces summaries.');
+    expect(result.evidence!.tldr).toEqual([0]);
+  });
+  it('keeps a confirmed final decision when the model selects only earlier proposals', async () => {
+    const texts = ['My initial proposal is Monday with PDF export.', 'I propose Friday and Markdown instead.', 'Agreed. Friday replaces Monday and Markdown replaces PDF. These are the final decisions.'];
+    const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: points.slice(0, 2).map((point, id) => ({ text: point.text, covers: [id] })) })) })({ segments: texts.map((text, id) => ({ start: id * 20, end: id * 20 + 10, speaker: 'You', text })) });
+    expect(result.tldr).toContain('Friday replaces Monday');
+    expect(result.tldr).toContain('Markdown replaces PDF');
+    expect(result.evidence!.tldr).toContain(2);
+    expect(result.tldr.split(/\s+/u).length).toBeLessThanOrEqual(90);
+  });
+  it('fills a status-only model response with supported main updates', async () => {
+    const texts = ['The model runs locally.', 'It creates summaries.', 'The tests are not finished.'];
+    const result = await createReadableSummariser({ model: scriptedModel(points => {
+      const id = points.findIndex(p => p.text.includes('tests are not finished'));
+      return { sentences: [{ text: points[id].text, covers: [id] }] };
+    }) })({ segments: texts.map((text, id) => ({ start: id * 10, end: id * 10 + 5, speaker: 'You', text })) });
+    expect(result.tldr).toBe('The model runs locally. It creates summaries. The tests are not finished.');
+    expect(result.evidence!.tldr).toEqual([0, 1, 2]);
+  });
+  it('keeps negation, ownership, conditions and deadlines when a proposed TLDR drops them', async () => {
+    for (const [original, invalid] of [
+      ['We will write the guide Thursday.', 'You will write the guide Thursday.'],
+      ['We will not launch Monday.', 'We will launch Monday.'],
+      ['The tests are yet to be done.', 'The tests are done.'],
+      ['The first release supports English only.', 'The first release supports English.'],
+      ['We want to integrate calendars.', 'We integrate calendars.'],
+      ['I am reviewing the guide.', 'I reviewed the guide.'],
+      ['I can commit to reviewing the guide after someone writes it.', 'I review the guide.'],
+      ['We will launch when the tests pass.', 'We will launch.'],
+      ['If the tests pass, I will review the guide Thursday.', 'If the tests pass, she will review the guide Thursday.'],
+      ['If the tests pass, we will launch Monday.', 'We will launch Monday.'],
+      ['I will review the guide Thursday.', 'I will review the guide Friday.'],
+      ['This is quoted test material: we approved cloud uploads.', 'We approved cloud uploads.'],
+      ['If we retain audio and it includes private material we will review deletion.', 'We will review deletion.'],
+    ]) {
+      const result = await createReadableSummariser({ model: scriptedModel(() => ({ sentences: [{ text: invalid, covers: [0] }] })) })({ segments: [{ start: 0, end: 10, speaker: 'You', text: original! }] });
+      expect(result.tldr).toContain(original!);
+      expect(result.tldr).not.toBe(invalid);
+    }
   });
 });

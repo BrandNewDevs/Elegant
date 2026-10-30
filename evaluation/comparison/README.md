@@ -1,5 +1,8 @@
 # Local comparison and remaining acceptance
 
+For the 171-word failure and the v13 correction, see [TL;DR word-budget recovery](tldr-budget-recovery.md). Earlier comparison results below retain their original prompt versions.
+
+
 ## Summary relevance and TL;DR improvements
 
 See the [readable Summary comparison](readable-summaries.md) for the current pipeline, all nine synthetic cases, three replays of each supplied private example, and known readability limitations. Private content stays outside Git; only aggregate metrics are committed. This update keeps Gemma 3 4B and does not establish M4 performance or complete every readability goal.
