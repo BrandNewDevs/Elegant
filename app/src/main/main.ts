@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, nativeImage, Notification, shell, Tray } from "electron";
+import { app, BrowserWindow, Menu, nativeImage, nativeTheme, Notification, shell, Tray } from "electron";
 import { fileURLToPath } from "node:url";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -160,6 +160,11 @@ app.whenReady().then(() => {
 
   // A menu-bar app at start (LSUIElement); the "Show in Dock" setting, on unless turned off, adds a Dock icon, whose click opens the main window ("activate").
   applyShowInDock(core.showInDock);
+  // Every window's `prefers-color-scheme` follows this, so the renderer's theme code needs no setting of its own.
+  nativeTheme.themeSource = core.appearance;
+  core.onAppearanceChange((appearance) => {
+    nativeTheme.themeSource = appearance;
+  });
   core.onKeepAudioChange(render); // the Settings page can change it too
   core.onShowInDockChange((show) => {
     applyShowInDock(show);

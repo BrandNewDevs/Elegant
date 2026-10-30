@@ -5,6 +5,7 @@ import { DISPLAY_NAME } from "../config.js";
 import { isGithubUrl } from "../core/update-check.js";
 import type { Updater, UpdateState } from "../core/updater.js";
 import type { Setup } from "../setup/setup.js";
+import { isAppearance } from "../shared/appearance.js";
 import type { MeetingsViewState } from "../shared/meetings-view-state.js";
 import type { SetupBridge } from "./setup-bridge.js";
 import { preloadPath, rendererPagePath, windowBackground } from "./window-ui.js";
@@ -71,6 +72,7 @@ export class MeetingsWindow {
     core.onRecordingChange(() => this.pushState());
     core.onMeetingsChanged(() => this.pushState());
     core.onShowInDockChange(() => this.pushState());
+    core.onAppearanceChange(() => this.pushState());
     core.onKeepAudioChange(() => this.pushState());
     core.onChatChanged(() => this.pushState());
     core.jobs.onChange(() => this.pushState());
@@ -100,6 +102,10 @@ export class MeetingsWindow {
     ipcMain.on("meetings:show-in-dock", (event, show: unknown) => {
       if (!this.fromThis(event.sender) || typeof show !== "boolean") return;
       this.core.setShowInDock(show);
+    });
+    ipcMain.on("meetings:appearance", (event, appearance: unknown) => {
+      if (!this.fromThis(event.sender) || !isAppearance(appearance)) return;
+      this.core.setAppearance(appearance);
     });
     ipcMain.on("meetings:keep-audio", (event, keep: unknown) => {
       if (!this.fromThis(event.sender) || typeof keep !== "boolean") return;
@@ -300,6 +306,7 @@ export class MeetingsWindow {
     const payload: MeetingsViewState = {
       settingsOpen: this.settingsOpen,
       showInDock: this.core.showInDock,
+      appearance: this.core.appearance,
       keepAudio: this.core.keepAudio,
       checkForUpdates: this.core.checkForUpdates,
       meetings,

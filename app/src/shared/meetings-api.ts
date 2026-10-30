@@ -1,4 +1,5 @@
 import type { RestartResult, UpdateState } from "../core/updater.js";
+import type { Appearance } from "./appearance.js";
 import type { MeetingsViewState } from "./meetings-view-state.js";
 
 export interface SendQuestionInput { meetingId: number; requestId: string; question: string }
@@ -12,6 +13,7 @@ export interface MeetingsApi {
   onState(callback: (state: MeetingsViewState) => void): () => void;
   settings(open: boolean): void;
   setShowInDock(show: boolean): void;
+  setAppearance(appearance: Appearance): void;
   setKeepAudio(keep: boolean): void;
   setCheckForUpdates(check: boolean): void;
   /** Runs as an update downloads, is ready or fails, once the window is open to show it. */
