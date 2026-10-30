@@ -50,7 +50,7 @@ func startBuffer() {
     }
 }
 
-/// The Prompt was declined or timed out. A Recording in progress is never touched.
+/// The Prompt was closed or its call ended. A Recording in progress is never touched.
 func discardBuffer() {
     guard let held = recorder, !held.isRecording else { return }
     held.discard()

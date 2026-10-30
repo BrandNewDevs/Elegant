@@ -264,10 +264,10 @@ describe("recording and stopping", () => {
     expect(core.listMeetings()[0]!.state).toBe("recording");
   });
 
-  it("is not ended by time passing, the Prompt timing out, or another app using the microphone", () => {
+  it("is not ended by time passing, closing the Prompt, or another app using the microphone", () => {
     const { core, engine, stopsSent } = recording();
     engine.emit({ type: "mic_in_use_started", app: "Slack", pid: 200 });
-    vi.advanceTimersByTime(DEFAULT_DETECTION.promptTimeoutMs + DEFAULT_DETECTION.debounceMs);
+    vi.advanceTimersByTime(DEFAULT_DETECTION.debounceMs);
     core.declinePrompt();
     core.acceptPrompt();
     vi.advanceTimersByTime(8 * 60 * 60_000);
@@ -473,7 +473,6 @@ describe("the audio of a Recording", () => {
 
 describe("detecting a meeting", () => {
   const DEBOUNCE = DEFAULT_DETECTION.debounceMs;
-  const TIMEOUT = DEFAULT_DETECTION.promptTimeoutMs;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -564,7 +563,7 @@ describe("detecting a meeting", () => {
     expect(core.listMeetings()).toMatchObject([{ app: "zoom.us", state: "recording" }]);
   });
 
-  it("discards the buffered audio and stores nothing when the user says not now", () => {
+  it("discards the buffered audio and stores nothing when the user closes the Prompt", () => {
     const { core, engine, prompts } = prompted();
     core.declinePrompt();
 
@@ -575,22 +574,18 @@ describe("detecting a meeting", () => {
     expect(core.listMeetings()).toEqual([]);
   });
 
-  it("treats an ignored Prompt as a decline once it times out", () => {
+  it("keeps the Prompt up, with the audio held, however long it goes unanswered", () => {
     const { core, engine } = prompted();
-    vi.advanceTimersByTime(TIMEOUT - 1);
+    vi.advanceTimersByTime(8 * 60 * 60_000);
     expect(core.detectedMeeting).toBeDefined();
-
-    vi.advanceTimersByTime(1);
-    expect(core.detectedMeeting).toBeUndefined();
-    expect(engine.commands).toContainEqual({ type: "discard_buffer" });
-    expect(engine.commands).not.toContainEqual({ type: "start_recording", app: "zoom.us" });
-    expect(core.listMeetings()).toEqual([]);
+    expect(engine.commands).toEqual([{ type: "start_buffer", app: "zoom.us" }]);
   });
 
-  it("does not time out once the user has answered", () => {
-    const { engine, core } = prompted();
+  it("still starts the Recording when the user accepts a long time later", () => {
+    const { core, engine } = prompted();
+    vi.advanceTimersByTime(60 * 60_000);
     core.acceptPrompt();
-    vi.advanceTimersByTime(TIMEOUT * 2);
+    expect(engine.commands).toContainEqual({ type: "start_recording", app: "zoom.us" });
     expect(engine.commands.filter((c) => c.type === "discard_buffer")).toEqual([]);
   });
 
@@ -608,6 +603,16 @@ describe("detecting a meeting", () => {
     micStarted("Google Chrome", 2);
     vi.advanceTimersByTime(DEBOUNCE);
     expect(prompts.filter(Boolean)).toHaveLength(1);
+  });
+
+  it("does not ask again however long the app keeps the microphone after the Prompt is closed", () => {
+    const { core, engine, prompts, micStarted } = prompted();
+    core.declinePrompt();
+    vi.advanceTimersByTime(60 * 60_000);
+    micStarted("zoom.us", 2);
+    vi.advanceTimersByTime(DEBOUNCE);
+    expect(prompts.filter(Boolean)).toHaveLength(1);
+    expect(engine.commands.filter((c) => c.type === "start_buffer")).toHaveLength(1);
   });
 
   it("asks again when the app takes the microphone for a later call", () => {
@@ -637,7 +642,7 @@ describe("detecting a meeting", () => {
     const { core, engine } = prompted();
     engine.exit();
     expect(core.detectedMeeting).toBeUndefined();
-    vi.advanceTimersByTime(TIMEOUT);
+    vi.advanceTimersByTime(60 * 60_000);
     expect(core.listMeetings()).toEqual([]);
   });
 
@@ -651,7 +656,6 @@ describe("detecting a meeting", () => {
 
 describe("holding audio from Detection", () => {
   const DEBOUNCE = DEFAULT_DETECTION.debounceMs;
-  const TIMEOUT = DEFAULT_DETECTION.promptTimeoutMs;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -688,7 +692,7 @@ describe("holding audio from Detection", () => {
   it("keeps the buffer when the user accepts late: the engine is told to record, not to discard", () => {
     const { core, engine, micStarted } = running();
     micStarted("zoom.us");
-    vi.advanceTimersByTime(DEBOUNCE + TIMEOUT - 1);
+    vi.advanceTimersByTime(DEBOUNCE + 60 * 60_000);
     core.acceptPrompt();
     expect(engine.commands).toEqual([
       { type: "start_buffer", app: "zoom.us" },
@@ -701,14 +705,6 @@ describe("holding audio from Detection", () => {
     micStarted("zoom.us");
     vi.advanceTimersByTime(DEBOUNCE);
     core.declinePrompt();
-    expect(engine.commands).toEqual([{ type: "start_buffer", app: "zoom.us" }, { type: "discard_buffer" }]);
-    expect(core.listMeetings()).toEqual([]);
-  });
-
-  it("discards the buffer when the Prompt is ignored", () => {
-    const { core, engine, micStarted } = running();
-    micStarted("zoom.us");
-    vi.advanceTimersByTime(DEBOUNCE + TIMEOUT);
     expect(engine.commands).toEqual([{ type: "start_buffer", app: "zoom.us" }, { type: "discard_buffer" }]);
     expect(core.listMeetings()).toEqual([]);
   });
