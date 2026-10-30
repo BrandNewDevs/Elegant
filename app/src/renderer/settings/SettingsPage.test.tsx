@@ -21,11 +21,12 @@ it("lists the sections, marks the open one, and asks to change section", () => {
   expect(changes).toEqual(["Permissions"]);
 });
 
-it("goes back to the Meetings from the back button and from Esc", () => {
+it("is a modal named for its section, closed from the close button and from Esc", () => {
   pushSetupState(nothingDone);
   const onBack = vi.fn();
   render(<SettingsPage section="General" onSectionChange={() => {}} onBack={onBack} />);
-  fireEvent.click(screen.getByRole("button", { name: "Meetings" }));
+  expect(screen.getByRole("dialog", { name: "General" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
   fireEvent.keyDown(document, { key: "Escape" });
   expect(onBack).toHaveBeenCalledTimes(2);
 });

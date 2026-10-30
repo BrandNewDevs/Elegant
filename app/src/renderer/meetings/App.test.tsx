@@ -89,27 +89,26 @@ function showSetup(view = nothingDone) {
   window.electron.setup = { ready: vi.fn(), onState: (callback) => { callback(view); return () => {}; }, act: vi.fn(), setUserName: vi.fn() };
 }
 
-it("shows Settings as a page in the main area when it is open, and asks to close it from Back", () => {
+it("shows Settings as a modal over the Meetings when it is open, and asks to close it from its close button", () => {
   showState({ settingsOpen: true, appVersion: "0.1.3" });
   showSetup();
   render(<MeetingsApp />);
+  expect(screen.getByRole("dialog", { name: "General" })).toBeTruthy();
   expect(screen.getByRole("region", { name: "Settings" })).toBeTruthy();
-  expect(screen.queryByRole("dialog")).toBeNull();
-  expect(screen.getByPlaceholderText("Search meetings")).toBeTruthy(); // the sidebar stays
+  expect(screen.getByPlaceholderText("Search meetings")).toBeTruthy(); // the Meetings stay behind it
   expect(screen.getByRole("switch", { name: "Show in Dock" }).getAttribute("aria-checked")).toBe("true");
   expect(screen.getByLabelText("Name")).toBeTruthy(); // the name lives in General now
 
-  fireEvent.click(screen.getByRole("button", { name: "Meetings" }));
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
   expect(window.electron.meetings.settings).toHaveBeenCalledWith(false);
 });
 
-it("picks the Meeting and leaves Settings when one is chosen in the sidebar", () => {
-  showState({ settingsOpen: true, meetings: [meeting], selected: meeting });
+it("shows no Settings until it is opened, and keeps the open Meeting behind it", () => {
+  showState({ settingsOpen: false, meetings: [meeting], selected: meeting });
   showSetup();
   render(<MeetingsApp />);
-  fireEvent.click(screen.getByRole("button", { name: /zoom\.us/ }));
-  expect(window.electron.meetings.settings).toHaveBeenCalledWith(false);
-  expect(window.electron.meetings.select).toHaveBeenCalledWith(4);
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(screen.getByRole("button", { name: /zoom\.us/ }).getAttribute("aria-current")).toBe("true");
 });
 
 it("has no Profile entry: the name is in Settings", () => {

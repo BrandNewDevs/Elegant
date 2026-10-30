@@ -97,41 +97,35 @@ export function MeetingsApp() {
         query={query}
         onQuery={setQuery}
         onSearch={() => window.electron.meetings.search(query)}
-        onSelect={(id) => {
-          if (settingsOpen) window.electron.meetings.settings(false);
-          window.electron.meetings.select(id);
-        }}
+        onSelect={(id) => window.electron.meetings.select(id)}
         onSettings={() => openSettings(update.status !== "idle" ? "Updates" : undefined)}
         recording={recording}
         update={update}
       />
-      {settingsOpen ? (
-        <main className="min-w-0 flex-1">
-          <SettingsPage
-            section={section}
-            onSectionChange={setSection}
-            onBack={() => window.electron.meetings.settings(false)}
-            showInDock={showInDock}
-            appearance={appearance}
-            keepAudio={keepAudio}
-            checkForUpdates={checkForUpdates}
-            update={update}
-            appVersion={appVersion}
-          />
+      <ScrollArea className="min-h-0 min-w-0 flex-1">
+        <main className="min-w-0">
+          {selected ? (
+            <MeetingDetail key={`${selected.id}:${chat?.revision ?? "legacy"}`} meeting={selected} chat={chat} isCurrent={() => selection.current.id === selected.id && selection.current.revision === chat?.revision} />
+          ) : (
+            <div className="flex flex-col items-center gap-2 pt-24 text-muted-foreground">
+              <MessagesSquare className="size-8" aria-hidden />
+              <p>Select a Meeting.</p>
+            </div>
+          )}
         </main>
-      ) : (
-        <ScrollArea className="min-h-0 min-w-0 flex-1">
-          <main className="min-w-0">
-            {selected ? (
-              <MeetingDetail key={`${selected.id}:${chat?.revision ?? "legacy"}`} meeting={selected} chat={chat} isCurrent={() => selection.current.id === selected.id && selection.current.revision === chat?.revision} />
-            ) : (
-              <div className="flex flex-col items-center gap-2 pt-24 text-muted-foreground">
-                <MessagesSquare className="size-8" aria-hidden />
-                <p>Select a Meeting.</p>
-              </div>
-            )}
-          </main>
-        </ScrollArea>
+      </ScrollArea>
+      {settingsOpen && (
+        <SettingsPage
+          section={section}
+          onSectionChange={setSection}
+          onBack={() => window.electron.meetings.settings(false)}
+          showInDock={showInDock}
+          appearance={appearance}
+          keepAudio={keepAudio}
+          checkForUpdates={checkForUpdates}
+          update={update}
+          appVersion={appVersion}
+        />
       )}
       <Toaster position="bottom-right" />
     </div>

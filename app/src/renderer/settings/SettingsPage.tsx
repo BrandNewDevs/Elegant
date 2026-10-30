@@ -1,5 +1,5 @@
-import { ArrowLeft, Bell, CheckCircle2, Cpu, Download, ExternalLink, Loader2, Monitor, Moon, RefreshCw, ShieldCheck, SlidersHorizontal, Sun, XCircle, AlertCircle, type LucideIcon } from "lucide-react";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { Bell, CheckCircle2, Cpu, Download, ExternalLink, Loader2, Monitor, Moon, RefreshCw, ShieldCheck, SlidersHorizontal, Sun, XCircle, AlertCircle, type LucideIcon } from "lucide-react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { UpdateState } from "../../core/updater";
 import { APPEARANCES, type Appearance } from "../../shared/appearance";
@@ -7,6 +7,7 @@ import type { Step } from "../../setup/setup";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -272,8 +273,8 @@ function Updates({ checkForUpdates, update, appVersion, name }: { checkForUpdate
 }
 
 /**
- * Settings, as a page in the main area: a list of sections on the left and one section at a time on the right. Back (or Esc)
- * returns to the Meeting that was open.
+ * Settings, as a modal over the Meetings window: a list of sections on the left and one section at a time on the right. Its
+ * close button, Esc, or a click outside close it (`onBack`), which returns to the Meeting that was open.
  */
 export function SettingsPage({
   section,
@@ -297,52 +298,48 @@ export function SettingsPage({
   appVersion?: string;
 }) {
   const view = useSetup();
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !event.defaultPrevented) onBack();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onBack]);
 
   return (
-    <section aria-label="Settings" className="flex h-full min-h-0">
-      <nav aria-label="Settings sections" className="w-40 shrink-0 space-y-1 border-r p-3">
-        <Button type="button" variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground" onClick={onBack}>
-          <ArrowLeft aria-hidden />
-          Meetings
-        </Button>
-        {SECTIONS.map((id) => {
-          const Icon = SECTION_ICON[id];
-          return (
-            <button
-              key={id}
-              type="button"
-              aria-current={section === id ? "page" : undefined}
-              onClick={() => onSectionChange(id)}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                section === id ? "bg-accent font-medium" : "text-muted-foreground hover:bg-accent/50",
-              )}
-            >
-              <Icon className="size-4" aria-hidden />
-              {id}
-              {id === "Updates" && update.status === "ready" && <span className="ml-auto size-2 rounded-full bg-primary" aria-label="An update is ready" />}
-            </button>
-          );
-        })}
-      </nav>
-      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-6">
-        <h1 className="mb-2 text-xl font-semibold tracking-tight">{section}</h1>
-        {view && (
-          <>
-            {section === "General" && <General appearance={appearance} showInDock={showInDock} keepAudio={keepAudio} name={view.name} userName={view.userName} />}
-            {section === "Permissions" && <Permissions state={view.state} name={view.name} />}
-            {section === "Models" && <Models models={view.state.models} ollama={view.state.ollama} name={view.name} />}
-            {section === "Updates" && <Updates checkForUpdates={checkForUpdates} update={update} appVersion={appVersion} name={view.name} />}
-          </>
-        )}
-      </div>
-    </section>
+    <Dialog open onOpenChange={(open) => !open && onBack()}>
+      <DialogContent aria-describedby={undefined} className="h-[min(40rem,85vh)] max-w-3xl gap-0 overflow-hidden p-0 sm:rounded-xl">
+        <section aria-label="Settings" className="flex h-full min-h-0">
+          <nav aria-label="Settings sections" className="w-44 shrink-0 space-y-1 border-r bg-muted/30 p-3">
+            <p className="mb-3 px-3 pt-1 text-sm font-semibold">Settings</p>
+            {SECTIONS.map((id) => {
+              const Icon = SECTION_ICON[id];
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-current={section === id ? "page" : undefined}
+                  onClick={() => onSectionChange(id)}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    section === id ? "bg-accent font-medium" : "text-muted-foreground hover:bg-accent/50",
+                  )}
+                >
+                  <Icon className="size-4" aria-hidden />
+                  {id}
+                  {id === "Updates" && update.status === "ready" && <span className="ml-auto size-2 rounded-full bg-primary" aria-label="An update is ready" />}
+                </button>
+              );
+            })}
+          </nav>
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-6">
+            <DialogTitle asChild>
+              <h1 className="mb-2 text-xl font-semibold tracking-tight">{section}</h1>
+            </DialogTitle>
+            {view && (
+              <>
+                {section === "General" && <General appearance={appearance} showInDock={showInDock} keepAudio={keepAudio} name={view.name} userName={view.userName} />}
+                {section === "Permissions" && <Permissions state={view.state} name={view.name} />}
+                {section === "Models" && <Models models={view.state.models} ollama={view.state.ollama} name={view.name} />}
+                {section === "Updates" && <Updates checkForUpdates={checkForUpdates} update={update} appVersion={appVersion} name={view.name} />}
+              </>
+            )}
+          </div>
+        </section>
+      </DialogContent>
+    </Dialog>
   );
 }
