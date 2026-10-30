@@ -193,6 +193,65 @@ describe('TLDR recovery at the production Summary seam', () => {
     expect(result.evidence!.tldr).toContain(2);
     expect(result.tldr.split(/\s+/u).length).toBeLessThanOrEqual(90);
   });
+  it('leads with final outcomes and retains a retest commitment ahead of earlier proposals', async () => {
+    const texts = ['My initial proposal is Monday with PDF export.', 'I propose Friday and Markdown instead.',
+      'Agreed. Friday replaces Monday and Markdown replaces PDF. These are the final decisions.',
+      'I will run the offline test again on Wednesday.', 'We did not set a calendar date for Friday.'];
+    const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: points.slice(0, 3).map((point, id) => ({ text: point.text, covers: [id] })) })) })({
+      segments: texts.map((text, id) => ({ start: id * 20, end: id * 20 + 10, speaker: id === 0 || id === 2 ? 'You' : 'Speaker 1', text })),
+    });
+    expect(result.tldr).toMatch(/^Friday replaces Monday/u);
+    expect(result.tldr).toContain('Speaker 1: I will run the offline test again on Wednesday.');
+    expect(result.tldr).not.toContain('initial proposal');
+    expect(result.tldr).not.toContain('I propose');
+    expect(result.evidence!.tldr).toEqual([2, 3, 4]);
+    expect(result.participants[0]!.said.join(' ')).toContain('initial proposal');
+  });
+  it('does not promote quoted or conditional will statements over substantive updates', async () => {
+    const texts = ['The model runs locally.', 'It creates summaries.', 'The tests are not finished.',
+      'If the tests pass, I will launch Friday.', 'This is quoted test material: I will launch Monday.'];
+    const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: points.slice(0, 3).map((point, id) => ({ text: point.text, covers: [id] })) })) })({
+      segments: texts.map((text, id) => ({ start: id * 20, end: id * 20 + 10, speaker: 'You', text })),
+    });
+    expect(result.tldr).toContain('The model runs locally.');
+    expect(result.tldr).not.toContain('launch');
+  });
+  it('cleans sentence-internal capitalization without changing ownership or evidence', async () => {
+    const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: [{ text: points[0].text, covers: [0] }] })) })({
+      segments: [{ start: 0, end: 10, speaker: 'Speaker 1', text: 'The tests are not finished. This call is one of the tests.' }],
+    });
+    expect(result.tldr).toBe('The tests are not finished; this call is one of the tests.');
+    expect(result.evidence!.tldr).toEqual([0]);
+  });
+  it('balances a release outcome, next step and unresolved status instead of taking only commitments', async () => {
+    const texts = ['I will write the guide Thursday.', 'I will review the guide Friday.',
+      'We agree to keep the first release English only.', 'The release date is still undecided.'];
+    const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: points.slice(0, 3).map((p, id) => ({ text: p.text, covers: [id] })) })) })({
+      segments: texts.map((text, id) => ({ start: id * 20, end: id * 20 + 8, speaker: id === 1 || id === 3 ? 'Speaker 1' : 'You', text })),
+    });
+    expect(result.tldr).toMatch(/^We agree/u);
+    expect(result.tldr).toContain('I will write the guide Thursday.');
+    expect(result.tldr).toContain('release date is still undecided');
+    expect(result.participants.flatMap(p => p.said)).toContain('I will review the guide Friday.');
+  });
+  it('keeps unassigned ownership and an absent deadline ahead of redundant inability', async () => {
+    const texts = ['The guide needs an update, but I cannot take it on.', 'The guide is unassigned.',
+      'We have not set a deadline.', 'I will ask the team tomorrow.'];
+    const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: points.slice(0, 3).map((p, id) => ({ text: p.text, covers: [id] })) })) })({
+      segments: texts.map((text, id) => ({ start: id * 20, end: id * 20 + 8, speaker: id % 2 ? 'Speaker 1' : 'You', text })),
+    });
+    expect(result.tldr).toContain('unassigned');
+    expect(result.tldr).toContain('not set a deadline');
+    expect(result.tldr).toContain('ask the team tomorrow');
+    expect(result.tldr).not.toContain('cannot take');
+  });
+  it('cleans Participant points after consolidation without changing their evidence', async () => {
+    const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: [{ text: points[0].text, covers: [0] }] })) })({
+      segments: [{ start: 0, end: 8, speaker: 'You', text: 'Agreed. The guide is unassigned' }],
+    });
+    expect(result.participants[0]!.said).toEqual(['The guide is unassigned.']);
+    expect(result.evidence!.participants[0]!.said).toEqual([[0]]);
+  });
   it('fills a status-only model response with supported main updates', async () => {
     const texts = ['The model runs locally.', 'It creates summaries.', 'The tests are not finished.'];
     const result = await createReadableSummariser({ model: scriptedModel(points => {

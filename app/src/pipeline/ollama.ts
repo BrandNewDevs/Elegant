@@ -3,7 +3,8 @@ import { AI_SETTINGS, assertRequestBudget } from "./model-request.js";
 
 export interface OllamaOptions {
   baseUrl?: string;
-  model?: string;
+  /** The model to ask for, read again for each request so a change applies to the next one. */
+  model?: string | (() => string);
   numCtx?: number;
   timeoutMs?: number;
 }
@@ -57,13 +58,13 @@ const count = (value: unknown): number | undefined =>
 /** Local text generation; callers validate JSON semantics separately from transport structure. */
 export class OllamaClient implements LanguageModel, TextModel {
   private readonly baseUrl: string;
-  private readonly model: string;
+  private readonly model: () => string;
   private readonly numCtx: number;
   private readonly timeoutMs: number;
 
   constructor({ baseUrl = DEFAULT_OLLAMA_URL, model = DEFAULT_SUMMARY_MODEL, numCtx = AI_SETTINGS.numCtx, timeoutMs = AI_SETTINGS.timeoutMs }: OllamaOptions = {}) {
     this.baseUrl = localUrl(baseUrl);
-    this.model = model;
+    this.model = typeof model === "function" ? model : () => model;
     this.numCtx = numCtx;
     this.timeoutMs = timeoutMs;
     if (!Number.isSafeInteger(numCtx) || numCtx <= AI_SETTINGS.maxOutputTokens) throw new Error("Ollama context must leave room for its response budget");
@@ -79,6 +80,7 @@ export class OllamaClient implements LanguageModel, TextModel {
     if (!request.messages.length || !request.messages.every(message => ["system", "user", "assistant"].includes(message.role) && typeof message.content === "string")) {
       throw new Error("AI request must contain valid text messages");
     }
+    const model = this.model();
     const timeoutMs = request.timeoutMs ?? this.timeoutMs;
     const maxOutputTokens = request.maxOutputTokens ?? AI_SETTINGS.maxOutputTokens;
     if (!Number.isInteger(timeoutMs) || timeoutMs < 1) throw new Error("AI timeout must be a positive number of milliseconds");
@@ -92,14 +94,14 @@ export class OllamaClient implements LanguageModel, TextModel {
         method: "POST",
         headers: { "content-type": "application/json" },
         redirect: "error",
-        body: JSON.stringify({ model: this.model, messages: request.messages, stream: false, format: request.schema, think: AI_SETTINGS.think,
+        body: JSON.stringify({ model, messages: request.messages, stream: false, format: request.schema, think: AI_SETTINGS.think,
           options: { num_ctx: this.numCtx, num_predict: maxOutputTokens, temperature: AI_SETTINGS.temperature } }),
         signal,
       });
       if (!response.ok) {
         // Server errors can echo prompts. Never include their body in application errors.
         await response.body?.cancel();
-        if (response.status === 404) throw new InvalidOllamaReply(`Ollama does not have the model ${this.model}. Run: ollama pull ${this.model}`);
+        if (response.status === 404) throw new InvalidOllamaReply(`Ollama does not have the model ${model}. Run: ollama pull ${model}`);
         throw new InvalidOllamaReply(`Ollama returned HTTP ${response.status}. Check the local server and retry.`);
       }
       const value = await readReply(response, signal);
@@ -111,7 +113,7 @@ export class OllamaClient implements LanguageModel, TextModel {
       if (Buffer.byteLength(content, "utf8") > MAX_CONTENT_BYTES) throw new InvalidOllamaReply("Ollama's generated content exceeded the response size limit");
       const promptTokens = count(body.prompt_eval_count);
       if (promptTokens !== undefined && promptTokens > this.numCtx - maxOutputTokens) throw new InvalidOllamaReply("Ollama's prompt-token count left insufficient response room; reduce the input budget");
-      return { text: content, metadata: { model: this.model, elapsedMs: performance.now() - started,
+      return { text: content, metadata: { model, elapsedMs: performance.now() - started,
         promptTokens, outputTokens: count(body.eval_count), loadDurationNs: count(body.load_duration) } };
     } catch (error) {
       if (request.signal?.aborted) throw Object.assign(new Error("AI request was cancelled"), { name: "AbortError" });
@@ -127,6 +129,22 @@ export type OllamaStatus =
   | { status: "not-running"; message: string }
   | { status: "no-model"; message: string };
 
+/** The names of the models pulled into Ollama, or undefined when it does not answer. */
+async function installedModelNames(baseUrl: string, timeoutMs: number): Promise<string[] | undefined> {
+  try {
+    const response = await fetch(`${baseUrl}/api/tags`, { redirect: "error", signal: AbortSignal.timeout(timeoutMs) });
+    if (!response.ok) return undefined;
+    return ((await response.json()) as { models?: { name: string }[] }).models?.map((m) => m.name) ?? [];
+  } catch {
+    return undefined;
+  }
+}
+
+/** The models pulled into Ollama, sorted; empty when it is not running. */
+export async function listOllamaModels({ baseUrl = DEFAULT_OLLAMA_URL, timeoutMs = 5000 }: { baseUrl?: string; timeoutMs?: number } = {}): Promise<string[]> {
+  return ((await installedModelNames(localUrl(baseUrl), timeoutMs)) ?? []).sort((a, b) => a.localeCompare(b));
+}
+
 /** Whether Ollama answers and has `model` pulled. The messages say what to do, since the user reads them in first-run setup. */
 export async function checkOllama({
   baseUrl = DEFAULT_OLLAMA_URL,
@@ -134,17 +152,12 @@ export async function checkOllama({
   timeoutMs = 5000,
 }: { baseUrl?: string; model?: string; timeoutMs?: number } = {}): Promise<OllamaStatus> {
   baseUrl = localUrl(baseUrl);
-  const notRunning: OllamaStatus = {
-    status: "not-running",
-    message: `Ollama is not running at ${baseUrl}. Install it from ollama.com and start it, then check again.`,
-  };
-  let names: string[];
-  try {
-    const response = await fetch(`${baseUrl}/api/tags`, { redirect: "error", signal: AbortSignal.timeout(timeoutMs) });
-    if (!response.ok) return notRunning;
-    names = ((await response.json()) as { models?: { name: string }[] }).models?.map((m) => m.name) ?? [];
-  } catch {
-    return notRunning;
+  const names = await installedModelNames(baseUrl, timeoutMs);
+  if (!names) {
+    return {
+      status: "not-running",
+      message: `Ollama is not running at ${baseUrl}. Install it from ollama.com and start it, then check again.`,
+    };
   }
   // A name without a tag means the latest one.
   const wanted = model.includes(":") ? model : `${model}:latest`;

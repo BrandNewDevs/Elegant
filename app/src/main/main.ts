@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, nativeImage, Notification, shell, Tray } from "electron";
+import { app, BrowserWindow, Menu, nativeImage, nativeTheme, Notification, shell, Tray } from "electron";
 import { fileURLToPath } from "node:url";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -19,7 +19,7 @@ import { Launch } from "./launch.js";
 import { MeetingsWindow } from "./meetings-window.js";
 import { OnboardingWindow } from "./onboarding-window.js";
 import { SetupBridge } from "./setup-bridge.js";
-import { STATUS_LABEL } from "./status-label.js";
+import { STATUS_LABEL, trayTitle } from "./status-label.js";
 import { createUpdateDriver } from "./update-driver.js";
 import { AISettings } from "../setup/ai-settings.js";
 import { GeminiClient } from "../pipeline/gemini.js";
@@ -32,6 +32,9 @@ const RECORDING_SYMBOL = "⏺";
 const engineCommand = app.isPackaged
   ? join(process.resourcesPath, "../Helpers/engine")
   : fileURLToPath(new URL("../../../engine/.build/release/engine", import.meta.url));
+
+// The icons ship in the app bundle's Resources when packaged, and are read from the repo's assets folder from source.
+const assetsDirectory = app.isPackaged ? process.resourcesPath : fileURLToPath(new URL("../../assets", import.meta.url));
 
 let tray: Tray | undefined;
 let core: AppCore | undefined;
@@ -49,8 +52,11 @@ let elapsedTimer: ReturnType<typeof setInterval> | undefined;
 // The packaged Info.plist sets LSUIElement, so the app starts with no Dock icon; showing it switches the running app to
 // a regular one, and hiding it switches it back, with no restart.
 function applyShowInDock(show: boolean): void {
-  if (show) void app.dock?.show();
-  else app.dock?.hide();
+  if (show) {
+    void app.dock?.show();
+    // Run from source, the Dock shows Electron's own icon; the packaged app gets its icon from its bundle.
+    if (!app.isPackaged) app.dock?.setIcon(join(assetsDirectory, "icon.png"));
+  } else app.dock?.hide();
 }
 
 // The menu bar keeps the Restart item for as long as an update is ready, since the toast is shown only once.
@@ -61,11 +67,11 @@ function restartForUpdate(): void {
 
 function render(): void {
   if (!tray || !core) return;
-  const { symbol, text } = STATUS_LABEL[core.status];
+  const { text } = STATUS_LABEL[core.status];
   const recording = core.recording;
   const elapsed = recording ? formatElapsed(recording.startedAt) : undefined;
   const ready = updater?.state.status === "ready" ? updater.state : undefined;
-  tray.setTitle(recording ? `${RECORDING_SYMBOL} ${elapsed}` : symbol);
+  tray.setTitle(trayTitle(core.status, recording && elapsed ? { symbol: RECORDING_SYMBOL, elapsed } : undefined));
   tray.setToolTip(recording ? `${DISPLAY_NAME}: recording ${recording.app}, ${elapsed}` : `${DISPLAY_NAME}: ${text}`);
   tray.setContextMenu(
     Menu.buildFromTemplate([
@@ -124,7 +130,8 @@ app.whenReady().then(() => {
   const store = openStore(join(dataDir, "meetings.db"));
   const engine = new ProcessEngine({ command: process.env.MEETING_RECORDER_ENGINE ?? engineCommand });
   ignoredAppsPath = join(dataDir, "ignored-apps.json");
-  const textModel = new OllamaClient();
+  // The local model is read per request, so the Summary model picked in Settings applies to the next one.
+  const textModel = new OllamaClient({ model: () => core?.summaryModel ?? DEFAULT_SUMMARY_MODEL });
   const ai = new AISettings(store, {
     isAsyncEncryptionAvailable: async () => (await import("electron")).safeStorage.isAsyncEncryptionAvailable(),
     encryptStringAsync: async text => (await import("electron")).safeStorage.encryptStringAsync(text),
@@ -156,7 +163,8 @@ app.whenReady().then(() => {
     jobs: core.jobs,
     speechModel: SPEECH_MODEL,
     modelsDirectory: join(dataDir, "models"),
-    checkOllama: () => checkOllama(),
+    checkOllama: () => checkOllama({ model: core?.summaryModel }),
+    busyReason: () => (core?.recording ? "A Recording is in progress." : core?.jobs.snapshot.length ? "Meeting processing is running." : undefined),
   });
   const setupBridge = new SetupBridge(setup, {
     ai,
@@ -181,21 +189,28 @@ app.whenReady().then(() => {
 
   // A menu-bar app at start (LSUIElement); the "Show in Dock" setting, on unless turned off, adds a Dock icon, whose click opens the main window ("activate").
   applyShowInDock(core.showInDock);
+  // Every window's `prefers-color-scheme` follows this, so the renderer's theme code needs no setting of its own.
+  nativeTheme.themeSource = core.appearance;
+  core.onAppearanceChange((appearance) => {
+    nativeTheme.themeSource = appearance;
+  });
+  core.onSummaryModelChange(() => void setup.checkOllama()); // the readiness shown in Settings is for the model now chosen
   core.onKeepAudioChange(render); // the Settings page can change it too
   core.onShowInDockChange((show) => {
     applyShowInDock(show);
     render();
   });
 
-  tray = new Tray(nativeImage.createEmpty());
+  // A template image, so macOS draws it black or white to suit the menu bar; the @2x file beside it is used on Retina screens.
+  tray = new Tray(nativeImage.createFromPath(join(assetsDirectory, "tray", "iconTemplate.png")));
   core.onDetectedMeetingChange((meeting) => {
-    prompt?.close(); // the Meeting was answered, timed out or ended; the old overlay is stale
+    prompt?.close(); // the Meeting was answered or ended; the old overlay is stale
     prompt = undefined;
     if (!meeting) return;
     console.log(`[detection] ${meeting.app}`);
     prompt = showPrompt(meeting.app, {
       record: () => core!.acceptPrompt(),
-      notNow: () => core!.declinePrompt(),
+      close: () => core!.declinePrompt(),
       never: () => {
         core!.neverForThisApp();
         render();

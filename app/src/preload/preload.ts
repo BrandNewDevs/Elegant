@@ -2,6 +2,8 @@ import type { UpdateState } from "../core/updater.js";
 import type { MeetingsApi } from "../shared/meetings-api.js";
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import type { MeetingsViewState } from "../shared/meetings-view-state.js";
+import type { Appearance } from "../shared/appearance.js";
+import type { ModelKind } from "../shared/model-kinds.js";
 import type { PromptChoice } from "../shared/prompt-choice.js";
 import type { SetupAction } from "../shared/setup-actions.js";
 import type { SetupViewState } from "../shared/setup-view-state.js";
@@ -18,6 +20,12 @@ const meetings = {
   onState: (callback: (state: MeetingsViewState) => void) => subscribe("meetings:state", callback),
   settings: (open: boolean) => ipcRenderer.send("meetings:settings", open),
   setShowInDock: (show: boolean) => ipcRenderer.send("meetings:show-in-dock", show),
+  setAppearance: (appearance: Appearance) => ipcRenderer.send("meetings:appearance", appearance),
+  setSummaryModel: (model: string) => ipcRenderer.send("meetings:summary-model", model),
+  modelFiles: () => ipcRenderer.invoke("meetings:model-files"),
+  removeModel: (kind: ModelKind) => ipcRenderer.invoke("meetings:remove-model", kind),
+  redownloadModel: (kind: ModelKind) => ipcRenderer.invoke("meetings:redownload-model", kind),
+  installedModels: () => ipcRenderer.invoke("meetings:installed-models"),
   setKeepAudio: (keep: boolean) => ipcRenderer.send("meetings:keep-audio", keep),
   setCheckForUpdates: (check: boolean) => ipcRenderer.send("meetings:check-for-updates", check),
   onUpdate: (callback: (update: Exclude<UpdateState, { status: "idle" }>) => void) => subscribe("meetings:update", callback),

@@ -114,7 +114,7 @@ export function Sidebar({
   const groups = searching ? [{ day: "", items: meetings }] : groupByDay(meetings);
   const busy = recording !== undefined || update.status !== "idle";
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r bg-muted/40 md:w-64" aria-label="Meetings">
+    <aside className="flex w-56 shrink-0 flex-col border-r bg-muted/40 pt-10 md:w-64" aria-label="Meetings">
       <form
         className="relative p-3"
         onSubmit={(e) => {
@@ -138,7 +138,7 @@ export function Sidebar({
               <section key={day} aria-label={day || "Search results"} className="mb-2">
                 {day && <h2 className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{day}</h2>}
                 {items.map((m) => (
-                  <MeetingRow key={m.id} meeting={m} selected={!settingsOpen && selectedId === m.id} onSelect={() => onSelect(m.id)} />
+                  <MeetingRow key={m.id} meeting={m} selected={selectedId === m.id} onSelect={() => onSelect(m.id)} />
                 ))}
               </section>
             ))}

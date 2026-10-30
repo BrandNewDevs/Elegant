@@ -1,7 +1,7 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { OllamaClient } from "./ollama.js";
+import { checkOllama, listOllamaModels, OllamaClient } from "./ollama.js";
 import { AI_SETTINGS, assertRequestBudget, requestBytes } from "./model-request.js";
 import type { TextRequest } from "./language-model.js";
 
@@ -45,6 +45,20 @@ describe("local Ollama model interface", () => {
     expect(response.metadata).toMatchObject({ model: "local:test", promptTokens: 64, outputTokens: 12, loadDurationNs: 12345 });
     expect(response.metadata.elapsedMs).toBeGreaterThanOrEqual(0);
     expect(JSON.stringify(response.metadata)).not.toContain("Friday");
+  });
+
+  it("asks for the model as it is at each request, so a change applies to the next one", async () => {
+    const asked: string[] = [];
+    const baseUrl = await serve((req, res) => {
+      void jsonBody(req).then(body => { asked.push((body as { model: string }).model); res.end(JSON.stringify(reply)); });
+    });
+    let chosen = "first:1b";
+    const client = new OllamaClient({ baseUrl, model: () => chosen });
+    await client.complete(request);
+    chosen = "second:2b";
+    const second = await client.complete(request);
+    expect(asked).toEqual(["first:1b", "second:2b"]);
+    expect(second.metadata.model).toBe("second:2b");
   });
 
   it("preserves the prompt-in/string-out compatibility adapter", async () => {
@@ -150,5 +164,21 @@ describe("complete request accounting", () => {
     expect(() => assertRequestBudget(value, requestBytes(value))).not.toThrow();
     expect(() => assertRequestBudget(value, requestBytes(value) - 1)).toThrow("input budget");
     expect(AI_SETTINGS.maxInputBytes).toBe(5500);
+  });
+});
+
+describe("the models pulled into Ollama", () => {
+  const tags = (names: string[]) => (_req: IncomingMessage, res: ServerResponse) => { res.end(JSON.stringify({ models: names.map(name => ({ name })) })); };
+
+  it("lists them sorted, and nothing when Ollama is not running", async () => {
+    const baseUrl = await serve(tags(["qwen3:4b", "gemma3:4b", "llama3.2:3b"]));
+    expect(await listOllamaModels({ baseUrl })).toEqual(["gemma3:4b", "llama3.2:3b", "qwen3:4b"]);
+    expect(await listOllamaModels({ baseUrl: "http://127.0.0.1:1", timeoutMs: 500 })).toEqual([]);
+  });
+
+  it("checks readiness for the model it is given", async () => {
+    const baseUrl = await serve(tags(["gemma3:4b", "llama3.2:3b"]));
+    expect(await checkOllama({ baseUrl, model: "llama3.2:3b" })).toEqual({ status: "ready" });
+    expect(await checkOllama({ baseUrl, model: "qwen3:4b" })).toMatchObject({ status: "no-model", message: expect.stringContaining("ollama pull qwen3:4b") });
   });
 });

@@ -4,7 +4,7 @@ A personal macOS menu-bar app that notices when you are in an online call, offer
 
 ## What it does
 
-- **Detects calls.** Any app that holds the microphone (Zoom, Teams, Slack, FaceTime, Meet in a browser, and so on) triggers a small prompt: **Record**, **Not now** or **Never for this app**. The prompt times out after about 20 seconds and defaults to not recording. The last few minutes of audio are held in memory from detection, so accepting late doesn't lose the start of the call; declining discards them.
+- **Detects calls.** Any app that holds the microphone (Zoom, Teams, Slack, FaceTime, Meet in a browser, and so on) triggers a small prompt: **Record** or **Never for this app**, with a × to close it. The prompt stays until you answer or the call ends, and closing it means not recording. The last few minutes of audio are held in memory from detection, so accepting late doesn't lose the start of the call; declining discards them.
 - **Records two tracks.** Your microphone and the system audio (everyone else) are captured separately. The menu bar shows elapsed time. Stopping is always manual; you only get a reminder when the call app lets go of the microphone.
 - **Transcribes locally.** After you stop, WhisperKit transcribes the whole recording (English only). Other voices are separated by speaker diarization and labelled "Speaker 1", "Speaker 2", and so on. You can rename any speaker per meeting.
 - **Summarises locally.** A local model served by Ollama (default `gemma3:4b`) writes a TL;DR and what each participant said. Every point links to the transcript passage that supports it, and clicking a timestamp jumps to and highlights that passage. Long meetings are handled in bounded chunks.

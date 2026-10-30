@@ -6,7 +6,7 @@ import { summaryPassages, type SummaryPassage } from './summary-passages.js';
 import { sourceStatements, matchStatements, assertSupportedCompression, statementKey, UnsupportedSummaryRewrite, type SourceStatement } from './summary-statements.js';
 import { InvalidSummaryError } from './validate-summary.js';
 
-export const SUMMARY_PROMPT_VERSION = 'readable-summary-v13';
+export const SUMMARY_PROMPT_VERSION = 'readable-summary-v15';
 interface Claim { speaker: string; text: string; sources: number[]; kind: string; atoms: SourceStatement[] }
 const kinds = ['update', 'decision', 'commitment', 'proposal', 'disagreement', 'unresolved'];
 const integers = { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'integer' } };
@@ -22,7 +22,7 @@ const rules = 'Write an English Meeting Summary using only supplied evidence. Sp
 const objective = 'Write short points, each as one complete sentence, capturing the main subject, important updates, decisions/actions and explicit unresolved issues. Use only clear evidence; preserve speaker, status, stated owner and deadline. Combine fragmented speech. Omit greetings, hopes, generic comments, requests for updates, recording controls and garbled phrases. Never infer a task or intent from unclear speech. Report substantive content instead of narrating who asked or spoke. Keep distinct tasks separate; never repeat facts. Do not output greetings, ready-to-go remarks, requests for updates, or garbled fragments at all. Paraphrase meaningful content in clear full sentences, without copying conversational filler. Testing status and no owner assigned are meaningful updates or unresolved facts.';
 function request(stage: string, data: object, retry = ''): Pick<TextRequest, 'messages' | 'schema'> {
   const instruction = stage === 'select' ? 'Select at most three supplied claim IDs for the main subject, important updates/outcomes and unresolved matters. Prefer informative facts over generic discussion or housekeeping. Return ids only.' : stage === 'tldr'
-    ? 'Write a concise English TLDR using the supported points. Return one to three complete sentences, usually two or three and 40–70 words total, never over 90 words. Each sentence must cite exactly one point ID in covers and supply text. You CAN shorten a point: copy a short complete clause from it, omitting filler and secondary detail. Use ONLY the original words in their original order. Do not substitute synonyms. Multiple different sentences may cite the same point. Preserve names, numbers, owners, negation, proposals, conditions and uncertainty. Never turn an idea into an agreement. Prefer final outcomes, substantive updates and explicit unresolved status. Include a statusPointId when supplied. Do not quote greetings, hopes or unclear endings. A shorter complete overview is better than forcing three sentences. Return text and covers, not IDs alone.'
+    ? 'Write a concise English TLDR using the supported points. Return one to three complete sentences, usually two or three and 40–70 words total, never over 90 words. Each sentence must cite exactly one point ID in covers and supply text. You CAN shorten a point: copy a short complete clause from it, omitting filler and secondary detail. Use ONLY the original words in their original order. Do not substitute synonyms. Multiple different sentences may cite the same point. Preserve names, numbers, owners, negation, proposals, conditions and uncertainty. Never turn an idea into an agreement. Lead with explicit final outcomes, then stated commitments with owners and deadlines, then substantive updates and unresolved status. Earlier proposals are lower priority when a final outcome is available. Include a statusPointId when supplied. Do not quote greetings, hopes or unclear endings. A shorter complete overview is better than forcing three sentences. Return text and covers, not IDs alone.'
     : objective + (stage === 'reduce' ? ' Consolidate supplied claims using original evidence. Return covers claim IDs, not source IDs; code derives evidence from covers. Every claim ID must appear in covers under its original speaker, including superseded positions: describe their replacement explicitly. Preserve every distinct action, deadline and critical fact; combine only related claims.' : ' Extract supported claims with their actual speaker, type and evidence IDs.');
   return { messages: [{ role: 'system', content: rules }, { role: 'user', content: JSON.stringify({ instruction: instruction + retry, data }) }], schema: outputSchema(stage, data) };
 }
@@ -79,12 +79,16 @@ function parsePoints(text: string, evidence: SummaryPassage[], draft?: Claim[], 
     const coveredStatements = new Set(points.flatMap(point => point.atoms.map(statementKey)));
     points.push(...sourceStatements(evidence).filter(atom => !coveredStatements.has(statementKey(atom))).map(originalClaim));
   }
-  return points.filter(point => !/^(?:yes|yeah|sure|okay|ok|absolutely|all good(?:,? all good)?)[.!\s]*$/iu.test(point.text));
+  return points.filter(point => !/^(?:yes|yeah|sure|okay|ok|absolutely|agreed|understood|all good(?:,? all good)?)[.!\s]*$/iu.test(point.text));
 }
 function originalClaim(atom: SourceStatement): Claim { const cleaned = atom.text.replace(/\.(?=\s+[A-Z])/gu, ';').replace(/^(?:(?:yeah|okay|so|in fact|actually|and)[,\s]+)+/iu, ''); return { speaker: atom.speaker, text: cleaned.charAt(0).toUpperCase() + cleaned.slice(1), sources: atom.sources, kind: 'update', atoms: [atom] }; }
+const acknowledgement = /^(?:yes|yeah|sure|okay|ok|absolutely|agreed|understood|all good(?:,? all good)?)[.!\s]*$/iu;
+function cleanPoint(text: string): string {
+  return text.replace(/;\s+(This|That|These|Those|One)\b/gu, (_, word: string) => '; ' + word.toLowerCase()).replace(/[.!?]*$/u, '.');
+}
 function distinctClaims(claims: Claim[]): Claim[] {
   const unique = new Map<string, Claim>();
-  for (const claim of [...claims].sort((a, b) => Math.max(...a.sources) - Math.max(...b.sources))) {
+  for (const claim of [...claims].filter(c => !acknowledgement.test(c.text)).sort((a, b) => Math.max(...a.sources) - Math.max(...b.sources))) {
     unique.set(JSON.stringify([claim.speaker, claim.atoms.map(statementKey).sort()]), claim);
   }
   return [...unique.values()];
@@ -94,6 +98,20 @@ function finalDecisionIds(items: Claim[]): number[] {
   return items.flatMap((point, id) => /\bfinal (?:decisions?|plans?|choices?|agreement)\b/iu.test(point.text)
     && !/\b(?:no|not|never|if|unless|quoted|hypothetical|propos\w*|suggest\w*|maybe|might|could|would)\b|n['’]t\b/iu.test(point.text) ? [id] : [])
     .sort((a, b) => Math.max(...items[b]!.sources) - Math.max(...items[a]!.sources));
+}
+/** Ranking changes selection only: source claims and their evidence remain intact. */
+function commitmentIds(items: Claim[]): number[] {
+  return items.flatMap((point, id) => /\b(?:I|we)\s+(?:will|shall)\s+\w+|\b(?:I|we)['’]ll\s+\w+/iu.test(point.text)
+    && !/\b(?:not|never|if|unless|provided|maybe|quoted|hypothetical|would)\b|n['’]t\b|["“”]/iu.test(point.text) ? [id] : []);
+}
+function proposal(point: Claim): boolean {
+  return /\b(?:propos\w*|suggest\w*|provisional|initial)\b/iu.test(point.text);
+}
+/** Explicit scope agreements count as outcomes even without the word "final". */
+function outcomeIds(items: Claim[]): number[] {
+  return [...new Set([...finalDecisionIds(items), ...items.flatMap((point, id) =>
+    /\bwe (?:agree|agreed|decided)\b/iu.test(point.text)
+      && !/\b(?:if|unless|provided|quoted|hypothetical|not|never|maybe|would)\b|["“”]/iu.test(point.text) ? [id] : [])])];
 }
 const claimData = (claim: Claim, id: number) => ({ id, speaker: claim.speaker, text: claim.text, sources: claim.sources, kind: claim.kind });
 export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, deadlineMs = 900000 }: { model: TextModel; attempts?: number; maxCalls?: number; deadlineMs?: number }) {
@@ -124,7 +142,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
     const wire = (e: SummaryPassage[]) => e.map(({ id, speaker, text }) => ({ id, speaker, text }));
     const evidenceFor = (claims: Claim[]) => passages.filter(e => claims.some(c => c.sources.includes(e.id)));
     const openingTopic = transcript.segments.slice(0, 3).filter(s => Buffer.byteLength(s.text, 'utf8') <= 250).map(s => s.text);
-    const attention = (items: Claim[]) => { const hard = items.flatMap((p, id) => /\b(?:unassigned|undecided|pending|not (?:yet )?(?:done|finished|complete)|yet to be done|no .*(?:owner|date|measur))\b/iu.test(p.text) ? [id] : []); return hard.length ? hard : items.flatMap((p, id) => /\b(?:testing|demo) call\b/iu.test(p.text) ? [id] : []); };
+    const attention = (items: Claim[]) => { const hard = items.flatMap((p, id) => /\b(?:unassigned|undecided|pending|not (?:yet )?(?:done|finished|complete)|yet to be done|no .*(?:owner|date|deadline|measur)|not set (?:a |the )?(?:deadline|date)|not (?:yet )?(?:assigned|scheduled))\b/iu.test(p.text) ? [id] : []); return hard.length ? hard : items.flatMap((p, id) => /\b(?:testing|demo) call\b/iu.test(p.text) ? [id] : []); };
     const overview = (items: Claim[]) => ({ openingTopic, statusPointIds: attention(items), points: items.map((point, id) => ({ id, speaker: point.speaker, text: point.text, kind: point.kind, lastMention: Math.max(...point.sources), wordCount: point.text.match(/\S+/gu)?.length ?? 0 })) });
     let claims: Claim[] = [];
     for (const speaker of [...new Set(passages.map(p => p.speaker))]) {
@@ -188,11 +206,13 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
         shortlist = next.slice(0, Math.max(1, next.length - 1));
       } else shortlist = next;
     }
-    const finalPoint = claims[finalDecisionIds(claims)[0]!];
-    if (finalPoint && !shortlist.includes(finalPoint)) {
-      while (shortlist.length && !fits('tldr', overview([...shortlist, finalPoint]))) shortlist.pop();
-      shortlist.push(finalPoint);
+    const priorities = [...outcomeIds(claims), ...attention(claims), ...commitmentIds(claims)];
+    // Reserve priority claims before filling the remaining request budget.
+    const retained: Claim[] = [];
+    for (const point of [...priorities.map(id => claims[id]!), ...shortlist]) {
+      if (!retained.includes(point) && fits('tldr', overview([...retained, point]))) retained.push(point);
     }
+    shortlist = retained;
     const evidence = evidenceFor(shortlist), payload = overview(shortlist);
     if (!fits('tldr', payload)) throw new Error('Summary incomplete: final evidence exceeds the TL;DR budget');
     const sentences = await ask('tldr', payload, text => {
@@ -202,7 +222,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       const render = (point: Claim, text: string) => {
         const firstPerson = /\b(?:I|my)\b|^(?:Will|Can|Must|Should)\b/iu.test(text);
         const attributed = firstPerson && !text.startsWith(point.speaker + ':') ? point.speaker + ': ' + text : text;
-        return attributed.replace(/[.!?]+$/u, '') + '.';
+        return attributed.replace(/^Agreed[.;]\s+/iu, '').replace(/;\s+(This|These|Those|One)\b/gu, (_, word: string) => '; ' + word.toLowerCase()).replace(/[.!?]+$/u, '') + '.';
       };
       const words = (text: string) => text.match(/\S+/gu)?.length ?? 0;
       const sentenceCount = (text: string) => [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(text)].length;
@@ -221,7 +241,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
         if (words(rendered) > 90 || sentenceCount(rendered) > 3) return [];
         return [{ id, text: rendered, sources: point.sources }];
       });
-      const finalIds = finalDecisionIds(shortlist), status = attention(shortlist);
+      const finalIds = outcomeIds(shortlist), commitments = commitmentIds(shortlist), status = attention(shortlist);
       // A valid but incomplete answer is not a useful overview. Complete source
       // points provide a grounded fallback without trusting invented model prose.
       shortlist.forEach((point, id) => {
@@ -251,17 +271,28 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       const packed: typeof candidates = required ? [required] : [];
       let used = required ? words(required.text) : 0;
       let count = required ? sentenceCount(required.text) : 0;
-      for (const candidate of [...(state ? [state] : []), ...candidates]) {
+      const rank = (id: number) => finalIds.includes(id) ? 0 : commitments.includes(id) ? 1
+        : status.includes(id) ? 2 : proposal(shortlist[id]!) ? 5
+        : /\b(?:cannot|can['’]t take|need to revise)\b/iu.test(shortlist[id]!.text) ? 4 : 3;
+      const ranked = [...candidates].sort((a, b) => rank(a.id) - rank(b.id));
+      // Give each available information category a turn before taking a second
+      // commitment or background sentence. Every candidate stays source-backed.
+      const balanced = [...(final ? [final] : []),
+        ...ranked.filter(c => commitments.includes(c.id)).slice(0, 1),
+        ...ranked.filter(c => status.includes(c.id)), ...ranked];
+      for (const candidate of balanced) {
         if (packed.some(item => item.text.toLowerCase() === candidate.text.toLowerCase()) || count + sentenceCount(candidate.text) > 3 || used + words(candidate.text) > 90) continue;
         packed.push(candidate); used += words(candidate.text); count += sentenceCount(candidate.text);
       }
       if (!packed.length) return fail((unsupported ? unsupported + '. ' : '') + 'Copy a shorter complete clause within 90 words from the point; do not substitute synonyms');
-      return candidates.filter(candidate => packed.includes(candidate)).sort((a, b) =>
-        Number(status.includes(a.id) && a.id !== final?.id) - Number(status.includes(b.id) && b.id !== final?.id));
+      return packed.sort((a, b) => {
+        const displayRank = (id: number) => finalIds.includes(id) ? 0 : status.includes(id) ? 3 : commitments.includes(id) ? 1 : 2;
+        return displayRank(a.id) - displayRank(b.id);
+      });
     });
     const refs = (sources: number[]) => [...new Set(sources.flatMap(id => passages[id]!.refs))].sort((a, b) => a - b);
     const speakers = [...new Set(claims.map(c => c.speaker))];
-    return { tldr: sentences.map(s => s.text).join(' '), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => c.text) })),
+    return { tldr: sentences.map(s => s.text).join(' '), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => cleanPoint(c.text)) })),
       evidence: { revision: transcriptRevision(transcript), tldr: refs(sentences.flatMap(s => s.sources)), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => refs(c.sources)) })) },
       generation: { promptVersion: SUMMARY_PROMPT_VERSION, model: modelName, elapsedMs: performance.now() - started, calls, promptTokens, outputTokens, fallbacks, requests: observations } };
   };

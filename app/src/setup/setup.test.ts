@@ -1,5 +1,8 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { checkOllama, type OllamaStatus } from "../pipeline/ollama.js";
 import { openStore } from "../store/store.js";
@@ -282,5 +285,66 @@ describe("the person's name", () => {
     s.onChange(() => changes++);
     s.setUserName("Kenny");
     expect([names, changes]).toEqual([1, 1]);
+  });
+});
+
+describe("removing and redownloading models", () => {
+  const dirs: string[] = [];
+  afterEach(() => dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })));
+
+  /** A models folder holding both kinds, as a finished download leaves it. */
+  function downloaded(busyReason?: () => string | undefined) {
+    const modelsDirectory = mkdtempSync(join(tmpdir(), "elegant-setup-"));
+    dirs.push(modelsDirectory);
+    for (const folder of ["models/argmaxinc/whisperkit-coreml/openai_whisper-tiny", "models/argmaxinc/speakerkit-coreml"]) {
+      mkdirSync(join(modelsDirectory, folder), { recursive: true });
+      writeFileSync(join(modelsDirectory, folder, "weights.bin"), "x");
+    }
+    const store = openStore(":memory:");
+    store.setSetting("modelsReady", "true");
+    const engine = new FakeEngine();
+    const s = new Setup(engine, store, { ...options(), modelsDirectory, busyReason });
+    return { engine, store, s };
+  }
+
+  it("removes a kind, and from then on the models count as not downloaded, also after a restart", async () => {
+    const { s, store } = downloaded();
+    expect(s.state.models.status).toBe("done");
+    expect(await s.removeModel("speaker")).toEqual({ ok: true });
+    expect((await s.listModels()).map((f) => f.present)).toEqual([true, false]);
+    expect(s.state.models).toEqual({ status: "todo", fraction: 0 });
+    expect(new Setup(new FakeEngine(), store, options()).state.models.status).toBe("todo");
+  });
+
+  it("is refused, and removes nothing, while a Recording or AI work is using the models", async () => {
+    let busy: string | undefined = "A Recording is in progress.";
+    const { s } = downloaded(() => busy);
+    expect(await s.removeModel("speech")).toEqual({ ok: false, reason: "A Recording is in progress." });
+    expect((await s.listModels()).map((f) => f.present)).toEqual([true, true]);
+    busy = undefined;
+    expect(await s.removeModel("speech")).toEqual({ ok: true });
+  });
+
+  it("is refused while the models are downloading", async () => {
+    const { s, engine } = downloaded();
+    await s.removeModel("speaker");
+    s.downloadModels();
+    expect(s.state.models.status).toBe("working");
+    expect(await s.removeModel("speech")).toMatchObject({ ok: false, reason: "The models are downloading." });
+    expect(engine.commands.at(-1)).toMatchObject({ type: "download_models" });
+  });
+
+  it("redownloading removes the kind, then asks the engine to download", async () => {
+    const { s, engine } = downloaded();
+    expect(await s.redownloadModel("speech")).toEqual({ ok: true });
+    expect((await s.listModels()).map((f) => f.present)).toEqual([false, true]);
+    expect(engine.commands.at(-1)).toMatchObject({ type: "download_models", model: "tiny" });
+    expect(s.state.models.status).toBe("working");
+  });
+
+  it("does not start a download when the removal was refused", async () => {
+    const { s, engine } = downloaded(() => "Meeting processing is running.");
+    expect(await s.redownloadModel("speech")).toMatchObject({ ok: false });
+    expect(engine.commands).toEqual([]);
   });
 });
