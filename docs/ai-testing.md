@@ -1,6 +1,6 @@
 # Local AI setup, acceptance and recovery
 
-The app runs on macOS; Linux can exercise the TypeScript pipeline and evaluation tooling. Automated tests and synthetic model runs do not establish real Meeting accuracy, native permissions, offline readiness or M4 performance. Those checks remain pending until performed on the target Mac.
+The app runs on macOS; Linux can exercise the TypeScript pipeline and evaluation tooling. Automated tests and synthetic model runs do not establish real Meeting accuracy, native permissions, offline readiness or M4 performance. Those checks remain pending until performed on the target Mac. This checklist describes Ollama mode; [Gemini verification](./gemini.md) covers opt-in cloud text processing, credentials and live API evaluation separately. Offline Summary and Chat acceptance applies only to Ollama.
 
 ## Prepare the Mac
 

@@ -15,6 +15,9 @@ import { useSetup } from "@/lib/use-setup";
 import { cn } from "@/lib/utils";
 import { restartForUpdate } from "../meetings/update-actions";
 
+import { AIProviderSettings } from "./AIProviderSettings";
+import type { AISettingsView } from "../../shared/ai-settings";
+
 export const SECTIONS = ["General", "Permissions", "Models", "Updates"] as const;
 export type SettingsSection = (typeof SECTIONS)[number];
 
@@ -142,7 +145,7 @@ function Permissions({ state, name }: { state: { microphone: PermissionStep; sys
   );
 }
 
-function Models({ models, ollama, name }: { models: Step & { fraction: number }; ollama: Step; name: string }) {
+function Models({ models, ollama, name, ai }: { models: Step & { fraction: number }; ollama: Step; name: string; ai?: AISettingsView }) {
   const percent = Math.round(models.fraction * 100);
   return (
     <div className="divide-y">
@@ -172,7 +175,8 @@ function Models({ models, ollama, name }: { models: Step & { fraction: number };
         {models.status === "problem" && <Status label="Failed" variant="destructive" />}
         {models.status === "todo" && <Status label="Not downloaded" variant="secondary" />}
       </SettingRow>
-      <SettingRow
+      {ai && <AIProviderSettings ai={ai} />}
+      {ai?.provider !== "gemini" && <SettingRow
         title="Summaries"
         description="Summaries are written by a model running in Ollama on your Mac. Ollama must be running with the model pulled. You can record without it and summarise later."
         below={
@@ -190,7 +194,7 @@ function Models({ models, ollama, name }: { models: Step & { fraction: number };
         {ollama.status === "done" && <Status label="Ready" variant="success" />}
         {ollama.status === "working" && <Status label="Checking…" variant="warning" />}
         {ollama.status === "problem" && <Status label="Not ready" variant="destructive" />}
-      </SettingRow>
+      </SettingRow>}
     </div>
   );
 }
@@ -299,7 +303,7 @@ export function SettingsPage({
           <>
             {section === "General" && <General showInDock={showInDock} keepAudio={keepAudio} name={view.name} userName={view.userName} />}
             {section === "Permissions" && <Permissions state={view.state} name={view.name} />}
-            {section === "Models" && <Models models={view.state.models} ollama={view.state.ollama} name={view.name} />}
+            {section === "Models" && <Models models={view.state.models} ollama={view.state.ollama} name={view.name} ai={view.ai} />}
             {section === "Updates" && <Updates checkForUpdates={checkForUpdates} update={update} appVersion={appVersion} name={view.name} />}
           </>
         )}

@@ -22,7 +22,7 @@ Linux can exercise Summary and chat logic and provide development measurements. 
 
 ## Constraints
 
-- **Fully local, open-weight only.** Nothing may call a cloud API ([ADR 0002](./adr/0002-fully-local-processing.md)). Summaries use models served by Ollama; the default is `gemma3:4b`.
+- **Local by default.** Ollama mode follows [ADR 0002](./adr/0002-fully-local-processing.md), with default `gemma3:4b`. [ADR 0003](./adr/0003-optional-gemini-processing.md) permits Gemini Summary and Chat processing only after explicit user selection and consent. Audio processing always stays local. Gemini has separate prompts and limits; do not change the working Ollama pipeline to accommodate it. See [Gemini contracts and evaluation](./gemini.md).
 - **English only.**
 - **Transcription runs after the Meeting, in one batch.** Live or streaming transcription is out of scope.
 

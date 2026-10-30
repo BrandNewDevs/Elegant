@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import type { UpdateState } from "../../core/updater";
 import { nothingDone, pushSetupState, withState } from "@/lib/test-electron";
@@ -190,4 +190,37 @@ it("confirms a saved name with a toast", async () => {
   fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Kenny" } });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   expect(await screen.findByText("Name saved")).toBeTruthy();
+});
+
+it("requires a saved key and explicit consent before selecting Gemini", async () => {
+  pushSetupState({ ...nothingDone, ai: { provider: "ollama", geminiModel: "gemini-test", hasGeminiKey: true } });
+  page("Models");
+  const useGemini = screen.getByRole("button", { name: "Use Gemini" });
+  expect(useGemini.hasAttribute("disabled")).toBe(true);
+  fireEvent.click(screen.getByRole("checkbox"));
+  await act(async () => fireEvent.click(useGemini));
+  expect(window.electron.setup.configureAI).toHaveBeenCalledWith({ type: "select", provider: "gemini", consent: true });
+});
+
+it("clears an entered key after saving and exposes errors without changing provider", async () => {
+  pushSetupState({ ...nothingDone, ai: { provider: "ollama", geminiModel: "gemini-test", hasGeminiKey: false } });
+  page("Models");
+  const field = screen.getByLabelText("Gemini API key") as HTMLInputElement;
+  expect(field.type).toBe("password");
+  fireEvent.change(field, { target: { value: "entered-key" } });
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save key" })));
+  expect(window.electron.setup.configureAI).toHaveBeenCalledWith({ type: "save-key", key: "entered-key" });
+  expect(field.value).toBe("");
+  expect(screen.getByRole("button", { name: "Use Gemini" }).hasAttribute("disabled")).toBe(true);
+});
+
+it("does not require Ollama when Gemini is selected and can switch back explicitly", async () => {
+  pushSetupState({ ...nothingDone, ai: { provider: "gemini", geminiModel: "gemini-test", hasGeminiKey: true } });
+  vi.mocked(window.electron.setup.configureAI).mockRejectedValue(new Error("Gemini quota reached"));
+  page("Models");
+  expect(screen.queryByRole("button", { name: "Check Ollama" })).toBeNull();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Test Gemini connection" })));
+  expect(screen.getByRole("alert").textContent).toContain("Gemini quota reached");
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Use Ollama" })));
+  expect(window.electron.setup.configureAI).toHaveBeenLastCalledWith({ type: "select", provider: "ollama" });
 });

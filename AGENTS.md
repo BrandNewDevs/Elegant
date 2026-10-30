@@ -19,6 +19,6 @@ Layout and commands:
 
 Rules:
 
-- Everything runs locally. No cloud APIs for audio, transcription or summaries.
+- Audio, transcription and diarization stay local. Ollama is the default for Summaries and Meeting Chat. Gemini text processing is allowed only after explicit selection and consent in Settings; never add automatic cloud fallback. Read [ADR 0003](./docs/adr/0003-optional-gemini-processing.md) before changing provider routing or credentials. Preserve existing Ollama prompts and generation logic when working on Gemini.
 - Never commit audio recordings, real Transcripts of real people, or `.env` files.
 - The bundle identifier is `dev.bnd.elegant` and is permanent (changed once from `dev.bnd.meetingrecorder` when the app was named Elegant).

@@ -116,6 +116,7 @@ export function MeetingDetail({ meeting, chat, isCurrent }: {
     </div>
     <section role="tabpanel" id={`meeting-${meeting.id}-${view}-panel`} aria-labelledby={`meeting-${meeting.id}-${view}-tab`} className="min-w-0">
       {view === "summary" && (meeting.summary ? <div className="space-y-6">
+        {meeting.summary.generation?.provider === "gemini" && <p className="text-xs text-muted-foreground">Generated with Gemini · {meeting.summary.generation.model}</p>}
         <div><Heading icon={Sparkles}>TL;DR</Heading><p className="text-sm leading-relaxed">{meeting.summary.tldr}{meeting.summary.evidence && <Citations revision={meeting.summary.evidence.revision} refs={meeting.summary.evidence.tldr} transcript={meeting.transcript} onOpen={openEvidence} />}</p></div>
         {meeting.summary.participants.map((participant, index) => <div key={participant.speaker}>
           <h3 className="font-medium">{participant.speaker}</h3>
