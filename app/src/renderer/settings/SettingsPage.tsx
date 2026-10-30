@@ -491,7 +491,7 @@ function GeminiModelPicker({ ai, busy, configure }: { ai: AISettingsView; busy: 
 }
 
 /** Gemini: opt-in cloud processing with the person's own key. Saving or testing a key never turns it on; consent and Use Gemini do. */
-function GeminiCard({ ai, busy, configure }: { ai: AISettingsView; busy: boolean; configure: (action: AISettingsAction) => Promise<boolean> }) {
+function GeminiCard({ ai, busy, testing, configure }: { ai: AISettingsView; busy: boolean; testing: boolean; configure: (action: AISettingsAction) => Promise<boolean> }) {
   const [key, setKey] = useState("");
   const [consent, setConsent] = useState(false);
   const active = ai.provider === "gemini";
@@ -519,6 +519,11 @@ function GeminiCard({ ai, busy, configure }: { ai: AISettingsView; busy: boolean
       <Button type="button" variant="outline" disabled={busy || !ai.hasGeminiKey} onClick={() => void configure({ type: "test" })}>
         Test Gemini connection
       </Button>
+      {testing && (
+        <Button type="button" variant="outline" onClick={() => void window.electron.setup.configureAI({ type: "cancel-test" }).catch(() => {})}>
+          Cancel connection test
+        </Button>
+      )}
       {!active && (
         <div className="space-y-3 border-t pt-4">
           <label className="flex items-start gap-2 text-sm">
@@ -535,11 +540,12 @@ function GeminiCard({ ai, busy, configure }: { ai: AISettingsView; busy: boolean
 
 /** The providers on offer: which one writes Summaries and answers questions, and each one's own settings. One choice covers new work. */
 function Providers({ ollama, summaryModel, ai }: { ollama: Step; summaryModel: string; ai?: AISettingsView }) {
-  const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState<AISettingsAction["type"]>();
+  const busy = running !== undefined;
   const [error, setError] = useState("");
   /** Runs the change; says whether it was made, with a toast when it was and an alert by the controls when it was not. */
   const configure = async (action: AISettingsAction): Promise<boolean> => {
-    setBusy(true);
+    setRunning(action.type);
     setError("");
     try {
       toast.success(await window.electron.setup.configureAI(action));
@@ -548,7 +554,7 @@ function Providers({ ollama, summaryModel, ai }: { ollama: Step; summaryModel: s
       setError(problem instanceof Error ? problem.message : "AI settings could not be saved");
       return false;
     } finally {
-      setBusy(false);
+      setRunning(undefined);
     }
   };
   const provider = ai?.provider ?? "ollama";
@@ -556,7 +562,7 @@ function Providers({ ollama, summaryModel, ai }: { ollama: Step; summaryModel: s
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">Choose what writes Summaries and answers questions about a Meeting. It applies to new work; Summaries and chats already written stay as they are. Recording, transcription and telling speakers apart always run on this Mac.</p>
       <OllamaCard ollama={ollama} summaryModel={summaryModel} active={provider === "ollama"} busy={busy} onUse={ai ? () => void configure({ type: "select", provider: "ollama" }) : undefined} />
-      {ai && <GeminiCard ai={ai} busy={busy} configure={configure} />}
+      {ai && <GeminiCard ai={ai} busy={busy} testing={running === "test"} configure={configure} />}
       {busy && <p role="status" className="text-sm">Updating AI settings…</p>}
       {error && (
         <Alert variant="destructive">

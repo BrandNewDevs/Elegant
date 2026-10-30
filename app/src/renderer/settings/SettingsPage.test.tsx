@@ -313,6 +313,28 @@ it("clears an entered key after saving and exposes errors without changing provi
   expect(screen.getByRole("button", { name: "Use Gemini" }).hasAttribute("disabled")).toBe(true);
 });
 
+it("offers cancellation only while a connection test runs", async () => {
+  pushSetupState({ ...nothingDone, ai: { provider: "gemini", geminiModel: "gemini-test", hasGeminiKey: true } });
+  let finish!: (value: string) => void;
+  vi.mocked(window.electron.setup.configureAI).mockImplementation(async action => action.type === "test" ? new Promise(resolve => { finish = resolve; }) : "Saved");
+  page("Providers");
+  const test = screen.getByRole("button", { name: "Test Gemini connection" });
+  expect(screen.queryByRole("button", { name: "Cancel connection test" })).toBeNull();
+  await act(async () => fireEvent.click(test));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Cancel connection test" })));
+  expect(window.electron.setup.configureAI).toHaveBeenLastCalledWith({ type: "cancel-test" });
+  await act(async () => finish("done"));
+  expect(screen.queryByRole("button", { name: "Cancel connection test" })).toBeNull();
+});
+
+it("does not offer test cancellation while other settings are saving", async () => {
+  pushSetupState({ ...nothingDone, ai: { provider: "gemini", geminiModel: "gemini-test", hasGeminiKey: true } });
+  vi.mocked(window.electron.setup.configureAI).mockImplementation(() => new Promise(() => {}));
+  page("Providers");
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: /Use Ollama/ })));
+  expect(screen.queryByRole("button", { name: "Cancel connection test" })).toBeNull();
+});
+
 it("does not require Ollama when Gemini is selected and can switch back explicitly", async () => {
   pushSetupState({ ...nothingDone, ai: { provider: "gemini", geminiModel: "gemini-test", hasGeminiKey: true } });
   vi.mocked(window.electron.setup.configureAI).mockRejectedValue(new Error("Gemini quota reached"));

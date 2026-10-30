@@ -18,7 +18,8 @@ export class AISettings {
   private readonly listeners = new Set<() => void>();
   private pending: Promise<unknown> = Promise.resolve();
   private closed = false;
-  private testController: AbortController | undefined;
+  /** One per queued or running test, so cancellation also covers tests still waiting in the queue. */
+  private readonly testControllers = new Set<AbortController>();
   private listController: AbortController | undefined;
   private finding: { controller: AbortController; done: number; total: number } | undefined;
   constructor(private readonly store: Pick<Store, "getSetting" | "setSetting">, private readonly encryption: CredentialEncryption,
@@ -60,7 +61,14 @@ export class AISettings {
   /** Serialize settings mutations so replacing/removing keys cannot race. */
   configure(value: unknown): Promise<string> {
     if (this.closed) return Promise.reject(new Error("AI settings are shutting down"));
-    const result = this.pending.then(() => this.apply(value));
+    const type = value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 1 ? (value as { type?: unknown }).type : undefined;
+    if (type === "cancel-test") {
+      this.cancelTests();
+      return Promise.resolve("Connection test cancellation requested");
+    }
+    const test = type === "test" ? new AbortController() : undefined;
+    if (test) this.testControllers.add(test);
+    const result = this.pending.then(() => this.apply(value, test?.signal)).finally(() => { if (test) this.testControllers.delete(test); });
     this.pending = result.catch(() => {});
     return result;
   }
@@ -159,10 +167,14 @@ export class AISettings {
 
   async shutdown(): Promise<void> {
     this.closed = true;
-    this.testController?.abort();
+    this.cancelTests();
     this.listController?.abort();
     this.finding?.controller.abort();
     await this.pending;
+  }
+
+  private cancelTests(): void {
+    for (const controller of this.testControllers) controller.abort();
   }
 
   private async decrypt(encrypted: string): Promise<string> {
@@ -172,7 +184,7 @@ export class AISettings {
     } catch { throw new Error("The saved Gemini key cannot be unlocked. Unlock your Mac keychain or replace the key in Settings."); }
   }
 
-  private async apply(value: unknown): Promise<string> {
+  private async apply(value: unknown, testSignal?: AbortSignal): Promise<string> {
     if (this.closed) throw new Error("AI settings are shutting down");
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid AI settings action");
     const action = value as AISettingsAction;
@@ -214,11 +226,19 @@ export class AISettings {
         if (!encrypted) throw new Error("Save a Gemini API key first");
         const apiKey = await this.decrypt(encrypted);
         if (this.closed) throw new Error("AI settings are shutting down");
-        this.testController = new AbortController();
+        if (testSignal?.aborted) throw Object.assign(new Error("Gemini request was cancelled"), { name: "AbortError" });
         try {
-          await this.testClient(apiKey, view.geminiModel).complete({ messages: [{ role: "user", content: "Connection test only. Return {\"ok\":true}." }],
-            schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] }, signal: this.testController.signal, timeoutMs: 30_000, maxOutputTokens: TEST_OUTPUT_TOKENS });
-        } finally { this.testController = undefined; }
+          const response = await this.testClient(apiKey, view.geminiModel).complete({ messages: [{ role: "user", content: "Connection test only. Return {\"ok\":true}." }],
+            schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] }, signal: testSignal, timeoutMs: 60_000, maxOutputTokens: TEST_OUTPUT_TOKENS,
+            // Only the default model is known to accept thinkingLevel; others keep Gemini's defaults.
+            ...(view.geminiModel === DEFAULT_GEMINI_MODEL ? { thinkingLevel: "low" as const } : {}) });
+          let result;
+          try { result = JSON.parse(response.text); } catch { throw new Error("Gemini connection test returned invalid JSON. Retry the test."); }
+          if (!result || result.ok !== true) throw new Error("Gemini connection test did not confirm success. Retry the test.");
+        } catch (error) {
+          if (error instanceof Error && error.name === "TimeoutError") throw new Error("Gemini connection test timed out after 60 seconds. Check network access and the saved model, then retry.");
+          throw error;
+        }
         message = "Gemini connection succeeded. No Meeting content was sent.";
         break;
       }

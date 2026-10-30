@@ -16,7 +16,8 @@ export type AISettingsAction =
   | { type: "save-key"; key: string }
   | { type: "remove-key" }
   | { type: "model"; model: string }
-  | { type: "test" };
+  | { type: "test" }
+  | { type: "cancel-test" };
 
 /** A Gemini text model the account can use. `id` is what is saved and sent; `label` is Google's name for it. */
 export interface GeminiModelOption {

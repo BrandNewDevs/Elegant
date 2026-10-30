@@ -124,6 +124,62 @@ it("restores provider and encrypted credentials from disk without rewriting an e
   } finally { store?.close(); rmSync(directory, { recursive: true, force: true }); }
 });
 
+it("rejects false and malformed connection confirmations", async () => {
+  const f = fixture();
+  await f.settings.configure({ type: "save-key", key: "synthetic" });
+  for (const text of ['{"ok":false}', 'not JSON']) {
+    f.complete.mockResolvedValue({ text, metadata: { model: "synthetic", elapsedMs: 1 } });
+    await expect(f.settings.configure({ type: "test" })).rejects.toThrow(/connection test/);
+  }
+  f.store.close();
+});
+it("cancels an active test outside the serialized mutation queue", async () => {
+  const f = fixture();
+  await f.settings.configure({ type: "save-key", key: "synthetic" });
+  f.complete.mockImplementation(async (...args: unknown[]) => {
+    const request = args[0] as { signal: AbortSignal };
+    return new Promise((_resolve, reject) => request.signal.addEventListener("abort", () => reject(new Error("cancelled")), { once: true }));
+  });
+  const work = f.settings.configure({ type: "test" });
+  const failure = expect(work).rejects.toThrow("cancelled");
+  await vi.waitFor(() => expect(f.complete).toHaveBeenCalled());
+  await f.settings.configure({ type: "cancel-test" });
+  await failure;
+  await f.settings.configure({ type: "select", provider: "ollama" });
+  f.store.close();
+});
+it("cancels a test that has not reached Gemini yet", async () => {
+  const f = fixture();
+  await f.settings.configure({ type: "save-key", key: "synthetic" });
+  let unlock!: () => void;
+  vi.mocked(f.encryption.decryptStringAsync).mockImplementationOnce(buffer => new Promise(resolve => { unlock = () => resolve({ result: buffer.toString().slice(10), shouldReEncrypt: false }); }));
+  const work = f.settings.configure({ type: "test" });
+  await vi.waitFor(() => expect(f.encryption.decryptStringAsync).toHaveBeenCalled());
+  await f.settings.configure({ type: "cancel-test" });
+  unlock();
+  await expect(work).rejects.toThrow("cancelled");
+  expect(f.complete).not.toHaveBeenCalled();
+  f.store.close();
+});
+it("explains a connection-test timeout as a setup problem", async () => {
+  const f = fixture();
+  await f.settings.configure({ type: "save-key", key: "synthetic" });
+  f.complete.mockRejectedValue(Object.assign(new Error("Gemini request timed out. Retry or ask a narrower question."), { name: "TimeoutError" }));
+  await expect(f.settings.configure({ type: "test" })).rejects.toThrow("timed out after 60 seconds. Check network access and the saved model");
+  f.store.close();
+});
+it("requests low thinking only for the default model", async () => {
+  const f = fixture();
+  await f.settings.configure({ type: "save-key", key: "synthetic" });
+  await f.settings.configure({ type: "test" });
+  await f.settings.configure({ type: "model", model: "gemini-other" });
+  await f.settings.configure({ type: "test" });
+  const requests = f.complete.mock.calls.map(call => (call as unknown[])[0]);
+  expect(requests[0]).toMatchObject({ thinkingLevel: "low" });
+  expect(requests[1]).not.toHaveProperty("thinkingLevel");
+  f.store.close();
+});
+
 it("lists the models with the decrypted key, never exposing it, and needs a saved key", async () => {
   const f = fixture();
   const listModels = vi.fn(async () => [{ id: "gemini-test", label: "Gemini Test" }]);
@@ -250,6 +306,6 @@ it("gives the connection test room to think, since thinking tokens count against
   const f = fixture();
   await f.settings.configure({ type: "save-key", key: "secret-test-key" });
   await f.settings.configure({ type: "test" });
-  expect(f.complete).toHaveBeenCalledWith(expect.objectContaining({ maxOutputTokens: 2048, timeoutMs: 30_000 }));
+  expect(f.complete).toHaveBeenCalledWith(expect.objectContaining({ maxOutputTokens: 2048, timeoutMs: 60_000 }));
   f.store.close();
 });

@@ -27,6 +27,21 @@ it.each([400, 401, 403, 404, 429, 500])("sanitizes HTTP %s without retrying or e
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
 
+it("sends thinkingConfig only when a thinking level is requested", async () => {
+  const fetcher = vi.fn<typeof fetch>(async () => reply());
+  const client = new GeminiClient({ apiKey: "private-key", fetch: fetcher });
+  await client.complete(request);
+  await client.complete({ ...request, thinkingLevel: "low" });
+  const configs = fetcher.mock.calls.map(([, init]) => JSON.parse(String(init?.body)).generationConfig);
+  expect(configs[0]).not.toHaveProperty("thinkingConfig");
+  expect(configs[1]).toMatchObject({ thinkingConfig: { thinkingLevel: "low" } });
+});
+
+it("reports output-token exhaustion separately from blocked output", async () => {
+  const client = new GeminiClient({ apiKey: "private-key", fetch: async () => reply({ candidates: [{ finishReason: "MAX_TOKENS" }] }) });
+  await expect(client.complete(request)).rejects.toThrow("output token limit");
+});
+
 it("rejects truncated, blocked, oversized and malformed responses", async () => {
   for (const response of [reply({ candidates: [{ finishReason: "MAX_TOKENS" }] }), reply({ promptFeedback: { blockReason: "SAFETY" }, candidates: [] }), new Response("{"), new Response("x".repeat(513 * 1024))]) {
     const client = new GeminiClient({ apiKey: "private-key", fetch: async () => response });
