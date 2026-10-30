@@ -117,17 +117,17 @@ function AppearancePicker({ appearance }: { appearance: Appearance }) {
 function General({ appearance, showInDock, keepAudio, name, userName }: { appearance: Appearance; showInDock: boolean; keepAudio: boolean; name: string; userName: string }) {
   return (
     <div className="divide-y">
-      <SettingRow stacked title="Your name" htmlFor="user-name" description={<>Shown in place of &ldquo;You&rdquo; in transcripts, summaries and exports, in every Meeting. It is kept on this Mac only.</>}>
+      <SettingRow stacked title="Your name" htmlFor="user-name" description={<>Used instead of &ldquo;You&rdquo; in every Transcript, Summary and export. Stays on this Mac.</>}>
         {/* Keyed on the saved name so the field follows a change made elsewhere. */}
         <NameForm key={userName} userName={userName} />
       </SettingRow>
-      <SettingRow title="Appearance" description={`Light or dark for ${name}'s windows. System follows macOS.`}>
+      <SettingRow title="Appearance" description={`Choose light or dark for ${name}, or follow your Mac's setting.`}>
         <AppearancePicker appearance={appearance} />
       </SettingRow>
-      <SettingRow title="Show in Dock" htmlFor="show-in-dock" description={`${name} always has its menu bar icon. With this on, it also shows in the Dock: click the icon to open ${name}, and minimised windows go there.`}>
+      <SettingRow title="Show in Dock" htmlFor="show-in-dock" description={`Show ${name} in the Dock as well as the menu bar. Clicking the Dock icon opens ${name}, and minimised windows go there.`}>
         <Switch id="show-in-dock" checked={showInDock} onCheckedChange={(checked) => window.electron.meetings.setShowInDock(checked)} />
       </SettingRow>
-      <SettingRow title="Keep audio after transcription" htmlFor="keep-audio" description="Off by default: a Recording's audio is deleted once its Transcript exists. With this on, the audio stays on this Mac until you delete the Meeting. It applies from the next transcription on.">
+      <SettingRow title="Keep audio after transcription" htmlFor="keep-audio" description="Keep each Recording's audio on this Mac after it is transcribed, until you delete the Meeting. Off by default, so the audio is deleted once the Transcript exists. Applies from the next transcription.">
         <Switch id="keep-audio" checked={keepAudio} onCheckedChange={(checked) => window.electron.meetings.setKeepAudio(checked)} />
       </SettingRow>
     </div>
@@ -171,7 +171,7 @@ function PermissionRow({ copy, step, name }: { copy: PermissionCopy; step: Permi
 function Permissions({ state, name }: { state: { microphone: PermissionStep; systemAudio: PermissionStep }; name: string }) {
   return (
     <>
-      <p className="text-sm text-muted-foreground">macOS remembers your answer, so each permission is asked for once.</p>
+      <p className="text-sm text-muted-foreground">macOS asks once and remembers your answer.</p>
       <div className="divide-y">
         <PermissionRow copy={PERMISSIONS.microphone} step={state.microphone} name={name} />
         <PermissionRow copy={PERMISSIONS.systemAudio} step={state.systemAudio} name={name} />
@@ -186,7 +186,7 @@ function Models({ models, ollama, name }: { models: Step & { fraction: number };
     <div className="divide-y">
       <SettingRow
         title="Speech and speaker models"
-        description={`${name} turns speech into text and tells speakers apart on your Mac, with no cloud service. The models need a one-time download.`}
+        description={`${name} transcribes speech and tells Participants apart on your Mac, with no cloud service. The models download once.`}
         below={
           <div className="space-y-3 pt-3">
             {models.status === "working" && (
@@ -212,7 +212,7 @@ function Models({ models, ollama, name }: { models: Step & { fraction: number };
       </SettingRow>
       <SettingRow
         title="Summaries"
-        description="Summaries are written by a model running in Ollama on your Mac. Ollama must be running with the model pulled. You can record without it and summarise later."
+        description="A model running in Ollama on your Mac writes each Summary. Start Ollama and pull the model first; you can record without it and summarise later."
         below={
           <div className="space-y-3 pt-3">
             {ollama.status === "problem" && ollama.message && <Problem>{ollama.message}</Problem>}
@@ -264,7 +264,7 @@ function Updates({ checkForUpdates, update, appVersion, name }: { checkForUpdate
       <SettingRow
         title="Check for updates"
         htmlFor="check-for-updates"
-        description={`When ${name} starts, it asks GitHub whether a newer release is out and downloads it in the background. You choose when to restart into it, and not while a Recording or a Meeting's processing is under way. It sends nothing about you or your Meetings.`}
+        description={`Look for a newer release on GitHub when ${name} starts, and download it in the background. You choose when to restart, never during a Recording or while a Meeting is processing. Nothing about you or your Meetings is sent.`}
       >
         <Switch id="check-for-updates" checked={checkForUpdates} onCheckedChange={(checked) => window.electron.meetings.setCheckForUpdates(checked)} />
       </SettingRow>
