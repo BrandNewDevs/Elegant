@@ -148,6 +148,8 @@ describe('TLDR recovery at the production Summary seam', () => {
     const commitment = `I will review the guide Thursday ${Array(150).fill('carefully').join(' ')}.`;
     const owned = await createReadableSummariser({ model: scriptedModel(() => ({ sentences: [{ text: 'I will review the guide Thursday.', covers: [0] }] })) })({ segments: [{ start: 0, end: 90, speaker: 'You', text: commitment }] });
     expect(owned.tldr).toBe('You: I will review the guide Thursday.');
+    const attribution = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: [{ text: points[0].text, covers: [0] }] })) })({ segments: [{ start: 0, end: 5, speaker: 'Speaker 1', text: "For the core engine I'm using Swift." }] });
+    expect(attribution.tldr).toBe("Speaker 1: For the core engine I'm using Swift.");
   });
   it('accepts separate supported facts from unpunctuated independent clauses', async () => {
     const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: points.map((p, id) => ({ text: p.text, covers: [id] })) }), evidence => ({ points: [
@@ -200,10 +202,20 @@ describe('TLDR recovery at the production Summary seam', () => {
     expect(result.tldr).toBe('The model runs locally. It creates summaries. The tests are not finished.');
     expect(result.evidence!.tldr).toEqual([0, 1, 2]);
   });
+  it('uses spare budget for main context when a model selects secondary details and status', async () => {
+    const texts = ['The app uses a local model.', 'The app uses a desktop window.', 'The tests are not finished.'];
+    const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: [1, 2].map(id => ({ text: points[id].text, covers: [id] })) })) })({ segments: texts.map((text, id) => ({ start: id * 10, end: id * 10 + 5, speaker: 'You', text })) });
+    expect(result.tldr).toContain('The app uses a local model.');
+    expect(result.tldr).toContain('The tests are not finished.');
+    expect(result.tldr.split(/\s+/u).length).toBeLessThanOrEqual(90);
+    expect(result.evidence!.tldr).toEqual([0, 1, 2]);
+  });
   it('keeps negation, ownership, conditions and deadlines when a proposed TLDR drops them', async () => {
     for (const [original, invalid] of [
       ['We will write the guide Thursday.', 'You will write the guide Thursday.'],
       ['We will not launch Monday.', 'We will launch Monday.'],
+￼
+
       ['The tests are yet to be done.', 'The tests are done.'],
       ['The first release supports English only.', 'The first release supports English.'],
       ['We want to integrate calendars.', 'We integrate calendars.'],

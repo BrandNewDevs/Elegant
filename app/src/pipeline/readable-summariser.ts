@@ -199,7 +199,11 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       const v = object(text); if (!Array.isArray(v.sentences) || !v.sentences.length || v.sentences.length > 3) return fail('Return one to three supported sentences');
       if (v.sentences.some(s => !s || typeof s !== 'object')) return fail('Return structured sentences');
       let unsupported = '';
-      const render = (point: Claim, text: string) => (/^I(?:\b|['’])|^(?:Will|Can|Must|Should)\b/u.test(text) ? point.speaker + ': ' + text : text).replace(/[.!?]+$/u, '') + '.';
+      const render = (point: Claim, text: string) => {
+        const firstPerson = /\b(?:I|my)\b|^(?:Will|Can|Must|Should)\b/iu.test(text);
+        const attributed = firstPerson && !text.startsWith(point.speaker + ':') ? point.speaker + ': ' + text : text;
+        return attributed.replace(/[.!?]+$/u, '') + '.';
+      };
       const words = (text: string) => text.match(/\S+/gu)?.length ?? 0;
       const sentenceCount = (text: string) => [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(text)].length;
       const candidates = v.sentences.flatMap(s => {
@@ -218,15 +222,13 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
         return [{ id, text: rendered, sources: point.sources }];
       });
       const finalIds = finalDecisionIds(shortlist), status = attention(shortlist);
-      // A valid but status-only answer is not a useful overview. Complete source
+      // A valid but incomplete answer is not a useful overview. Complete source
       // points provide a grounded fallback without trusting invented model prose.
-      if (new Set(candidates.map(item => item.id)).size < 2 || candidates.every(item => status.includes(item.id))) {
-        shortlist.forEach((point, id) => {
-          if (candidates.some(item => item.id === id)) return;
-          const text = render(point, point.text);
-          if (words(text) <= 90 && sentenceCount(text) <= 3) candidates.push({ id, text, sources: point.sources });
-        });
-      }
+      shortlist.forEach((point, id) => {
+        if (candidates.some(item => item.id === id)) return;
+        const text = render(point, point.text);
+        if (words(text) <= 90 && sentenceCount(text) <= 3) candidates.push({ id, text, sources: point.sources });
+      });
       const reserve = (ids: number[]) => {
         let candidate = candidates.find(item => ids.includes(item.id));
         if (!candidate) {
