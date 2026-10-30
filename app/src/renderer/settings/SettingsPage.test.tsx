@@ -131,7 +131,7 @@ it("says why a model could not be removed", async () => {
 
 it("says why Summaries are not ready and checks Ollama again on request", () => {
   const act = pushSetupState(withState({ ollama: { status: "problem", message: "Run: ollama pull gemma3:4b" } }));
-  page("Models");
+  page("Providers");
   expect(screen.getByText("Run: ollama pull gemma3:4b")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Check again" }));
   expect(act).toHaveBeenCalledWith("ollama");
@@ -162,7 +162,7 @@ function openPicker(picker: HTMLElement) {
 it("picks the Summary model from the pulled ones, and cautions about any but the tested default", async () => {
   const send = pushSetupState(nothingDone);
   vi.mocked(window.electron.meetings.installedModels).mockResolvedValue(["llama3.2:3b", "gemma3:4b"]);
-  const { rerender } = page("Models");
+  const { rerender } = page("Providers");
   const picker = await screen.findByRole("combobox", { name: "Summary model" });
   expect(picker.textContent).toBe("gemma3:4b");
   expect(screen.queryByText(/Not tested/)).toBeNull();
@@ -172,13 +172,13 @@ it("picks the Summary model from the pulled ones, and cautions about any but the
   fireEvent.click(await screen.findByRole("option", { name: "llama3.2:3b" }));
   expect(send.setSummaryModel).toHaveBeenLastCalledWith("llama3.2:3b");
 
-  rerender(<SettingsPage section="Models" onSectionChange={() => {}} onBack={() => {}} summaryModel="llama3.2:3b" />);
+  rerender(<SettingsPage section="Providers" onSectionChange={() => {}} onBack={() => {}} summaryModel="llama3.2:3b" />);
   expect(screen.getByText(/Not tested with/)).toBeTruthy();
 });
 
 it("keeps a chosen model in the list even when Ollama is not running or no longer has it", async () => {
   pushSetupState(nothingDone);
-  page("Models", { summaryModel: "qwen3:4b" });
+  page("Providers", { summaryModel: "qwen3:4b" });
   const picker = await screen.findByRole("combobox", { name: "Summary model" });
   expect(picker.textContent).toContain("qwen3:4b");
   openPicker(picker);
@@ -293,7 +293,7 @@ it("confirms a saved name with a toast", async () => {
 
 it("requires a saved key and explicit consent before selecting Gemini", async () => {
   pushSetupState({ ...nothingDone, ai: { provider: "ollama", geminiModel: "gemini-test", hasGeminiKey: true } });
-  page("Models");
+  page("Providers");
   const useGemini = screen.getByRole("button", { name: "Use Gemini" });
   expect(useGemini.hasAttribute("disabled")).toBe(true);
   fireEvent.click(screen.getByRole("checkbox"));
@@ -303,7 +303,7 @@ it("requires a saved key and explicit consent before selecting Gemini", async ()
 
 it("clears an entered key after saving and exposes errors without changing provider", async () => {
   pushSetupState({ ...nothingDone, ai: { provider: "ollama", geminiModel: "gemini-test", hasGeminiKey: false } });
-  page("Models");
+  page("Providers");
   const field = screen.getByLabelText("Gemini API key") as HTMLInputElement;
   expect(field.type).toBe("password");
   fireEvent.change(field, { target: { value: "entered-key" } });
@@ -316,10 +316,176 @@ it("clears an entered key after saving and exposes errors without changing provi
 it("does not require Ollama when Gemini is selected and can switch back explicitly", async () => {
   pushSetupState({ ...nothingDone, ai: { provider: "gemini", geminiModel: "gemini-test", hasGeminiKey: true } });
   vi.mocked(window.electron.setup.configureAI).mockRejectedValue(new Error("Gemini quota reached"));
-  page("Models");
+  page("Providers");
   expect(screen.queryByRole("button", { name: "Check Ollama" })).toBeNull();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Test Gemini connection" })));
   expect(screen.getByRole("alert").textContent).toContain("Gemini quota reached");
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Use Ollama" })));
   expect(window.electron.setup.configureAI).toHaveBeenLastCalledWith({ type: "select", provider: "ollama" });
+});
+
+it("lists Providers as a section, and keeps the speech and speaker models apart from the AI providers", () => {
+  pushSetupState({ ...nothingDone, ai: { provider: "ollama", geminiModel: "gemini-test", hasGeminiKey: false } });
+  const changes: string[] = [];
+  const { rerender } = render(<SettingsPage section="Models" onSectionChange={(s) => changes.push(s)} onBack={() => {}} />);
+  fireEvent.click(screen.getByRole("button", { name: "Providers" }));
+  expect(changes).toEqual(["Providers"]);
+  expect(screen.getByText("Speech model")).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "Gemini" })).toBeNull();
+  expect(screen.queryByText("Summary model")).toBeNull();
+
+  rerender(<SettingsPage section="Providers" onSectionChange={() => {}} onBack={() => {}} />);
+  expect(screen.getByRole("region", { name: "Ollama" })).toBeTruthy();
+  expect(screen.getByRole("region", { name: "Gemini" })).toBeTruthy();
+  expect(screen.queryByText("Speech model")).toBeNull();
+});
+
+it("marks the provider in use, and shows Ollama's readiness only while Ollama is the one", () => {
+  pushSetupState({ ...nothingDone, ai: { provider: "ollama", geminiModel: "gemini-test", hasGeminiKey: true } });
+  const { unmount } = page("Providers");
+  expect(within(screen.getByRole("region", { name: "Ollama" })).getByText("In use")).toBeTruthy();
+  expect(within(screen.getByRole("region", { name: "Gemini" })).queryByText("In use")).toBeNull();
+  expect(screen.getByRole("button", { name: "Check Ollama" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Use Ollama" })).toBeNull();
+
+  unmount();
+
+  pushSetupState({ ...nothingDone, ai: { provider: "gemini", geminiModel: "gemini-test", hasGeminiKey: true } });
+  page("Providers");
+  expect(within(screen.getByRole("region", { name: "Gemini" })).getByText("In use")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Check Ollama" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Use Ollama" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Use Gemini" })).toBeNull();
+});
+
+it("keeps the key that was typed when saving it fails", async () => {
+  pushSetupState({ ...nothingDone, ai: { provider: "ollama", geminiModel: "gemini-test", hasGeminiKey: false } });
+  vi.mocked(window.electron.setup.configureAI).mockRejectedValue(new Error("The keychain is locked"));
+  page("Providers");
+  const field = screen.getByLabelText("Gemini API key") as HTMLInputElement;
+  fireEvent.change(field, { target: { value: "entered-key" } });
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save key" })));
+  expect(screen.getByRole("alert").textContent).toContain("The keychain is locked");
+  expect(field.value).toBe("entered-key");
+});
+
+const gemini = (extra = {}) => ({ ...nothingDone, ai: { provider: "ollama" as const, geminiModel: "gemini-2.5-flash", hasGeminiKey: true, ...extra } });
+
+it("loads the Gemini models from the API and picks one without saving a separate field", async () => {
+  pushSetupState(gemini());
+  vi.mocked(window.electron.setup.geminiModels).mockResolvedValue([{ id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" }, { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" }]);
+  page("Providers");
+  const picker = await screen.findByRole("combobox", { name: "Gemini text model" });
+  expect(window.electron.setup.geminiModels).toHaveBeenCalledTimes(1);
+  expect(picker.textContent).toContain("gemini-2.5-flash");
+  expect(screen.queryByRole("button", { name: "Save model" })).toBeNull();
+
+  openPicker(picker);
+  expect(await screen.findByRole("option", { name: "gemini-2.5-pro" })).toBeTruthy();
+  await act(async () => fireEvent.click(screen.getByRole("option", { name: "gemini-2.5-pro" })));
+  expect(window.electron.setup.configureAI).toHaveBeenCalledWith({ type: "model", model: "gemini-2.5-pro" });
+});
+
+it("asks Google for models only once a key is saved, and says so until then", () => {
+  pushSetupState(gemini({ hasGeminiKey: false }));
+  page("Providers");
+  const picker = screen.getByRole("combobox", { name: "Gemini text model" });
+  expect(picker.hasAttribute("disabled")).toBe(true);
+  expect(picker.textContent).toContain("gemini-2.5-flash");
+  expect(window.electron.setup.geminiModels).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Refresh models" }).hasAttribute("disabled")).toBe(true);
+});
+
+it("keeps the saved model visible when Google no longer lists it, and when the list is still loading", async () => {
+  pushSetupState(gemini({ geminiModel: "gemini-old" }));
+  vi.mocked(window.electron.setup.geminiModels).mockResolvedValue([{ id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" }]);
+  page("Providers");
+  const picker = screen.getByRole("combobox", { name: "Gemini text model" });
+  expect(picker.textContent).toContain("gemini-old");
+  await vi.waitFor(() => expect(window.electron.setup.geminiModels).toHaveBeenCalled());
+  openPicker(picker);
+  expect(await screen.findByRole("option", { name: "gemini-old (not listed)" })).toBeTruthy();
+});
+
+it("says why the model list could not be loaded and asks again on Refresh", async () => {
+  pushSetupState(gemini());
+  vi.mocked(window.electron.setup.geminiModels).mockRejectedValueOnce(new Error("Gemini access was denied. Check your API key.")).mockResolvedValue([{ id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" }]);
+  page("Providers");
+  expect(await screen.findByText("Gemini access was denied. Check your API key.")).toBeTruthy();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Refresh models" })));
+  expect(window.electron.setup.geminiModels).toHaveBeenCalledTimes(2);
+  expect(screen.queryByText("Gemini access was denied. Check your API key.")).toBeNull();
+});
+
+it("confirms a provider change with a toast, not with text in the page", async () => {
+  pushSetupState(gemini());
+  vi.mocked(window.electron.setup.configureAI).mockResolvedValue("Gemini key removed. New Gemini requests need a key.");
+  render(<><SettingsPage section="Providers" onSectionChange={() => {}} onBack={() => {}} /><Toaster /></>);
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Remove key" })));
+  const toast = await screen.findByText("Gemini key removed. New Gemini requests need a key.");
+  expect(toast.closest("[data-sonner-toast]")).not.toBeNull();
+  expect(toast.closest("section[aria-label='Gemini']")).toBeNull();
+});
+
+it("shows a failed provider change as an alert beside the controls, with no toast", async () => {
+  pushSetupState(gemini({ hasGeminiKey: false }));
+  vi.mocked(window.electron.setup.configureAI).mockRejectedValue(new Error("The keychain is locked"));
+  render(<><SettingsPage section="Providers" onSectionChange={() => {}} onBack={() => {}} /><Toaster /></>);
+  fireEvent.change(screen.getByLabelText("Gemini API key"), { target: { value: "entered-key" } });
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save key" })));
+  expect(screen.getByRole("alert").textContent).toContain("The keychain is locked");
+  expect(document.querySelector("[data-sonner-toast]")).toBeNull();
+});
+
+const listed = [{ id: "gemini-flash", label: "Flash" }, { id: "gemini-argon", label: "Argon" }, { id: "gemini-pro", label: "Pro" }];
+
+it("finds the usable models from a button, and says what it found in a toast", async () => {
+  pushSetupState(gemini());
+  vi.mocked(window.electron.setup.geminiModels).mockResolvedValue(listed);
+  vi.mocked(window.electron.setup.findGeminiModels).mockResolvedValue("Found 1 model that works on your key.");
+  render(<><SettingsPage section="Providers" onSectionChange={() => {}} onBack={() => {}} /><Toaster /></>);
+  await act(async () => fireEvent.click(await screen.findByRole("button", { name: "Find usable models" })));
+  expect(window.electron.setup.findGeminiModels).toHaveBeenCalledTimes(1);
+  expect(await screen.findByText("Found 1 model that works on your key.")).toBeTruthy();
+});
+
+it("shows progress with a Stop button while it runs, and nothing else to start", async () => {
+  pushSetupState(gemini({ finding: { done: 3, total: 10 } }));
+  vi.mocked(window.electron.setup.geminiModels).mockResolvedValue(listed);
+  page("Providers");
+  expect(await screen.findByText("Trying models… 3 of 10")).toBeTruthy();
+  expect(screen.getByRole("progressbar", { name: "Trying models" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Find usable models/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "Refresh models" }).hasAttribute("disabled")).toBe(true);
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Stop" })));
+  expect(window.electron.setup.stopFindingGeminiModels).toHaveBeenCalledTimes(1);
+});
+
+it("offers only the models that answered, marks a saved one that did not, and can show them all", async () => {
+  pushSetupState(gemini({ geminiModel: "gemini-argon", usableModels: ["gemini-flash"] }));
+  vi.mocked(window.electron.setup.geminiModels).mockResolvedValue(listed);
+  page("Providers");
+  const picker = await screen.findByRole("combobox", { name: "Gemini text model" });
+  await vi.waitFor(() => expect(window.electron.setup.geminiModels).toHaveBeenCalled());
+  expect(screen.getByText("1 of the listed models answered on your key.")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Find usable models again" })).toBeTruthy();
+  openPicker(picker);
+  expect(await screen.findByRole("option", { name: "gemini-flash" })).toBeTruthy();
+  expect(screen.getByRole("option", { name: "gemini-argon (didn't answer)" })).toBeTruthy();
+  expect(screen.queryByRole("option", { name: "gemini-pro" })).toBeNull();
+  fireEvent.keyDown(document, { key: "Escape" });
+
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Show all models" })));
+  openPicker(picker);
+  expect(await screen.findByRole("option", { name: "gemini-pro" })).toBeTruthy();
+  expect(screen.getByRole("option", { name: "gemini-argon" })).toBeTruthy();
+});
+
+it("says why trying the models failed, in a toast", async () => {
+  pushSetupState(gemini());
+  vi.mocked(window.electron.setup.geminiModels).mockResolvedValue(listed);
+  vi.mocked(window.electron.setup.findGeminiModels).mockRejectedValue(new Error("Could not reach Gemini. Check your connection and retry."));
+  render(<><SettingsPage section="Providers" onSectionChange={() => {}} onBack={() => {}} /><Toaster /></>);
+  await act(async () => fireEvent.click(await screen.findByRole("button", { name: "Find usable models" })));
+  expect(await screen.findByText("Could not reach Gemini. Check your connection and retry.")).toBeTruthy();
 });
