@@ -7,6 +7,7 @@ import type { Updater, UpdateState } from "../core/updater.js";
 import type { Setup } from "../setup/setup.js";
 import { isAppearance } from "../shared/appearance.js";
 import { isModelName } from "../shared/summary-model.js";
+import { MODEL_KINDS, type ModelKind } from "../shared/model-kinds.js";
 import { listOllamaModels } from "../pipeline/ollama.js";
 import type { MeetingsViewState } from "../shared/meetings-view-state.js";
 import type { SetupBridge } from "./setup-bridge.js";
@@ -46,6 +47,8 @@ function reference(value: unknown): { meetingId: number; revision: string; refs:
  * The main window: the Meetings (a list on the left, the selected Meeting on the right), with the Settings dialog over them
  * when it is open. Redraws when Meetings change.
  */
+const isModelKind = (value: unknown): value is ModelKind => (MODEL_KINDS as readonly unknown[]).includes(value);
+
 export class MeetingsWindow {
   private window: BrowserWindow | undefined;
   private settingsOpen = false;
@@ -113,6 +116,18 @@ export class MeetingsWindow {
     ipcMain.on("meetings:summary-model", (event, model: unknown) => {
       if (!this.fromThis(event.sender) || !isModelName(model)) return;
       this.core.setSummaryModel(model);
+    });
+    ipcMain.handle("meetings:model-files", (event) => {
+      this.requireFromThis(event.sender);
+      return this.setup.listModels();
+    });
+    ipcMain.handle("meetings:remove-model", (event, kind: unknown) => {
+      this.requireFromThis(event.sender);
+      return isModelKind(kind) ? this.setup.removeModel(kind) : { ok: false as const, reason: "Unknown model." };
+    });
+    ipcMain.handle("meetings:redownload-model", (event, kind: unknown) => {
+      this.requireFromThis(event.sender);
+      return isModelKind(kind) ? this.setup.redownloadModel(kind) : { ok: false as const, reason: "Unknown model." };
     });
     ipcMain.handle("meetings:installed-models", (event) => {
       this.requireFromThis(event.sender);

@@ -137,6 +137,7 @@ app.whenReady().then(() => {
     speechModel: SPEECH_MODEL,
     modelsDirectory: join(dataDir, "models"),
     checkOllama: () => checkOllama({ model: core?.summaryModel }),
+    busyReason: () => (core?.recording ? "A Recording is in progress." : core?.jobs.snapshot.length ? "Meeting processing is running." : undefined),
   });
   const setupBridge = new SetupBridge(setup, {
     done: (sender) => BrowserWindow.fromWebContents(sender)?.close(),

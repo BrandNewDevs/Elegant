@@ -1,14 +1,15 @@
-import { Bell, CheckCircle2, Cpu, Download, ExternalLink, Loader2, Monitor, Moon, RefreshCw, ShieldCheck, SlidersHorizontal, Sun, XCircle, AlertCircle, type LucideIcon } from "lucide-react";
+import { Bell, CheckCircle2, Cpu, Download, ExternalLink, Loader2, Monitor, Moon, RefreshCw, ShieldCheck, SlidersHorizontal, Sun, Trash2, XCircle, AlertCircle, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { UpdateState } from "../../core/updater";
 import { APPEARANCES, type Appearance } from "../../shared/appearance";
 import { DEFAULT_SUMMARY_MODEL } from "../../shared/summary-model";
+import { MODEL_KINDS, type ModelFile, type ModelKind } from "../../shared/model-kinds";
 import type { Step } from "../../setup/setup";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -217,36 +218,117 @@ function SummaryModelPicker({ model, ollama }: { model: string; ollama: Step["st
   );
 }
 
+const MODEL_ROW: Record<ModelKind, { title: string; description: string; noun: string }> = {
+  speech: { title: "Speech model", description: "Whisper large-v3 turns speech into text.", noun: "speech model" },
+  speaker: { title: "Speaker model", description: "Pyannote tells Participants apart.", noun: "speaker model" },
+};
+
+const formatSize = (bytes: number) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`);
+
+/**
+ * The speech and speaker models on this Mac, each with its size and buttons to remove it or fetch it again, and the one
+ * download that fetches whatever is missing. Both kinds are fetched together, so their progress and problems are shared.
+ */
+function DownloadedModels({ models, name }: { models: Step & { fraction: number }; name: string }) {
+  const [files, setFiles] = useState<ModelFile[]>();
+  const [asked, setAsked] = useState<{ kind: ModelKind; action: "remove" | "redownload" }>();
+  useEffect(() => {
+    let current = true;
+    void window.electron.meetings.modelFiles().then((found) => current && setFiles(found));
+    return () => {
+      current = false;
+    };
+  }, [models.status]); // a download starting, finishing or failing, or a removal, changes what is on disk
+  const downloading = models.status === "working";
+  const percent = Math.round(models.fraction * 100);
+  const anyMissing = files !== undefined && MODEL_KINDS.some((kind) => !files.find((file) => file.kind === kind)?.present);
+
+  const confirm = async () => {
+    if (!asked) return;
+    const { kind, action } = asked;
+    setAsked(undefined);
+    const result = await (action === "remove" ? window.electron.meetings.removeModel(kind) : window.electron.meetings.redownloadModel(kind));
+    if (!result.ok) toast.error(result.reason);
+    setFiles(await window.electron.meetings.modelFiles());
+  };
+
+  return (
+    <>
+      {MODEL_KINDS.map((kind) => {
+        const file = files?.find((f) => f.kind === kind);
+        const copy = MODEL_ROW[kind];
+        return (
+          <SettingRow
+            key={kind}
+            title={copy.title}
+            description={copy.description}
+            below={
+              file?.present && !downloading ? (
+                <div className="flex gap-2 pt-3">
+                  <Button type="button" size="sm" variant="outline" onClick={() => setAsked({ kind, action: "redownload" })}>
+                    <RefreshCw aria-hidden />
+                    Redownload
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setAsked({ kind, action: "remove" })}>
+                    <Trash2 aria-hidden />
+                    Remove
+                  </Button>
+                </div>
+              ) : undefined
+            }
+          >
+            {downloading && <Status label="Downloading…" variant="warning" />}
+            {!downloading && file?.present && <Status label={`Downloaded · ${formatSize(file.bytes)}`} variant="success" />}
+            {!downloading && file && !file.present && <Status label="Not downloaded" variant="secondary" />}
+          </SettingRow>
+        );
+      })}
+      {(downloading || models.status === "problem" || (files && anyMissing)) && (
+        <div className="space-y-3 py-4">
+          {downloading && (
+            <div className="space-y-1">
+              <Progress value={percent} aria-label="Model download" />
+              <p className="text-sm text-muted-foreground">{models.fraction >= 1 ? "Preparing the models…" : `${percent}% downloaded`}</p>
+            </div>
+          )}
+          {models.status === "problem" && models.message && <Problem>{models.message}</Problem>}
+          {!downloading && (
+            <Button type="button" onClick={() => window.electron.setup.act("models")}>
+              {models.status === "problem" ? <RefreshCw aria-hidden /> : <Download aria-hidden />}
+              {models.status === "problem" ? "Try again" : "Download models"}
+            </Button>
+          )}
+        </div>
+      )}
+      <Dialog open={asked !== undefined} onOpenChange={(open) => !open && setAsked(undefined)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{asked?.action === "remove" ? "Remove" : "Redownload"} the {asked ? MODEL_ROW[asked.kind].noun : "model"}?</DialogTitle>
+            <DialogDescription>
+              {asked?.action === "remove"
+                ? `It is deleted from this Mac and downloaded again the next time ${name} needs it, so the next Transcript waits for the download.`
+                : "It is deleted and downloaded again, which needs an internet connection. Nothing can be recorded or transcribed until it finishes."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setAsked(undefined)}>
+              Cancel
+            </Button>
+            <Button type="button" variant={asked?.action === "remove" ? "destructive" : "default"} onClick={() => void confirm()}>
+              {asked?.action === "remove" ? "Remove" : "Redownload"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function Models({ models, ollama, summaryModel, name }: { models: Step & { fraction: number }; ollama: Step; summaryModel: string; name: string }) {
   const percent = Math.round(models.fraction * 100);
   return (
     <div className="divide-y">
-      <SettingRow
-        title="Speech and speaker models"
-        description={`${name} transcribes speech and tells Participants apart on your Mac, with no cloud service. The models download once.`}
-        below={
-          <div className="space-y-3 pt-3">
-            {models.status === "working" && (
-              <div className="space-y-1">
-                <Progress value={percent} aria-label="Model download" />
-                <p className="text-sm text-muted-foreground">{models.fraction >= 1 ? "Preparing the models…" : `${percent}% downloaded`}</p>
-              </div>
-            )}
-            {models.status === "problem" && models.message && <Problem>{models.message}</Problem>}
-            {(models.status === "todo" || models.status === "problem") && (
-              <Button type="button" onClick={() => window.electron.setup.act("models")}>
-                {models.status === "problem" ? <RefreshCw aria-hidden /> : <Download aria-hidden />}
-                {models.status === "problem" ? "Try again" : "Download models"}
-              </Button>
-            )}
-          </div>
-        }
-      >
-        {models.status === "done" && <Status label="Downloaded" variant="success" />}
-        {models.status === "working" && <Status label="Downloading…" variant="warning" />}
-        {models.status === "problem" && <Status label="Failed" variant="destructive" />}
-        {models.status === "todo" && <Status label="Not downloaded" variant="secondary" />}
-      </SettingRow>
+      <DownloadedModels models={models} name={name} />
       <SettingRow
         title="Summary model"
         htmlFor="summary-model"

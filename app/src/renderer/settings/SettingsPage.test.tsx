@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import type { UpdateState } from "../../core/updater";
 import { nothingDone, pushSetupState, withState } from "@/lib/test-electron";
@@ -57,10 +57,14 @@ it("links each missing permission to its own System Settings pane, and not an al
   expect(act).toHaveBeenCalledWith("settings-system-audio");
 });
 
-it("downloads the models from here, showing progress while it runs", () => {
+const absent = (kind: "speech" | "speaker") => ({ kind, present: false, bytes: 0 });
+const present = (kind: "speech" | "speaker", bytes: number) => ({ kind, present: true, bytes });
+
+it("downloads the models from here, showing progress while it runs", async () => {
   const act = pushSetupState(nothingDone);
+  vi.mocked(window.electron.meetings.modelFiles).mockResolvedValue([absent("speech"), absent("speaker")]);
   const { unmount } = page("Models");
-  expect(screen.getByText("Not downloaded")).toBeTruthy();
+  expect(await screen.findAllByText("Not downloaded")).toHaveLength(2);
   fireEvent.click(screen.getByRole("button", { name: "Download models" }));
   expect(act).toHaveBeenCalledWith("models");
   unmount();
@@ -70,13 +74,59 @@ it("downloads the models from here, showing progress while it runs", () => {
   expect(screen.getByText("42% downloaded")).toBeTruthy();
   expect(screen.getByRole("progressbar", { name: "Model download" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Download models" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Remove|Redownload/ })).toBeNull();
 });
 
-it("shows downloaded models without offering the download again", () => {
+it("shows each downloaded model with its size, and offers Remove and Redownload but not the download", async () => {
   pushSetupState(withState({ models: { status: "done", fraction: 1 } }));
+  vi.mocked(window.electron.meetings.modelFiles).mockResolvedValue([present("speech", 601e6), present("speaker", 11e6)]);
   page("Models");
-  expect(screen.getByText("Downloaded")).toBeTruthy();
+  expect(await screen.findByText("Downloaded · 601 MB")).toBeTruthy();
+  expect(screen.getByText("Downloaded · 11 MB")).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: "Remove" })).toHaveLength(2);
+  expect(screen.getAllByRole("button", { name: "Redownload" })).toHaveLength(2);
   expect(screen.queryByRole("button", { name: /Download models|Try again/ })).toBeNull();
+});
+
+it("asks before removing a model, and only then removes that one", async () => {
+  pushSetupState(withState({ models: { status: "done", fraction: 1 } }));
+  const meetings = window.electron.meetings;
+  vi.mocked(meetings.modelFiles).mockResolvedValue([present("speech", 601e6), present("speaker", 11e6)]);
+  page("Models");
+  await screen.findByText("Downloaded · 601 MB");
+
+  fireEvent.click(screen.getAllByRole("button", { name: "Remove" })[0]!);
+  const dialog = await screen.findByRole("dialog", { name: "Remove the speech model?" });
+  expect(meetings.removeModel).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  expect(meetings.removeModel).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getAllByRole("button", { name: "Remove" })[1]!);
+  fireEvent.click(within(await screen.findByRole("dialog", { name: "Remove the speaker model?" })).getByRole("button", { name: "Remove" }));
+  expect(meetings.removeModel).toHaveBeenCalledExactlyOnceWith("speaker");
+});
+
+it("redownloads a model after confirming", async () => {
+  pushSetupState(withState({ models: { status: "done", fraction: 1 } }));
+  const meetings = window.electron.meetings;
+  vi.mocked(meetings.modelFiles).mockResolvedValue([present("speech", 601e6), present("speaker", 11e6)]);
+  page("Models");
+  await screen.findByText("Downloaded · 601 MB");
+  fireEvent.click(screen.getAllByRole("button", { name: "Redownload" })[0]!);
+  fireEvent.click(within(await screen.findByRole("dialog", { name: "Redownload the speech model?" })).getByRole("button", { name: "Redownload" }));
+  expect(meetings.redownloadModel).toHaveBeenCalledExactlyOnceWith("speech");
+});
+
+it("says why a model could not be removed", async () => {
+  pushSetupState(withState({ models: { status: "done", fraction: 1 } }));
+  const meetings = window.electron.meetings;
+  vi.mocked(meetings.modelFiles).mockResolvedValue([present("speech", 601e6), present("speaker", 11e6)]);
+  vi.mocked(meetings.removeModel).mockResolvedValue({ ok: false, reason: "A Recording is in progress." });
+  render(<><SettingsPage section="Models" onSectionChange={() => {}} onBack={() => {}} /><Toaster /></>);
+  await screen.findByText("Downloaded · 601 MB");
+  fireEvent.click(screen.getAllByRole("button", { name: "Remove" })[0]!);
+  fireEvent.click(within(await screen.findByRole("dialog", { name: "Remove the speech model?" })).getByRole("button", { name: "Remove" }));
+  expect(await screen.findByText("A Recording is in progress.")).toBeTruthy();
 });
 
 it("says why Summaries are not ready and checks Ollama again on request", () => {

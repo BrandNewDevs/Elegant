@@ -1,4 +1,6 @@
 import type { RestartResult, UpdateState } from "../core/updater.js";
+import type { ModelChange } from "../setup/setup.js";
+import type { ModelFile, ModelKind } from "./model-kinds.js";
 import type { Appearance } from "./appearance.js";
 import type { MeetingsViewState } from "./meetings-view-state.js";
 
@@ -16,6 +18,12 @@ export interface MeetingsApi {
   setAppearance(appearance: Appearance): void;
   /** Chooses the Ollama model that writes Summaries and answers chat. */
   setSummaryModel(model: string): void;
+  /** The speech and speaker models on disk, with their sizes. */
+  modelFiles(): Promise<ModelFile[]>;
+  /** Deletes one kind of model; refused, with the reason, while it is in use. */
+  removeModel(kind: ModelKind): Promise<ModelChange>;
+  /** Deletes one kind of model and downloads it again; progress shows as the models' download. */
+  redownloadModel(kind: ModelKind): Promise<ModelChange>;
   /** The models pulled into Ollama, empty when it is not running. */
   installedModels(): Promise<string[]>;
   setKeepAudio(keep: boolean): void;
