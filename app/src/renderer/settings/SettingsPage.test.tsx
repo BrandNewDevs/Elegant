@@ -159,16 +159,16 @@ function openPicker(picker: HTMLElement) {
   fireEvent.keyDown(picker, { key: "Enter" });
 }
 
-it("picks the Summary model from the pulled ones, marks the tested default and cautions about any other", async () => {
+it("picks the Summary model from the pulled ones, and cautions about any but the tested default", async () => {
   const send = pushSetupState(nothingDone);
   vi.mocked(window.electron.meetings.installedModels).mockResolvedValue(["llama3.2:3b", "gemma3:4b"]);
   const { rerender } = page("Models");
   const picker = await screen.findByRole("combobox", { name: "Summary model" });
-  expect(picker.textContent).toContain("gemma3:4b");
+  expect(picker.textContent).toBe("gemma3:4b");
   expect(screen.queryByText(/Not tested/)).toBeNull();
 
   openPicker(picker);
-  expect(await screen.findByRole("option", { name: "gemma3:4b (tested)" })).toBeTruthy();
+  expect(await screen.findByRole("option", { name: "gemma3:4b" })).toBeTruthy();
   fireEvent.click(await screen.findByRole("option", { name: "llama3.2:3b" }));
   expect(send.setSummaryModel).toHaveBeenLastCalledWith("llama3.2:3b");
 

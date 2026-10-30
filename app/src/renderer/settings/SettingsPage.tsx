@@ -183,7 +183,7 @@ function Permissions({ state, name }: { state: { microphone: PermissionStep; sys
   );
 }
 
-/** Picks the Ollama model that writes Summaries from the ones pulled; the tested default is marked, anything else is cautioned. */
+/** Picks the Ollama model that writes Summaries from the ones pulled; any model but the tested default is cautioned about. */
 function SummaryModelPicker({ model, ollama }: { model: string; ollama: Step["status"] }) {
   const [installed, setInstalled] = useState<string[]>([]);
   useEffect(() => {
@@ -195,7 +195,7 @@ function SummaryModelPicker({ model, ollama }: { model: string; ollama: Step["st
   }, [ollama]); // look again once Ollama is found or its check finishes
   const options = [...new Set([...installed, model])].sort((a, b) => a.localeCompare(b));
   const label = (option: string) =>
-    option + (option === DEFAULT_SUMMARY_MODEL ? " (tested)" : "") + (installed.length > 0 && !installed.includes(option) ? " (not pulled)" : "");
+    option + (installed.length > 0 && !installed.includes(option) ? " (not pulled)" : "");
   return (
     <Select
       value={model}

@@ -232,10 +232,12 @@ export class MeetingsWindow {
       const window = new BrowserWindow({
         width: 900,
         height: 640,
-        title: `${DISPLAY_NAME}: Meetings`,
+        title: DISPLAY_NAME,
         backgroundColor: windowBackground(),
         webPreferences: { preload: preloadPath(), contextIsolation: true, sandbox: true },
       });
+      // The page has its own <title>, which would replace this one in the Dock's window list and the window menu.
+      window.on("page-title-updated", (event) => event.preventDefault());
       window.on("closed", () => {
         this.window = undefined;
         this.pageLoaded = false;
