@@ -71,8 +71,6 @@ export class AppCore {
   private readonly inFlight = new Set<Promise<void>>();
   private readonly deletingMeetings = new Set<number>();
   private readonly micWatcher: MicWatcher;
-  private readonly promptTimeoutMs: number;
-  private promptTimer: ReturnType<typeof setTimeout> | undefined;
   private _detectedMeeting: DetectedMeeting | undefined;
   private detectedListeners: ((meeting: DetectedMeeting | undefined) => void)[] = [];
   private _recording: ActiveRecording | undefined;
@@ -105,7 +103,6 @@ export class AppCore {
       previousOwners = currentOwners;
     });
     const detection = { ...DEFAULT_DETECTION, ...deps.detection };
-    this.promptTimeoutMs = detection.promptTimeoutMs;
     const extraIgnoredApps = deps.extraIgnoredApps ?? (() => []);
     this.micWatcher = new MicWatcher(
       { debounceMs: detection.debounceMs, ignoredMicApps: detection.ignoredMicApps, extraIgnoredApps },
@@ -193,7 +190,10 @@ export class AppCore {
     this.deps.engine.send({ type: "start_recording", app: meeting.app });
   }
 
-  /** The user chose Not now, the Prompt timed out, or the call ended. Nothing about the Meeting is kept. */
+  /**
+   * The user closed the Prompt, or the call ended. Nothing about the Meeting is kept. The app is not asked about
+   * again until it has let go of the microphone (the MicWatcher reports one Detection per hold).
+   */
   declinePrompt(): void {
     if (!this.clearDetectedMeeting()) return;
     this.deps.engine.send({ type: "discard_buffer" });
@@ -525,14 +525,12 @@ export class AppCore {
     this._detectedMeeting = { state: "detected", app, detectedAt: new Date().toISOString() };
     // The start of the Meeting must survive a late answer, so audio is held in memory from now on.
     this.deps.engine.send({ type: "start_buffer", app });
-    this.promptTimer = setTimeout(() => this.declinePrompt(), this.promptTimeoutMs);
     this.notifyDetected();
   }
 
   /** Returns whether there was a detected Meeting to clear. */
   private clearDetectedMeeting(): boolean {
     if (!this._detectedMeeting) return false;
-    clearTimeout(this.promptTimer);
     this._detectedMeeting = undefined;
     this.notifyDetected();
     return true;

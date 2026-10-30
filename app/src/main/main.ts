@@ -168,13 +168,13 @@ app.whenReady().then(() => {
 
   tray = new Tray(nativeImage.createEmpty());
   core.onDetectedMeetingChange((meeting) => {
-    prompt?.close(); // the Meeting was answered, timed out or ended; the old overlay is stale
+    prompt?.close(); // the Meeting was answered or ended; the old overlay is stale
     prompt = undefined;
     if (!meeting) return;
     console.log(`[detection] ${meeting.app}`);
     prompt = showPrompt(meeting.app, {
       record: () => core!.acceptPrompt(),
-      notNow: () => core!.declinePrompt(),
+      close: () => core!.declinePrompt(),
       never: () => {
         core!.neverForThisApp();
         render();

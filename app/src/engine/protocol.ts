@@ -44,7 +44,7 @@ export type EngineCommand =
    * `discard_buffer` drops it. Ignored if the engine is already buffering or recording.
    */
   | { type: "start_buffer"; app: string }
-  /** The Prompt was declined or timed out: drop the buffered audio and stop capturing. Never touches a Recording. */
+  /** The Prompt was closed or its call ended: drop the buffered audio and stop capturing. Never touches a Recording. */
   | { type: "discard_buffer" }
   | { type: "stop_recording" }
   /**

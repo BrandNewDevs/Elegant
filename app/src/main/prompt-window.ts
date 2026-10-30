@@ -3,8 +3,13 @@ import type { PromptChoice } from "../shared/prompt-choice.js";
 import { promptPosition } from "./prompt-position.js";
 import { preloadPath, rendererPagePath } from "./window-ui.js";
 
-/** Shows the Prompt overlay at the bottom centre of the screen. Closing it without answering counts as Not now. */
-export function showPrompt(app: string, handlers: { record(): void; notNow(): void; never(): void }): { close(): void } {
+/**
+ * Shows the Prompt overlay at the bottom centre of the screen. It has no timeout and is never dismissed by a click
+ * elsewhere or by switching apps: it goes when the person answers, or when the caller closes it because the Meeting
+ * ended. It is shown without taking focus, and nothing here takes focus again. Closing the window without answering
+ * counts as the person closing the Prompt.
+ */
+export function showPrompt(app: string, handlers: { record(): void; close(): void; never(): void }): { close(): void } {
   const { workArea } = screen.getPrimaryDisplay();
   const size = { width: 640, height: 72 };
   const win = new BrowserWindow({
@@ -20,6 +25,8 @@ export function showPrompt(app: string, handlers: { record(): void; notNow(): vo
     fullscreenable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
+    // Without this the first click on an inactive window only activates it, and the buttons would need two.
+    acceptFirstMouse: true,
     show: false,
     webPreferences: { preload: preloadPath(), sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
@@ -44,7 +51,7 @@ export function showPrompt(app: string, handlers: { record(): void; notNow(): vo
     if (!fromThis(event.sender)) return;
     if (choice === "record") answer(handlers.record);
     else if (choice === "never") answer(handlers.never);
-    else answer(handlers.notNow);
+    else answer(handlers.close);
   };
   const onResize = (event: Electron.IpcMainEvent, height: number) => {
     if (!fromThis(event.sender)) return;
@@ -61,7 +68,7 @@ export function showPrompt(app: string, handlers: { record(): void; notNow(): vo
     ipcMain.removeListener("prompt:ready", onReady);
     ipcMain.removeListener("prompt:choose", onChoose);
     ipcMain.removeListener("prompt:resize", onResize);
-    answer(handlers.notNow);
+    answer(handlers.close);
   });
 
   void win.loadFile(rendererPagePath("prompt"));

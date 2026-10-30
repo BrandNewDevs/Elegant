@@ -12,15 +12,12 @@ export const DEFAULT_IGNORED_MIC_APPS = [
 export interface DetectionSettings {
   /** How long an app must hold the microphone before a Detection. A default to tune against real calls. */
   debounceMs: number;
-  /** How long the Prompt waits for an answer before it counts as a decline. */
-  promptTimeoutMs: number;
   /** Built-in ignores; tests may override via `detection.ignoredMicApps`. */
   ignoredMicApps: readonly string[];
 }
 
 export const DEFAULT_DETECTION: DetectionSettings = {
   debounceMs: 2000,
-  promptTimeoutMs: 20_000,
   ignoredMicApps: DEFAULT_IGNORED_MIC_APPS,
 };
 
