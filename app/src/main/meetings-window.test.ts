@@ -105,7 +105,8 @@ afterEach(async () => {
 describe("Meetings window application bridge", () => {
   it("is titled with the app's name, and the page's own title does not replace it", () => {
     const ctx = context();
-    expect((ctx.window.options as { title?: string }).title).toBe("Elegant");
+    expect(ctx.window.options).toMatchObject({ title: "Elegant", titleBarStyle: "hiddenInset" });
+    expect(latest(ctx).appName).toBe("Elegant");
     const event = { preventDefault: vi.fn() };
     (ctx.window.handlers.get("page-title-updated") as unknown as (e: typeof event) => void)(event);
     expect(event.preventDefault).toHaveBeenCalled();

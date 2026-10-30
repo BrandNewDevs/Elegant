@@ -6,6 +6,8 @@ import type { ChatRecord } from "./meeting-chat.js";
 import type { Meeting, MeetingListItem } from "../store/store.js";
 
 export type MeetingsViewState = {
+  /** The app's display name, shown centred in the window's title strip. Absent in older renderer state fixtures. */
+  appName?: string;
   /** Whether the Settings page is open in the main area. */
   settingsOpen: boolean;
   /** The "Show in Dock" setting, shown in Settings. */
