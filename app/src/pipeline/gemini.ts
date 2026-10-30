@@ -12,6 +12,57 @@ export function validGeminiModel(model: string): boolean {
 }
 
 class GeminiError extends Error {}
+
+/** The reply's first bytes only: a quota error is small, and nothing else is read. */
+async function readSmall(response: Response, limit = 16 * 1024): Promise<string> {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (size < limit) {
+      const part = await reader.read();
+      if (part.done) break;
+      chunks.push(part.value);
+      size += part.value.byteLength;
+    }
+    await reader.cancel();
+  } catch { /* A reply that cannot be read is treated as empty. */ } finally { reader.releaseLock(); }
+  return Buffer.concat(chunks).toString("utf8").slice(0, limit);
+}
+
+const safeToken = (value: unknown): string | undefined => (typeof value === "string" && /^[A-Za-z0-9_./-]{1,120}$/.test(value) ? value : undefined);
+
+/**
+ * Why Google refused for quota, from the structured parts of its 429 only: the quota's id, the model, the retry delay, and
+ * whether the limit is zero (the model is not on the plan at all). Its free-text message is never forwarded, because an
+ * error body can echo what was sent; each value taken is a short token that passes a strict pattern.
+ */
+export function quotaMessage(body: string, requestedModel?: string): string {
+  let error: { message?: unknown; details?: unknown } | undefined;
+  try { error = (JSON.parse(body) as { error?: typeof error }).error; } catch { /* Not JSON: say the general thing. */ }
+  const details = Array.isArray(error?.details) ? (error.details as Record<string, unknown>[]) : [];
+  const violation = details.flatMap(d => (Array.isArray(d?.violations) ? (d.violations as Record<string, unknown>[]) : []))[0];
+  const dimensions = violation?.quotaDimensions as Record<string, unknown> | undefined;
+  const quota = safeToken(violation?.quotaId);
+  const model = safeToken(dimensions?.model) ?? safeToken(requestedModel);
+  const retry = details.map(d => safeToken(d?.retryDelay)).find(Boolean);
+  const text = typeof error?.message === "string" ? error.message : "";
+  const limitZero = /limit:\s*0\b/.test(text);
+  const where = [model && `for ${model}`, quota && `(${quota})`].filter(Boolean).join(" ");
+  return `Gemini quota or rate limit reached${where ? ` ${where}` : ""}. ` +
+    (limitZero ? "This model has no quota on your plan: choose another model, or enable billing in Google AI Studio. " : "") +
+    (retry ? `Retry in ${retry}.` : "Check your Google account usage and retry later.");
+}
+
+/** The message for a refused request. Only a 429 is read, for the quota it names; every other reply is dropped unread. */
+async function refusal(response: Response, model?: string): Promise<GeminiError> {
+  if (response.status !== 429) {
+    await response.body?.cancel();
+    return new GeminiError(failure(response.status));
+  }
+  return new GeminiError(quotaMessage(await readSmall(response), model));
+}
 const failure = (status: number): string => {
   if (status === 400) return "Gemini rejected the request. Check the API key, model and supported settings.";
   if (status === 401 || status === 403) return "Gemini access was denied. Check your API key and project permissions in Settings.";
@@ -48,10 +99,7 @@ export class GeminiClient implements TextModel {
           generationConfig: { temperature: 0, maxOutputTokens, responseMimeType: "application/json", responseJsonSchema: request.schema },
         }),
       });
-      if (!response.ok) {
-        await response.body?.cancel();
-        throw new GeminiError(failure(response.status));
-      }
+      if (!response.ok) throw await refusal(response, model);
       if (!response.body) throw new GeminiError("Gemini returned an empty response. Retry the request.");
       const reader = response.body.getReader();
       let bytes = 0;
@@ -114,10 +162,7 @@ export async function listGeminiModels({ apiKey, signal, fetch: fetcher = fetch 
       url.searchParams.set("pageSize", "1000");
       if (pageToken) url.searchParams.set("pageToken", pageToken);
       const response = await fetcher(url, { redirect: "error", signal: aborted, headers: { "x-goog-api-key": apiKey } });
-      if (!response.ok) {
-        await response.body?.cancel();
-        throw new GeminiError(failure(response.status));
-      }
+      if (!response.ok) throw await refusal(response);
       const text = await response.text();
       if (text.length > MAX_REPLY_BYTES) throw new GeminiError("Gemini's model list exceeded its size limit");
       let body: { models?: unknown; nextPageToken?: unknown };

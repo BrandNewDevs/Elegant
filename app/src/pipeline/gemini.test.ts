@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { GeminiClient, GEMINI_INPUT_BYTES, listGeminiModels } from "./gemini.js";
+import { GeminiClient, GEMINI_INPUT_BYTES, listGeminiModels, quotaMessage } from "./gemini.js";
 import type { TextRequest } from "./language-model.js";
 
 const request: TextRequest = { messages: [{ role: "system", content: "Rules" }, { role: "user", content: "Synthetic evidence" }], schema: { type: "object" } };
@@ -112,4 +112,46 @@ it("can be cancelled", async () => {
   const controller = new AbortController();
   controller.abort();
   await expect(listGeminiModels({ apiKey: "private-key", signal: controller.signal, fetch: async () => list([]) })).rejects.toMatchObject({ name: "AbortError" });
+});
+
+/** The shape of Google's 429: a free-text message plus structured quota and retry details. */
+const quotaBody = (extra: { limit?: number; message?: string } = {}) => JSON.stringify({ error: { code: 429, status: "RESOURCE_EXHAUSTED",
+  message: extra.message ?? `You exceeded your current quota. * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: ${extra.limit ?? 20}, model: gemini-4-argon\nPlease retry in 28.5s.`,
+  details: [
+    { "@type": "type.googleapis.com/google.rpc.QuotaFailure", violations: [{ quotaMetric: "generativelanguage.googleapis.com/generate_content_free_tier_requests", quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier", quotaDimensions: { location: "global", model: "gemini-4-argon" } }] },
+    { "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: "28s" },
+  ] } });
+
+it("names the quota, the model and the retry delay when Google refuses for quota", () => {
+  expect(quotaMessage(quotaBody())).toBe("Gemini quota or rate limit reached for gemini-4-argon (GenerateRequestsPerDayPerProjectPerModel-FreeTier). Retry in 28s.");
+});
+
+it("says the model is not on the plan when its limit is zero", () => {
+  expect(quotaMessage(quotaBody({ limit: 0 }))).toContain("This model has no quota on your plan: choose another model, or enable billing");
+});
+
+it("never forwards Google's free text, only tokens that pass a strict pattern", () => {
+  const hostile = quotaMessage(quotaBody({ message: "Synthetic evidence and private-key, limit: 5" }).replace("gemini-4-argon", "bad model <script>"), "gemini-test");
+  expect(hostile).not.toContain("Synthetic evidence");
+  expect(hostile).not.toContain("private-key");
+  expect(hostile).not.toContain("<script>");
+  expect(hostile).toContain("for gemini-test");
+});
+
+it("falls back to the general message for a 429 that is not structured", () => {
+  expect(quotaMessage("rate limited", "gemini-test")).toBe("Gemini quota or rate limit reached for gemini-test. Check your Google account usage and retry later.");
+  expect(quotaMessage("")).toBe("Gemini quota or rate limit reached. Check your Google account usage and retry later.");
+});
+
+it("reports the quota detail through a real 429 from generation and from the model list, without the key or the reply text", async () => {
+  const fetcher = vi.fn<typeof fetch>(async () => new Response(quotaBody({ message: "private-key Synthetic evidence limit: 0" }), { status: 429 }));
+  const generation = new GeminiClient({ apiKey: "private-key", model: "gemini-test", fetch: fetcher }).complete(request);
+  await expect(generation).rejects.toThrow("for gemini-4-argon (GenerateRequestsPerDayPerProjectPerModel-FreeTier)");
+  await expect(generation).rejects.toThrow("no quota on your plan");
+  const listing = listGeminiModels({ apiKey: "private-key", fetch: fetcher });
+  await expect(listing).rejects.toThrow("Gemini quota or rate limit reached");
+  for (const attempt of [generation, listing]) await attempt.catch(error => {
+    expect(String(error)).not.toContain("private-key");
+    expect(String(error)).not.toContain("Synthetic evidence");
+  });
 });
