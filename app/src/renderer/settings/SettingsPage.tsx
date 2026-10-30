@@ -491,15 +491,13 @@ function GeminiCard({ ai, busy, configure }: { ai: AISettingsView; busy: boolean
 /** The providers on offer: which one writes Summaries and answers questions, and each one's own settings. One choice covers new work. */
 function Providers({ ollama, summaryModel, ai }: { ollama: Step; summaryModel: string; ai?: AISettingsView }) {
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  /** Runs the change; says whether it was made, and shows what went wrong when it was not. */
+  /** Runs the change; says whether it was made, with a toast when it was and an alert by the controls when it was not. */
   const configure = async (action: AISettingsAction): Promise<boolean> => {
     setBusy(true);
     setError("");
-    setMessage("");
     try {
-      setMessage(await window.electron.setup.configureAI(action));
+      toast.success(await window.electron.setup.configureAI(action));
       return true;
     } catch (problem) {
       setError(problem instanceof Error ? problem.message : "AI settings could not be saved");
@@ -515,7 +513,6 @@ function Providers({ ollama, summaryModel, ai }: { ollama: Step; summaryModel: s
       <OllamaCard ollama={ollama} summaryModel={summaryModel} active={provider === "ollama"} busy={busy} onUse={ai ? () => void configure({ type: "select", provider: "ollama" }) : undefined} />
       {ai && <GeminiCard ai={ai} busy={busy} configure={configure} />}
       {busy && <p role="status" className="text-sm">Updating AI settings…</p>}
-      {message && <p role="status" className="text-sm">{message}</p>}
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>

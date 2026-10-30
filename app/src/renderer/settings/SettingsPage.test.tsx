@@ -416,3 +416,23 @@ it("says why the model list could not be loaded and asks again on Refresh", asyn
   expect(window.electron.setup.geminiModels).toHaveBeenCalledTimes(2);
   expect(screen.queryByText("Gemini access was denied. Check your API key.")).toBeNull();
 });
+
+it("confirms a provider change with a toast, not with text in the page", async () => {
+  pushSetupState(gemini());
+  vi.mocked(window.electron.setup.configureAI).mockResolvedValue("Gemini key removed. New Gemini requests need a key.");
+  render(<><SettingsPage section="Providers" onSectionChange={() => {}} onBack={() => {}} /><Toaster /></>);
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Remove key" })));
+  const toast = await screen.findByText("Gemini key removed. New Gemini requests need a key.");
+  expect(toast.closest("[data-sonner-toast]")).not.toBeNull();
+  expect(toast.closest("section[aria-label='Gemini']")).toBeNull();
+});
+
+it("shows a failed provider change as an alert beside the controls, with no toast", async () => {
+  pushSetupState(gemini({ hasGeminiKey: false }));
+  vi.mocked(window.electron.setup.configureAI).mockRejectedValue(new Error("The keychain is locked"));
+  render(<><SettingsPage section="Providers" onSectionChange={() => {}} onBack={() => {}} /><Toaster /></>);
+  fireEvent.change(screen.getByLabelText("Gemini API key"), { target: { value: "entered-key" } });
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save key" })));
+  expect(screen.getByRole("alert").textContent).toContain("The keychain is locked");
+  expect(document.querySelector("[data-sonner-toast]")).toBeNull();
+});
