@@ -214,8 +214,6 @@ describe('TLDR recovery at the production Summary seam', () => {
     for (const [original, invalid] of [
       ['We will write the guide Thursday.', 'You will write the guide Thursday.'],
       ['We will not launch Monday.', 'We will launch Monday.'],
-￼
-
       ['The tests are yet to be done.', 'The tests are done.'],
       ['The first release supports English only.', 'The first release supports English.'],
       ['We want to integrate calendars.', 'We integrate calendars.'],
