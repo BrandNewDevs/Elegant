@@ -111,12 +111,6 @@ it("shows no Settings until it is opened, and keeps the open Meeting behind it",
   expect(screen.getByRole("button", { name: /zoom\.us/ }).getAttribute("aria-current")).toBe("true");
 });
 
-it("names the app in the title strip that stands in for the native title bar", () => {
-  showState({ appName: "Elegant" });
-  render(<MeetingsApp />);
-  expect(screen.getByText("Elegant")).toBeTruthy();
-});
-
 it("has no Profile entry: the name is in Settings", () => {
   showState({ meetings: [meeting], selected: meeting });
   render(<MeetingsApp />);

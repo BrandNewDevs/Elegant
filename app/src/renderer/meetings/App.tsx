@@ -13,7 +13,6 @@ import { Toaster } from "@/components/ui/sonner";
 import { SettingsPage, type SettingsSection } from "../settings/SettingsPage";
 
 export function MeetingsApp() {
-  const [appName, setAppName] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showInDock, setShowInDock] = useState(true);
   const [appearance, setAppearance] = useState<Appearance>("system");
@@ -40,7 +39,6 @@ export function MeetingsApp() {
       setUpdate(state.update ?? { status: "idle" });
       setAppVersion(state.appVersion);
       setJobs(state.jobs);
-      setAppName(state.appName ?? "");
       setSettingsOpen(state.settingsOpen);
       setShowInDock(state.showInDock);
       setAppearance(state.appearance ?? "system");
@@ -94,10 +92,8 @@ export function MeetingsApp() {
 
   return (
     <div className="relative flex h-screen min-h-0 overflow-hidden">
-      {/* The window has no native title bar. This strip stands in for it: transparent, centred name, and draggable. */}
-      <div className="absolute inset-x-0 top-0 z-10 flex h-10 select-none items-center justify-center [-webkit-app-region:drag]">
-        <span className="text-sm font-semibold tracking-tight text-foreground/70">{appName}</span>
-      </div>
+      {/* The window has no native title bar. This transparent strip stands in for it, so the window can still be dragged. */}
+      <div className="absolute inset-x-0 top-0 z-10 h-10 [-webkit-app-region:drag]" aria-hidden />
       <Sidebar
         meetings={meetings}
         selectedId={selected?.id}

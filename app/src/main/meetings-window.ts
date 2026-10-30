@@ -233,7 +233,7 @@ export class MeetingsWindow {
         width: 900,
         height: 640,
         title: DISPLAY_NAME,
-        // No native title bar: the page draws its own transparent strip with the name, and the traffic lights sit inside it.
+        // No native title bar: the page draws a transparent drag strip, and the traffic lights sit inside it.
         titleBarStyle: "hiddenInset",
         trafficLightPosition: { x: 16, y: 13 },
         backgroundColor: windowBackground(),
@@ -335,7 +335,6 @@ export class MeetingsWindow {
     const selected = this.selectedId === undefined ? undefined : this.core.getMeetingForDisplay(this.selectedId);
     const meetings = this.query.trim() ? this.core.searchMeetings(this.query) : this.core.listMeetings();
     const payload: MeetingsViewState = {
-      appName: DISPLAY_NAME,
       settingsOpen: this.settingsOpen,
       showInDock: this.core.showInDock,
       appearance: this.core.appearance,
