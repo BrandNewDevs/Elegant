@@ -245,3 +245,11 @@ it("stops with the cause, and keeps the last good results, when a model cannot b
   expect(f.settings.view.usableModels).toEqual(["gemini-a", "gemini-b"]);
   f.store.close();
 });
+
+it("gives the connection test room to think, since thinking tokens count against the output cap", async () => {
+  const f = fixture();
+  await f.settings.configure({ type: "save-key", key: "secret-test-key" });
+  await f.settings.configure({ type: "test" });
+  expect(f.complete).toHaveBeenCalledWith(expect.objectContaining({ maxOutputTokens: 2048, timeoutMs: 30_000 }));
+  f.store.close();
+});

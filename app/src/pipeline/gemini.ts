@@ -207,7 +207,7 @@ export async function probeGeminiModel({ apiKey, model, signal, fetch: fetcher }
   try {
     await new GeminiClient({ apiKey, model, fetch: fetcher }).complete({
       messages: [{ role: "user", content: 'Connection test only. Return {"ok":true}.' }],
-      schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] }, signal, timeoutMs: 30_000, maxOutputTokens: 1024 });
+      schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] }, signal, timeoutMs: 30_000, maxOutputTokens: 2048 });
     return "ok";
   } catch (error) {
     if (signal?.aborted || !(error instanceof GeminiError)) throw error;

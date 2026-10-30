@@ -497,7 +497,7 @@ function GeminiCard({ ai, busy, configure }: { ai: AISettingsView; busy: boolean
   const active = ai.provider === "gemini";
   return (
     <ProviderCard title="Gemini" where="Cloud" active={active}>
-      <p className="text-sm text-muted-foreground">Sends Transcript evidence and questions to Google using your own account, and may incur charges. Audio always stays on your Mac.</p>
+      <p className="text-sm text-muted-foreground">Sends Transcript evidence and questions to Google using your own account. Paid use is charged; on the free tier Google may use what you send to improve its products. Audio always stays on your Mac.</p>
       <div className="space-y-2">
         <Label htmlFor="gemini-key">Gemini API key</Label>
         <Input id="gemini-key" type="password" autoComplete="off" spellCheck={false} maxLength={512} value={key} placeholder={ai.hasGeminiKey ? "A key is saved securely" : "Enter your API key"} onChange={(event) => setKey(event.target.value)} />
@@ -522,7 +522,7 @@ function GeminiCard({ ai, busy, configure }: { ai: AISettingsView; busy: boolean
       {!active && (
         <div className="space-y-3 border-t pt-4">
           <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" className="mt-0.5" checked={consent} onChange={(event) => setConsent(event.target.checked)} />I agree to send Transcript evidence and questions to Google when using Gemini.
+            <input type="checkbox" className="mt-0.5" checked={consent} onChange={(event) => setConsent(event.target.checked)} />I agree to send Transcript evidence and questions to Google when using Gemini, and understand that on the free tier Google may use them to improve its products.
           </label>
           <Button type="button" disabled={busy || !consent || !ai.hasGeminiKey} onClick={() => void configure({ type: "select", provider: "gemini", consent: true })}>
             Use Gemini

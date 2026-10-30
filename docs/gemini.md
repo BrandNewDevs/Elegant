@@ -41,3 +41,14 @@ Private cloud evaluation is refused before reading a manifest unless `AI_ALLOW_C
 - Test invalid/restricted keys, unavailable models, quota/rate limits, no network, cancellation and quit. Existing Summaries must survive failures and partial results must never publish.
 - Review the same synthetic and permissioned real Transcripts for coverage, every critical final decision, attribution, citation support, readability, follow-ups and absent-answer questions. Record failures and costs/usage instead of claiming success from valid JSON.
 - Verify citation navigation, rename, export, restart, regeneration and deletion with mixed legacy/local/Gemini results. Audio must never leave the Mac, and private/cloud processing must never activate silently.
+
+## Checked against Google's documentation (30 October 2026)
+
+Read from ai.google.dev; nothing here was verified with a live key.
+
+- **Endpoint and key.** `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`, with the key in the `x-goog-api-key` header, as this app sends it. Google's quickstart now uses the newer Interactions API (`/v1beta/interactions`, `response_format`) and calls it the recommended successor for new projects; it describes `generateContent` as legacy but "fully supported". This app stays on `generateContent`: a move would change the request and reply formats and is not needed to work. The generation-config field names the app sends (`responseMimeType`, `responseJsonSchema`) could not be confirmed from the reference text that could be read, so a successful **Test Gemini connection** with a model on the key's plan is the real check.
+- **Models.** `gemini-3.8-flash` (the default here) and `gemini-4-argon` are both listed as stable, along with `gemini-3.6-flash`, `gemini-3.5-flash-lite` and `gemini-3.1-flash-lite`. The 2.5 models are legacy, limited to accounts that already used them. `gemini-2.0-*` is shut down.
+- **Free tier.** Per Google's pricing page the free tier covers `gemini-3.8-flash`, `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite` and the 2.5 flash and pro models, and **`gemini-4-argon` is paid only**: on a free key it fails with a 429 whose limit is zero. Limits apply per project and per model, not per key, and the models list does not say which models are free, which is why "Find usable models" tries them.
+- **Free-tier data use.** The pricing page says content sent to free-tier models may be used to improve Google's products. Meeting Transcripts are personal, so use a paid-tier project (or Ollama) for real Meetings, and read Google's terms. The consent text in Settings says this.
+- **Thinking.** The Gemini 3 and 4 models think by default (medium for `gemini-3.8-flash` and `gemini-4-argon`), and thinking tokens count against `maxOutputTokens`. A request with a small cap can end before any answer is written, so the connection test and the model probe allow 2,048 tokens.
+

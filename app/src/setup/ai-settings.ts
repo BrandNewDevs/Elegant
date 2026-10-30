@@ -8,6 +8,9 @@ export interface CredentialEncryption {
   encryptStringAsync(text: string): Promise<Buffer>;
   decryptStringAsync(buffer: Buffer): Promise<{ result: string; shouldReEncrypt: boolean }>;
 }
+/** Thinking tokens count against the cap, so a thinking model needs room to reason before it can write even a tiny answer. */
+const TEST_OUTPUT_TOKENS = 2048;
+
 export type AISelection = { provider: "ollama" } | { provider: "gemini"; model: string; apiKey: string };
 
 /** Credentials are decrypted lazily: local-only launches never touch the OS keychain. */
@@ -214,7 +217,7 @@ export class AISettings {
         this.testController = new AbortController();
         try {
           await this.testClient(apiKey, view.geminiModel).complete({ messages: [{ role: "user", content: "Connection test only. Return {\"ok\":true}." }],
-            schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] }, signal: this.testController.signal, timeoutMs: 30_000, maxOutputTokens: 256 });
+            schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] }, signal: this.testController.signal, timeoutMs: 30_000, maxOutputTokens: TEST_OUTPUT_TOKENS });
         } finally { this.testController = undefined; }
         message = "Gemini connection succeeded. No Meeting content was sent.";
         break;
