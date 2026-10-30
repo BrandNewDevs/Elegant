@@ -1,6 +1,6 @@
 import { cpus, platform, release, totalmem } from "node:os";
 import { execFileSync } from "node:child_process";
-import { SUMMARY_PROMPT_VERSION } from "../pipeline/grounded-summariser.js";
+import { SUMMARY_PROMPT_VERSION } from "../pipeline/readable-summariser.js";
 import { DEFAULT_OLLAMA_URL } from "../pipeline/ollama.js";
 import { AI_SETTINGS } from "../pipeline/model-request.js";
 

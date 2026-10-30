@@ -13,7 +13,7 @@ describe("production-interface evaluation", () => {
   it("validates every committed fixture and its expected source references", () => {
     const dir = new URL("../../../evaluation/fixtures/", import.meta.url);
     const names = readdirSync(dir).filter(n => n.endsWith(".json"));
-    expect(names).toHaveLength(8);
+    expect(names).toHaveLength(10);
     for (const name of names) expect(validateFixture(JSON.parse(readFileSync(new URL(name, dir), "utf8"))).synthetic).toBe(true);
   });
   it("does not feed expected answers to generation and preserves follow-up context", async () => {

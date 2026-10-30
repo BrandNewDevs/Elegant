@@ -1,5 +1,13 @@
 # Local comparison and remaining acceptance
 
+For the 171-word failure and the v13 correction, see [TL;DR word-budget recovery](tldr-budget-recovery.md). Earlier comparison results below retain their original prompt versions.
+
+
+## Summary relevance and TL;DR improvements
+
+See the [readable Summary comparison](readable-summaries.md) for the current pipeline, all nine synthetic cases, three replays of each supplied private example, and known readability limitations. Private content stays outside Git; only aggregate metrics are committed. This update keeps Gemma 3 4B and does not establish M4 performance or complete every readability goal.
+
+
 All committed inputs and outputs here are synthetic. The device is the Linux i7-11800H laptop with approximately 16 GB RAM and an RTX 3050 Ti with 4 GB VRAM, running Ollama 0.34.0. These measurements do not establish M4 or Swift performance.
 
 ## Frozen baseline smoke

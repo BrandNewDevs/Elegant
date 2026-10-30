@@ -5,6 +5,9 @@ export interface EvaluationFixture {
   split: "tuning" | "reserved";
   synthetic: boolean;
   expectationsPrepared?: boolean;
+  /** Human review criteria; never supplied to generation. */
+  tldrTopics?: string[];
+  unwantedContent?: string[];
   transcript: Transcript;
   points: { id: string; text: string; speaker: string; refs: number[]; critical: boolean }[];
   questions: { id: string; question: string; answer: string | null; refs: number[]; followUpTo?: string; critical: boolean }[];

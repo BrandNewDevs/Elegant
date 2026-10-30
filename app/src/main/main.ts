@@ -10,7 +10,7 @@ import { ProcessEngine } from "../engine/process-engine.js";
 import { createEngineTranscriber } from "../pipeline/engine-transcriber.js";
 import { createMeetingChat } from "../pipeline/meeting-chat.js";
 import { checkOllama, OllamaClient, DEFAULT_SUMMARY_MODEL } from "../pipeline/ollama.js";
-import { createGroundedSummariser } from "../pipeline/grounded-summariser.js";
+import { createReadableSummariser } from "../pipeline/readable-summariser.js";
 import { Setup } from "../setup/setup.js";
 import { openStore } from "../store/store.js";
 import { DISPLAY_NAME, RELEASES_REPO, SPEECH_MODEL } from "../config.js";
@@ -128,7 +128,7 @@ app.whenReady().then(() => {
     extraIgnoredApps: ignoredAppsFile(ignoredAppsPath),
     pipeline: {
       transcribe: createEngineTranscriber(engine, { model: SPEECH_MODEL, modelsDirectory: join(dataDir, "models") }),
-      summarise: createGroundedSummariser({ model: textModel }),
+      summarise: createReadableSummariser({ model: textModel }),
     },
   });
 
