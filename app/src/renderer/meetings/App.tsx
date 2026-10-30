@@ -8,6 +8,7 @@ import { restartForUpdate } from "./update-actions";
 import { MessagesSquare } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Meeting, MeetingListItem } from "../../store/store";
+import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Toaster } from "@/components/ui/sonner";
 import { SettingsPage, type SettingsSection } from "../settings/SettingsPage";
@@ -90,8 +91,13 @@ export function MeetingsApp() {
 
   return (
     <div className="relative flex h-screen min-h-0 overflow-hidden">
-      {/* The window has no native title bar. This transparent strip stands in for it, so the window can still be dragged. */}
-      <div className="absolute inset-x-0 top-0 z-10 h-10 [-webkit-app-region:drag]" aria-hidden />
+      {/* The window has no native title bar. This transparent strip stands in for it, so the window can still be dragged. The Beta
+          label sits just right of the traffic lights, which the window places at the left edge. */}
+      <div className="absolute inset-x-0 top-0 z-10 flex h-10 select-none items-center pl-[84px] [-webkit-app-region:drag]">
+        <Badge variant="secondary" className="px-2 py-0 text-[11px] uppercase tracking-wide text-muted-foreground">
+          Beta
+        </Badge>
+      </div>
       <Sidebar
         meetings={meetings}
         selectedId={selected?.id}

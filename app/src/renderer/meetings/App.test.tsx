@@ -111,6 +111,12 @@ it("shows no Settings until it is opened, and keeps the open Meeting behind it",
   expect(screen.getByRole("button", { name: /zoom\.us/ }).getAttribute("aria-current")).toBe("true");
 });
 
+it("labels the app as a Beta in the top strip", () => {
+  showState({});
+  render(<MeetingsApp />);
+  expect(screen.getByText("Beta")).toBeTruthy();
+});
+
 it("has no Profile entry: the name is in Settings", () => {
   showState({ meetings: [meeting], selected: meeting });
   render(<MeetingsApp />);
