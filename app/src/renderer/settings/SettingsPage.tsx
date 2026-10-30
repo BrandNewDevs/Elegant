@@ -1,4 +1,4 @@
-import { Bell, CheckCircle2, Cpu, Download, ExternalLink, Loader2, Monitor, Moon, RefreshCw, ShieldCheck, SlidersHorizontal, Sun, Trash2, XCircle, AlertCircle, type LucideIcon } from "lucide-react";
+import { Bell, CheckCircle2, Cpu, Download, ExternalLink, Loader2, Monitor, Moon, RefreshCw, ShieldCheck, SlidersHorizontal, Sparkles, Sun, Trash2, XCircle, AlertCircle, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { UpdateState } from "../../core/updater";
@@ -20,13 +20,12 @@ import { useSetup } from "@/lib/use-setup";
 import { cn } from "@/lib/utils";
 import { restartForUpdate } from "../meetings/update-actions";
 
-import { AIProviderSettings } from "./AIProviderSettings";
-import type { AISettingsView } from "../../shared/ai-settings";
+import type { AISettingsAction, AISettingsView } from "../../shared/ai-settings";
 
-export const SECTIONS = ["General", "Permissions", "Models", "Updates"] as const;
+export const SECTIONS = ["General", "Permissions", "Models", "Providers", "Updates"] as const;
 export type SettingsSection = (typeof SECTIONS)[number];
 
-const SECTION_ICON: Record<SettingsSection, LucideIcon> = { General: SlidersHorizontal, Permissions: ShieldCheck, Models: Cpu, Updates: Bell };
+const SECTION_ICON: Record<SettingsSection, LucideIcon> = { General: SlidersHorizontal, Permissions: ShieldCheck, Models: Cpu, Providers: Sparkles, Updates: Bell };
 
 const STATUS_ICON: Partial<Record<NonNullable<BadgeProps["variant"]>, LucideIcon>> = {
   success: CheckCircle2,
@@ -327,11 +326,33 @@ function DownloadedModels({ models, name }: { models: Step & { fraction: number 
   );
 }
 
-function Models({ models, ollama, summaryModel, name, ai }: { models: Step & { fraction: number }; ollama: Step; summaryModel: string; name: string; ai?: AISettingsView }) {
-  const percent = Math.round(models.fraction * 100);
+function Models({ models, name }: { models: Step & { fraction: number }; name: string }) {
   return (
     <div className="divide-y">
       <DownloadedModels models={models} name={name} />
+    </div>
+  );
+}
+
+/** One provider of the AI that writes Summaries and answers questions about a Meeting. */
+function ProviderCard({ title, where, active, children }: { title: string; where: "Local" | "Cloud"; active: boolean; children: ReactNode }) {
+  return (
+    <section aria-label={title} className="space-y-4 rounded-lg border p-4">
+      <header className="flex items-center gap-2">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <Badge variant="secondary">{where}</Badge>
+        {active && <Status label="In use" variant="success" />}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+/** Ollama: runs on this Mac. Its readiness only matters while it is the provider in use. */
+function OllamaCard({ ollama, summaryModel, active, busy, onUse }: { ollama: Step; summaryModel: string; active: boolean; busy: boolean; onUse?: () => void }) {
+  return (
+    <ProviderCard title="Ollama" where="Local" active={active}>
+      <p className="text-sm text-muted-foreground">A model running on your Mac writes each Summary. Nothing about your Meetings leaves it.</p>
       <SettingRow
         title="Summary model"
         htmlFor="summary-model"
@@ -339,26 +360,115 @@ function Models({ models, ollama, summaryModel, name, ai }: { models: Step & { f
       >
         <SummaryModelPicker model={summaryModel} ollama={ollama.status} />
       </SettingRow>
-      {ai && <AIProviderSettings ai={ai} />}
-      {ai?.provider !== "gemini" && <SettingRow
-        title="Summaries"
-        description="A model running in Ollama on your Mac writes each Summary. Start Ollama and pull the model first; you can record without it and summarise later."
-        below={
-          <div className="space-y-3 pt-3">
-            {ollama.status === "problem" && ollama.message && <Problem>{ollama.message}</Problem>}
+      {active && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            {ollama.status === "done" && <Status label="Ready" variant="success" />}
+            {ollama.status === "working" && <Status label="Checking…" variant="warning" />}
+            {ollama.status === "problem" && <Status label="Not ready" variant="destructive" />}
             {ollama.status !== "working" && (
-              <Button type="button" variant={ollama.status === "done" ? "outline" : "default"} onClick={() => window.electron.setup.act("ollama")}>
+              <Button type="button" size="sm" variant={ollama.status === "done" ? "outline" : "default"} onClick={() => window.electron.setup.act("ollama")}>
                 <RefreshCw aria-hidden />
                 {ollama.status === "todo" ? "Check Ollama" : "Check again"}
               </Button>
             )}
           </div>
-        }
-      >
-        {ollama.status === "done" && <Status label="Ready" variant="success" />}
-        {ollama.status === "working" && <Status label="Checking…" variant="warning" />}
-        {ollama.status === "problem" && <Status label="Not ready" variant="destructive" />}
-      </SettingRow>}
+          {ollama.status === "problem" && ollama.message && <Problem>{ollama.message}</Problem>}
+          <p className="text-sm text-muted-foreground">Start Ollama and pull the model first; you can record without it and summarise later.</p>
+        </div>
+      )}
+      {onUse && !active && (
+        <Button type="button" variant="outline" disabled={busy} onClick={onUse}>
+          Use Ollama
+        </Button>
+      )}
+    </ProviderCard>
+  );
+}
+
+/** Gemini: opt-in cloud processing with the person's own key. Saving or testing a key never turns it on; consent and Use Gemini do. */
+function GeminiCard({ ai, busy, configure }: { ai: AISettingsView; busy: boolean; configure: (action: AISettingsAction) => Promise<boolean> }) {
+  const [key, setKey] = useState("");
+  const [model, setModel] = useState(ai.geminiModel);
+  const [consent, setConsent] = useState(false);
+  const active = ai.provider === "gemini";
+  return (
+    <ProviderCard title="Gemini" where="Cloud" active={active}>
+      <p className="text-sm text-muted-foreground">Sends Transcript evidence and questions to Google using your own account, and may incur charges. Audio always stays on your Mac.</p>
+      <div className="space-y-2">
+        <Label htmlFor="gemini-key">Gemini API key</Label>
+        <Input id="gemini-key" type="password" autoComplete="off" spellCheck={false} maxLength={512} value={key} placeholder={ai.hasGeminiKey ? "A key is saved securely" : "Enter your API key"} onChange={(event) => setKey(event.target.value)} />
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy || !key.trim()}
+            onClick={() => void configure({ type: "save-key", key }).then((saved) => saved && setKey(""))}
+          >
+            {ai.hasGeminiKey ? "Replace key" : "Save key"}
+          </Button>
+          <Button type="button" variant="outline" disabled={busy || !ai.hasGeminiKey} onClick={() => void configure({ type: "remove-key" }).then((removed) => removed && setKey(""))}>
+            Remove key
+          </Button>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="gemini-model">Gemini text model</Label>
+        <Input id="gemini-model" value={model} maxLength={110} onChange={(event) => setModel(event.target.value)} />
+        <Button type="button" variant="outline" disabled={busy || model === ai.geminiModel} onClick={() => void configure({ type: "model", model })}>
+          Save model
+        </Button>
+      </div>
+      <Button type="button" variant="outline" disabled={busy || !ai.hasGeminiKey} onClick={() => void configure({ type: "test" })}>
+        Test Gemini connection
+      </Button>
+      {!active && (
+        <div className="space-y-3 border-t pt-4">
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-0.5" checked={consent} onChange={(event) => setConsent(event.target.checked)} />I agree to send Transcript evidence and questions to Google when using Gemini.
+          </label>
+          <Button type="button" disabled={busy || !consent || !ai.hasGeminiKey} onClick={() => void configure({ type: "select", provider: "gemini", consent: true })}>
+            Use Gemini
+          </Button>
+        </div>
+      )}
+    </ProviderCard>
+  );
+}
+
+/** The providers on offer: which one writes Summaries and answers questions, and each one's own settings. One choice covers new work. */
+function Providers({ ollama, summaryModel, ai }: { ollama: Step; summaryModel: string; ai?: AISettingsView }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  /** Runs the change; says whether it was made, and shows what went wrong when it was not. */
+  const configure = async (action: AISettingsAction): Promise<boolean> => {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      setMessage(await window.electron.setup.configureAI(action));
+      return true;
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : "AI settings could not be saved");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+  const provider = ai?.provider ?? "ollama";
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">Choose what writes Summaries and answers questions about a Meeting. It applies to new work; Summaries and chats already written stay as they are. Recording, transcription and telling speakers apart always run on this Mac.</p>
+      <OllamaCard ollama={ollama} summaryModel={summaryModel} active={provider === "ollama"} busy={busy} onUse={ai ? () => void configure({ type: "select", provider: "ollama" }) : undefined} />
+      {ai && <GeminiCard ai={ai} busy={busy} configure={configure} />}
+      {busy && <p role="status" className="text-sm">Updating AI settings…</p>}
+      {message && <p role="status" className="text-sm">{message}</p>}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }
@@ -461,7 +571,8 @@ export function SettingsPage({
               <>
                 {section === "General" && <General appearance={appearance} showInDock={showInDock} keepAudio={keepAudio} userName={view.userName} />}
                 {section === "Permissions" && <Permissions state={view.state} name={view.name} />}
-                {section === "Models" && <Models models={view.state.models} ollama={view.state.ollama} summaryModel={summaryModel} name={view.name} ai={view.ai} />}
+                {section === "Models" && <Models models={view.state.models} name={view.name} />}
+                {section === "Providers" && <Providers ollama={view.state.ollama} summaryModel={summaryModel} ai={view.ai} />}
                 {section === "Updates" && <Updates checkForUpdates={checkForUpdates} update={update} appVersion={appVersion} name={view.name} />}
               </>
             )}
