@@ -1,5 +1,6 @@
 import { toast } from "sonner";
 import { useJobToasts } from "./job-toasts";
+import type { Appearance } from "../../shared/appearance";
 import type { MeetingsViewState } from "../../shared/meetings-view-state";
 import { MeetingDetail } from "./MeetingDetail";
 import { Sidebar } from "./Sidebar";
@@ -14,6 +15,7 @@ import { SettingsPage, type SettingsSection } from "../settings/SettingsPage";
 export function MeetingsApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showInDock, setShowInDock] = useState(true);
+  const [appearance, setAppearance] = useState<Appearance>("system");
   const [keepAudio, setKeepAudio] = useState(false);
   const [checkForUpdates, setCheckForUpdates] = useState(true);
   const [section, setSection] = useState<SettingsSection>("General");
@@ -38,6 +40,7 @@ export function MeetingsApp() {
       setJobs(state.jobs);
       setSettingsOpen(state.settingsOpen);
       setShowInDock(state.showInDock);
+      setAppearance(state.appearance ?? "system");
       setKeepAudio(state.keepAudio ?? false);
       setCheckForUpdates(state.checkForUpdates);
       setQuery(state.query);
@@ -109,6 +112,7 @@ export function MeetingsApp() {
             onSectionChange={setSection}
             onBack={() => window.electron.meetings.settings(false)}
             showInDock={showInDock}
+            appearance={appearance}
             keepAudio={keepAudio}
             checkForUpdates={checkForUpdates}
             update={update}

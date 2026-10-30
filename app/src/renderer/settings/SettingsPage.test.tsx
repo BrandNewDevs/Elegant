@@ -86,6 +86,22 @@ it("says why Summaries are not ready and checks Ollama again on request", () => 
   expect(act).toHaveBeenCalledWith("ollama");
 });
 
+it("shows the chosen Appearance and asks to change it", () => {
+  const send = pushSetupState(nothingDone);
+  const { rerender } = page("General");
+  const options = () => screen.getAllByRole("radio").map((o) => [o.textContent, o.getAttribute("aria-checked")]);
+  expect(screen.getByRole("radiogroup", { name: "Appearance" })).toBeTruthy();
+  expect(options()).toEqual([["System", "true"], ["Light", "false"], ["Dark", "false"]]);
+
+  fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
+  expect(send.setAppearance).toHaveBeenLastCalledWith("dark");
+
+  rerender(<SettingsPage section="General" onSectionChange={() => {}} onBack={() => {}} appearance="dark" />);
+  expect(options()).toEqual([["System", "false"], ["Light", "false"], ["Dark", "true"]]);
+  fireEvent.click(screen.getByRole("radio", { name: "Light" }));
+  expect(send.setAppearance).toHaveBeenLastCalledWith("light");
+});
+
 it("turns Show in Dock on and off, starting from the stored setting", () => {
   const send = pushSetupState(nothingDone);
   const { rerender } = page("General", { showInDock: false });

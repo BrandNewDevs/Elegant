@@ -1647,6 +1647,35 @@ describe("show in Dock", () => {
   });
 });
 
+describe("appearance", () => {
+  it("follows macOS until the user chooses, and each change is announced once", () => {
+    const { core } = setup();
+    const changes: string[] = [];
+    core.onAppearanceChange((appearance) => changes.push(appearance));
+    expect(core.appearance).toBe("system");
+
+    core.setAppearance("system");
+    core.setAppearance("dark");
+    core.setAppearance("dark");
+    core.setAppearance("light");
+    core.setAppearance("system");
+    expect(core.appearance).toBe("system");
+    expect(changes).toEqual(["dark", "light", "system"]);
+  });
+
+  it("remembers the choice across a restart", () => {
+    const store = openStore(":memory:");
+    new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).setAppearance("dark");
+    expect(new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).appearance).toBe("dark");
+  });
+
+  it("falls back to system when the stored value is not one it knows", () => {
+    const store = openStore(":memory:");
+    store.setSetting("appearance", "sepia");
+    expect(new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).appearance).toBe("system");
+  });
+});
+
 describe("update check settings", () => {
   it("checks until the user turns it off, and a stored false is kept across a restart", () => {
     const store = openStore(":memory:");

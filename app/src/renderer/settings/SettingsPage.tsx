@@ -1,7 +1,8 @@
-import { ArrowLeft, Bell, CheckCircle2, Cpu, Download, ExternalLink, Loader2, RefreshCw, ShieldCheck, SlidersHorizontal, XCircle, AlertCircle, type LucideIcon } from "lucide-react";
+import { ArrowLeft, Bell, CheckCircle2, Cpu, Download, ExternalLink, Loader2, Monitor, Moon, RefreshCw, ShieldCheck, SlidersHorizontal, Sun, XCircle, AlertCircle, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { UpdateState } from "../../core/updater";
+import { APPEARANCES, type Appearance } from "../../shared/appearance";
 import type { Step } from "../../setup/setup";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -79,12 +80,48 @@ function NameForm({ userName }: { userName: string }) {
   );
 }
 
-function General({ showInDock, keepAudio, name, userName }: { showInDock: boolean; keepAudio: boolean; name: string; userName: string }) {
+const APPEARANCE_OPTION: Record<Appearance, { label: string; Icon: LucideIcon }> = {
+  system: { label: "System", Icon: Monitor },
+  light: { label: "Light", Icon: Sun },
+  dark: { label: "Dark", Icon: Moon },
+};
+
+/** Picks how the windows are coloured; one option is always chosen. */
+function AppearancePicker({ appearance }: { appearance: Appearance }) {
+  return (
+    <div role="radiogroup" aria-label="Appearance" className="inline-flex gap-0.5 rounded-lg border bg-muted/40 p-0.5">
+      {APPEARANCES.map((id) => {
+        const { label, Icon } = APPEARANCE_OPTION[id];
+        const chosen = appearance === id;
+        return (
+          <Button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={chosen}
+            size="sm"
+            variant={chosen ? "secondary" : "ghost"}
+            className={cn("h-7 px-2.5", chosen ? "bg-background shadow-sm hover:bg-background" : "text-muted-foreground")}
+            onClick={() => window.electron.meetings.setAppearance(id)}
+          >
+            <Icon aria-hidden />
+            {label}
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
+
+function General({ appearance, showInDock, keepAudio, name, userName }: { appearance: Appearance; showInDock: boolean; keepAudio: boolean; name: string; userName: string }) {
   return (
     <div className="divide-y">
       <SettingRow stacked title="Your name" htmlFor="user-name" description={<>Shown in place of &ldquo;You&rdquo; in transcripts, summaries and exports, in every Meeting. It is kept on this Mac only.</>}>
         {/* Keyed on the saved name so the field follows a change made elsewhere. */}
         <NameForm key={userName} userName={userName} />
+      </SettingRow>
+      <SettingRow title="Appearance" description={`Light or dark for ${name}'s windows. System follows macOS.`}>
+        <AppearancePicker appearance={appearance} />
       </SettingRow>
       <SettingRow title="Show in Dock" htmlFor="show-in-dock" description={`${name} always has its menu bar icon. With this on, it also shows in the Dock: click the icon to open ${name}, and minimised windows go there.`}>
         <Switch id="show-in-dock" checked={showInDock} onCheckedChange={(checked) => window.electron.meetings.setShowInDock(checked)} />
@@ -242,6 +279,7 @@ export function SettingsPage({
   section,
   onSectionChange,
   onBack,
+  appearance = "system",
   showInDock = true,
   keepAudio = false,
   checkForUpdates = true,
@@ -251,6 +289,7 @@ export function SettingsPage({
   section: SettingsSection;
   onSectionChange: (section: SettingsSection) => void;
   onBack: () => void;
+  appearance?: Appearance;
   showInDock?: boolean;
   keepAudio?: boolean;
   checkForUpdates?: boolean;
@@ -297,7 +336,7 @@ export function SettingsPage({
         <h1 className="mb-2 text-xl font-semibold tracking-tight">{section}</h1>
         {view && (
           <>
-            {section === "General" && <General showInDock={showInDock} keepAudio={keepAudio} name={view.name} userName={view.userName} />}
+            {section === "General" && <General appearance={appearance} showInDock={showInDock} keepAudio={keepAudio} name={view.name} userName={view.userName} />}
             {section === "Permissions" && <Permissions state={view.state} name={view.name} />}
             {section === "Models" && <Models models={view.state.models} ollama={view.state.ollama} name={view.name} />}
             {section === "Updates" && <Updates checkForUpdates={checkForUpdates} update={update} appVersion={appVersion} name={view.name} />}

@@ -1,6 +1,7 @@
 import type { ActiveRecording } from "../core/app-core.js";
 import type { UpdateState } from "../core/updater.js";
 import type { AIJobState } from "../pipeline/job-queue.js";
+import type { Appearance } from "./appearance.js";
 import type { ChatRecord } from "./meeting-chat.js";
 import type { Meeting, MeetingListItem } from "../store/store.js";
 
@@ -9,6 +10,8 @@ export type MeetingsViewState = {
   settingsOpen: boolean;
   /** The "Show in Dock" setting, shown in Settings. */
   showInDock: boolean;
+  /** The Appearance setting, shown in Settings. Absent in older renderer state fixtures. */
+  appearance?: Appearance;
   /** The "Keep audio after transcription" setting, shown in Settings. Absent in older renderer state fixtures. */
   keepAudio?: boolean;
   /** The "Check for updates" setting, shown in Settings. */

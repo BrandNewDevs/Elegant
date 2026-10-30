@@ -12,6 +12,8 @@ import type { MeetingChatGenerator } from "../pipeline/meeting-chat.js";
 import type { ChatRecord } from "../shared/meeting-chat.js";
 import { resolveReference, transcriptRevision, type TranscriptReference } from "../pipeline/evidence.js";
 import { discardAudio, PipelineRunner } from "../pipeline/runner.js";
+import type { Appearance } from "../shared/appearance.js";
+import { isAppearance } from "../shared/appearance.js";
 import type { Meeting, MeetingListItem, Store } from "../store/store.js";
 
 /** The store setting behind `AppCore.keepAudio`. */
@@ -19,6 +21,9 @@ const KEEP_AUDIO_SETTING = "keepAudio";
 
 /** The store setting behind `AppCore.showInDock`. */
 const SHOW_IN_DOCK_SETTING = "showInDock";
+
+/** The store setting behind `AppCore.appearance`. */
+const APPEARANCE_SETTING = "appearance";
 
 /** The store setting behind `AppCore.checkForUpdates`. */
 const CHECK_FOR_UPDATES_SETTING = "checkForUpdates";
@@ -79,6 +84,7 @@ export class AppCore {
   private engineProblemListeners: ((message: string) => void)[] = [];
   private stopNudgeListeners: ((app: string) => void)[] = [];
   private showInDockListeners: ((show: boolean) => void)[] = [];
+  private appearanceListeners: ((appearance: Appearance) => void)[] = [];
   private keepAudioListeners: ((keep: boolean) => void)[] = [];
   private recordingSettledWaiters: (() => void)[] = [];
   private stopTimer: ReturnType<typeof setTimeout> | undefined;
@@ -333,6 +339,23 @@ export class AppCore {
 
   onShowInDockChange(listener: (show: boolean) => void): void {
     this.showInDockListeners.push(listener);
+  }
+
+  /** Whether the windows follow macOS or stay light or dark. Follows macOS until the user chooses. */
+  get appearance(): Appearance {
+    const stored = this.deps.store.getSetting(APPEARANCE_SETTING);
+    return isAppearance(stored) ? stored : "system";
+  }
+
+  /** Remembers the choice and tells the listeners, which recolour the windows at once. */
+  setAppearance(appearance: Appearance): void {
+    if (appearance === this.appearance) return;
+    this.deps.store.setSetting(APPEARANCE_SETTING, appearance);
+    for (const l of this.appearanceListeners) l(appearance);
+  }
+
+  onAppearanceChange(listener: (appearance: Appearance) => void): void {
+    this.appearanceListeners.push(listener);
   }
 
   /** Whether the app asks GitHub at launch for a newer release. On unless the user turned it off. */
