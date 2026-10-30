@@ -92,8 +92,8 @@ export function MeetingsApp() {
   return (
     <div className="relative flex h-screen min-h-0 overflow-hidden">
       {/* The window has no native title bar. This transparent strip stands in for it, so the window can still be dragged. The Beta
-          label sits just right of the traffic lights, which the window places at the left edge. */}
-      <div className="absolute inset-x-0 top-0 z-10 flex h-10 select-none items-center pl-[84px] [-webkit-app-region:drag]">
+          label sits at its right edge, opposite the traffic lights. */}
+      <div className="absolute inset-x-0 top-0 z-10 flex h-10 select-none items-center justify-end pr-4 [-webkit-app-region:drag]">
         <Badge variant="secondary" className="px-2 py-0 text-[11px] uppercase tracking-wide text-muted-foreground">
           Beta
         </Badge>
