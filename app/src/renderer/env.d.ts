@@ -4,7 +4,7 @@ import type { MeetingsApi } from "../shared/meetings-api";
 import type { SetupAction } from "../shared/setup-actions";
 import type { SetupViewState } from "../shared/setup-view-state";
 import type { PromptChoice } from "../shared/prompt-choice";
-import type { AISettingsAction } from "../shared/ai-settings";
+import type { AISettingsAction, GeminiModelOption } from "../shared/ai-settings";
 
 declare global {
   interface Window {
@@ -16,6 +16,8 @@ declare global {
         act(action: SetupAction): void;
         setUserName(name: string): void;
         configureAI(action: AISettingsAction): Promise<string>;
+        /** The Gemini text models the saved key can use. */
+        geminiModels(): Promise<GeminiModelOption[]>;
       };
       prompt: {
         ready(): void;

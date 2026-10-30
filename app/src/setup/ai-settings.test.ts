@@ -122,3 +122,30 @@ it("restores provider and encrypted credentials from disk without rewriting an e
     expect(store.getMeeting(id)?.summary).toEqual(previous);
   } finally { store?.close(); rmSync(directory, { recursive: true, force: true }); }
 });
+
+it("lists the models with the decrypted key, never exposing it, and needs a saved key", async () => {
+  const f = fixture();
+  const listModels = vi.fn(async () => [{ id: "gemini-test", label: "Gemini Test" }]);
+  const settings = new AISettings(f.store, f.encryption, f.createClient, listModels);
+  await expect(settings.geminiModels()).rejects.toThrow("Save a Gemini API key first");
+  expect(listModels).not.toHaveBeenCalled();
+  await settings.configure({ type: "save-key", key: "secret-test-key" });
+  expect(await settings.geminiModels()).toEqual([{ id: "gemini-test", label: "Gemini Test" }]);
+  expect(listModels).toHaveBeenCalledWith("secret-test-key", expect.any(AbortSignal));
+  expect(settings.view.provider).toBe("ollama"); // looking at the list never turns Gemini on
+  f.store.close();
+});
+
+it("cancels a model list in flight when the settings shut down, and refuses new ones", async () => {
+  const f = fixture();
+  let signal: AbortSignal | undefined;
+  const listModels = vi.fn((_key: string, s: AbortSignal) => new Promise<never>((_resolve, reject) => { signal = s; s.addEventListener("abort", () => reject(new Error("cancelled"))); }));
+  const settings = new AISettings(f.store, f.encryption, f.createClient, listModels);
+  await settings.configure({ type: "save-key", key: "secret-test-key" });
+  const pending = settings.geminiModels();
+  await vi.waitFor(() => expect(signal).toBeDefined());
+  await settings.shutdown();
+  await expect(pending).rejects.toThrow("cancelled");
+  await expect(settings.geminiModels()).rejects.toThrow("shutting down");
+  f.store.close();
+});

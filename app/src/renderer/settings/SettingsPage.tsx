@@ -20,7 +20,7 @@ import { useSetup } from "@/lib/use-setup";
 import { cn } from "@/lib/utils";
 import { restartForUpdate } from "../meetings/update-actions";
 
-import type { AISettingsAction, AISettingsView } from "../../shared/ai-settings";
+import type { AISettingsAction, AISettingsView, GeminiModelOption } from "../../shared/ai-settings";
 
 export const SECTIONS = ["General", "Permissions", "Models", "Providers", "Updates"] as const;
 export type SettingsSection = (typeof SECTIONS)[number];
@@ -386,10 +386,68 @@ function OllamaCard({ ollama, summaryModel, active, busy, onUse }: { ollama: Ste
   );
 }
 
+/** Picks the Gemini text model from the ones Google says this key can use, loaded when a key is saved and on request. */
+function GeminiModelPicker({ ai, busy, configure }: { ai: AISettingsView; busy: boolean; configure: (action: AISettingsAction) => Promise<boolean> }) {
+  const [models, setModels] = useState<GeminiModelOption[]>();
+  const [loading, setLoading] = useState(false);
+  const [problem, setProblem] = useState("");
+  const [reload, setReload] = useState(0);
+  useEffect(() => {
+    if (!ai.hasGeminiKey) {
+      setModels(undefined);
+      setProblem("");
+      return;
+    }
+    let current = true;
+    setLoading(true);
+    setProblem("");
+    window.electron.setup
+      .geminiModels()
+      .then((found) => current && setModels(found))
+      .catch((error: unknown) => current && setProblem(error instanceof Error ? error.message : "The model list could not be loaded"))
+      .finally(() => current && setLoading(false));
+    return () => {
+      current = false;
+    };
+  }, [ai.hasGeminiKey, reload]); // a saved or replaced key, or the Refresh button, asks Google again
+  const options = models ?? [];
+  const saved = ai.geminiModel;
+  const listed = options.some((m) => m.id === saved); // the saved model is shown even before the list arrives, or if Google no longer lists it
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="gemini-model">Gemini text model</Label>
+      <div className="flex items-center gap-2">
+        <Select value={saved} disabled={busy || !ai.hasGeminiKey} onValueChange={(next) => void configure({ type: "model", model: next })}>
+          <SelectTrigger id="gemini-model" className="w-72">
+            <SelectValue placeholder={ai.hasGeminiKey ? "Loading models…" : "Save a key to load models"} />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((option) => (
+              <SelectItem key={option.id} value={option.id}>
+                {option.id}
+              </SelectItem>
+            ))}
+            {!listed && (
+              <SelectItem value={saved}>
+                {saved}
+                {models ? " (not listed)" : ""}
+              </SelectItem>
+            )}
+          </SelectContent>
+        </Select>
+        <Button type="button" size="icon" variant="ghost" aria-label="Refresh models" title="Refresh models" disabled={!ai.hasGeminiKey || loading} onClick={() => setReload((n) => n + 1)}>
+          <RefreshCw className={loading ? "animate-spin" : undefined} aria-hidden />
+        </Button>
+      </div>
+      {problem && <p className="text-sm text-destructive">{problem}</p>}
+      {!problem && models && models.length === 0 && <p className="text-sm text-muted-foreground">This key has no Gemini text models available.</p>}
+    </div>
+  );
+}
+
 /** Gemini: opt-in cloud processing with the person's own key. Saving or testing a key never turns it on; consent and Use Gemini do. */
 function GeminiCard({ ai, busy, configure }: { ai: AISettingsView; busy: boolean; configure: (action: AISettingsAction) => Promise<boolean> }) {
   const [key, setKey] = useState("");
-  const [model, setModel] = useState(ai.geminiModel);
   const [consent, setConsent] = useState(false);
   const active = ai.provider === "gemini";
   return (
@@ -412,13 +470,7 @@ function GeminiCard({ ai, busy, configure }: { ai: AISettingsView; busy: boolean
           </Button>
         </div>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="gemini-model">Gemini text model</Label>
-        <Input id="gemini-model" value={model} maxLength={110} onChange={(event) => setModel(event.target.value)} />
-        <Button type="button" variant="outline" disabled={busy || model === ai.geminiModel} onClick={() => void configure({ type: "model", model })}>
-          Save model
-        </Button>
-      </div>
+      <GeminiModelPicker ai={ai} busy={busy} configure={configure} />
       <Button type="button" variant="outline" disabled={busy || !ai.hasGeminiKey} onClick={() => void configure({ type: "test" })}>
         Test Gemini connection
       </Button>

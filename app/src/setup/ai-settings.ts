@@ -1,6 +1,6 @@
 import type { Store } from "../store/store.js";
-import type { AISettingsAction, AISettingsView, AIProvider } from "../shared/ai-settings.js";
-import { DEFAULT_GEMINI_MODEL, GeminiClient, validGeminiModel } from "../pipeline/gemini.js";
+import type { AISettingsAction, AISettingsView, AIProvider, GeminiModelOption } from "../shared/ai-settings.js";
+import { DEFAULT_GEMINI_MODEL, GeminiClient, listGeminiModels, validGeminiModel } from "../pipeline/gemini.js";
 import type { TextModel } from "../pipeline/language-model.js";
 
 export interface CredentialEncryption {
@@ -16,8 +16,10 @@ export class AISettings {
   private pending: Promise<unknown> = Promise.resolve();
   private closed = false;
   private testController: AbortController | undefined;
+  private listController: AbortController | undefined;
   constructor(private readonly store: Pick<Store, "getSetting" | "setSetting">, private readonly encryption: CredentialEncryption,
-    private readonly testClient: (apiKey: string, model: string) => TextModel = (apiKey, model) => new GeminiClient({ apiKey, model })) {}
+    private readonly testClient: (apiKey: string, model: string) => TextModel = (apiKey, model) => new GeminiClient({ apiKey, model }),
+    private readonly listModels: (apiKey: string, signal: AbortSignal) => Promise<GeminiModelOption[]> = (apiKey, signal) => listGeminiModels({ apiKey, signal })) {}
 
   get view(): AISettingsView {
     return { provider: this.store.getSetting("ai.provider") === "gemini" ? "gemini" : "ollama",
@@ -44,9 +46,29 @@ export class AISettings {
     return result;
   }
 
+  /**
+   * The Gemini text models the saved key can use, asked of Google. Only the key is sent, never Meeting content. It does not
+   * change any setting, so it is not serialised with the changes that do.
+   */
+  async geminiModels(): Promise<GeminiModelOption[]> {
+    if (this.closed) throw new Error("AI settings are shutting down");
+    const encrypted = this.store.getSetting("ai.gemini.encryptedKey");
+    if (!encrypted) throw new Error("Save a Gemini API key first");
+    const apiKey = await this.decrypt(encrypted);
+    if (this.closed) throw new Error("AI settings are shutting down");
+    this.listController?.abort();
+    const controller = (this.listController = new AbortController());
+    try {
+      return await this.listModels(apiKey, controller.signal);
+    } finally {
+      if (this.listController === controller) this.listController = undefined;
+    }
+  }
+
   async shutdown(): Promise<void> {
     this.closed = true;
     this.testController?.abort();
+    this.listController?.abort();
     await this.pending;
   }
 

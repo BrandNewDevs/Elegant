@@ -42,6 +42,10 @@ export class SetupBridge {
         if (!this.clients.has(event.sender)) throw new Error("This window cannot configure AI");
         return handlers.ai!.configure(action);
       });
+      ipcMain.handle("setup:gemini-models", (event) => {
+        if (!this.clients.has(event.sender)) throw new Error("This window cannot configure AI");
+        return handlers.ai!.geminiModels();
+      });
     }
     ipcMain.on("setup:ready", (event) => {
       if (!this.clients.has(event.sender)) return;

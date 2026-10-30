@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { GeminiClient, GEMINI_INPUT_BYTES } from "./gemini.js";
+import { GeminiClient, GEMINI_INPUT_BYTES, listGeminiModels } from "./gemini.js";
 import type { TextRequest } from "./language-model.js";
 
 const request: TextRequest = { messages: [{ role: "system", content: "Rules" }, { role: "user", content: "Synthetic evidence" }], schema: { type: "object" } };
@@ -53,4 +53,63 @@ it("propagates cancellation and timeouts without returning partial content", asy
   await expect(work).rejects.toMatchObject({ name: "AbortError" });
   await expect(client.complete({ ...request, timeoutMs: 10 })).rejects.toMatchObject({ name: "TimeoutError" });
   await expect(client.complete({ ...request, signal: AbortSignal.timeout(10) })).rejects.toMatchObject({ name: "TimeoutError" });
+});
+
+const model = (name: string, methods = ["generateContent", "countTokens"], displayName = name) => ({ name: `models/${name}`, displayName, supportedGenerationMethods: methods });
+const list = (models: unknown[], nextPageToken?: string) => new Response(JSON.stringify({ models, ...(nextPageToken ? { nextPageToken } : {}) }));
+
+it("lists the text models the key can use, sorted, leaving out other kinds of model", async () => {
+  const fetcher = vi.fn<typeof fetch>(async () => list([
+    model("gemini-2.5-pro", undefined, "Gemini 2.5 Pro"),
+    model("gemini-2.5-flash", undefined, "Gemini 2.5 Flash"),
+    model("gemini-2.5-flash-image"),
+    model("gemini-2.5-flash-preview-tts"),
+    model("gemini-live-2.5-flash-preview"),
+    model("gemini-embedding-001", ["embedContent"]),
+    model("gemini-2.0-flash-lite", ["countTokens"]),
+    model("imagen-4.0-generate-001", ["predict"]),
+    model("gemma-3-27b-it"),
+    { name: "gemini-no-prefix", supportedGenerationMethods: ["generateContent"] },
+  ]));
+  expect(await listGeminiModels({ apiKey: "private-key", fetch: fetcher })).toEqual([
+    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+    { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+  ]);
+});
+
+it("asks Google's fixed endpoint with the key in a header only, and follows pages", async () => {
+  const fetcher = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(list([model("gemini-a")], "next-page"))
+    .mockResolvedValueOnce(list([model("gemini-b")]));
+  const result = await listGeminiModels({ apiKey: "private-key", fetch: fetcher });
+  expect(result.map(m => m.id)).toEqual(["gemini-a", "gemini-b"]);
+  const [first, init] = fetcher.mock.calls[0]!;
+  expect(String(first)).toBe("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000");
+  expect(String(first)).not.toContain("private-key");
+  expect(init?.redirect).toBe("error");
+  expect(init?.headers).toMatchObject({ "x-goog-api-key": "private-key" });
+  expect(String(fetcher.mock.calls[1]![0])).toContain("pageToken=next-page");
+});
+
+it.each([401, 403, 429, 500])("sanitizes HTTP %s from the model list without echoing the key or the server's reply", async status => {
+  const fetcher = vi.fn<typeof fetch>(async () => new Response("private-key and server details", { status }));
+  await expect(listGeminiModels({ apiKey: "private-key", fetch: fetcher })).rejects.toThrow(/Gemini/);
+  try { await listGeminiModels({ apiKey: "private-key", fetch: fetcher }); } catch (error) {
+    expect(String(error)).not.toContain("private-key");
+    expect(String(error)).not.toContain("server details");
+  }
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+it("rejects a malformed model list, a bad key and an unreachable server without leaking the cause", async () => {
+  await expect(listGeminiModels({ apiKey: "private-key", fetch: async () => new Response("not json") })).rejects.toThrow("invalid model list");
+  await expect(listGeminiModels({ apiKey: "private-key", fetch: async () => new Response("{}") })).rejects.toThrow("no model list");
+  await expect(listGeminiModels({ apiKey: "has space" })).rejects.toThrow("valid Gemini API key");
+  await expect(listGeminiModels({ apiKey: "private-key", fetch: async () => { throw new Error("socket private-key"); } })).rejects.toThrow("Could not reach Gemini");
+});
+
+it("can be cancelled", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  await expect(listGeminiModels({ apiKey: "private-key", signal: controller.signal, fetch: async () => list([]) })).rejects.toMatchObject({ name: "AbortError" });
 });

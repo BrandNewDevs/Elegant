@@ -69,3 +69,22 @@ it("limits credential operations to attached windows and never pushes the saved 
   expect(send.mock.calls.at(-1)?.[1].ai).toMatchObject({ hasGeminiKey: true, provider: "ollama" });
   store.close();
 });
+
+it("lists Gemini models only for attached windows", async () => {
+  const store = openStore(":memory:");
+  const listModels = vi.fn(async () => [{ id: "gemini-test", label: "Gemini Test" }]);
+  const ai = new AISettings(store, {
+    isAsyncEncryptionAvailable: async () => true,
+    encryptStringAsync: async text => Buffer.from("protected:" + text),
+    decryptStringAsync: async () => ({ result: "private-key", shouldReEncrypt: false }),
+  }, undefined, listModels);
+  const setup = new Setup(new FakeEngine(), store, { speechModel: "tiny", modelsDirectory: "/models", checkOllama: async () => ({ status: "ready" }) });
+  const bridge = new SetupBridge(setup, { ai, done: () => {}, openSettings: () => {} });
+  const page = { once: () => {}, isDestroyed: () => false, send: vi.fn() } as unknown as WebContents;
+  bridge.attach(page);
+  const models = electron.handlers.get("setup:gemini-models")!;
+  expect(() => models({ sender: {} })).toThrow("cannot configure AI");
+  await electron.handlers.get("setup:configure-ai")!({ sender: page }, { type: "save-key", key: "private-key" });
+  expect(await models({ sender: page })).toEqual([{ id: "gemini-test", label: "Gemini Test" }]);
+  store.close();
+});

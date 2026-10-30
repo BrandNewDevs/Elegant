@@ -1,3 +1,4 @@
+import type { GeminiModelOption } from "../shared/ai-settings.js";
 import type { TextModel, TextRequest, TextResponse } from "./language-model.js";
 import { requestBytes } from "./model-request.js";
 
@@ -89,4 +90,53 @@ export class GeminiClient implements TextModel {
       throw new Error("Could not reach Gemini. Check your connection and retry.");
     }
   }
+}
+
+/** Models that can generate text but are for something else: images, speech, live audio, embeddings or agents. */
+const NOT_A_TEXT_MODEL = /embedding|-image|image-|-tts|-live|live-|native-audio|-audio|computer-use|robotics|aqa/;
+const MAX_PAGES = 5;
+
+/**
+ * The Gemini text models this key can use, asked of Google's models list: those that support `generateContent` and are not
+ * image, speech, live-audio or embedding variants. Only the key goes out, in a header, to the fixed endpoint; nothing from a
+ * Meeting is sent, and Google's error bodies are never forwarded.
+ */
+export async function listGeminiModels({ apiKey, signal, fetch: fetcher = fetch }: { apiKey: string; signal?: AbortSignal; fetch?: typeof fetch }): Promise<GeminiModelOption[]> {
+  if (!apiKey.trim() || /\s/.test(apiKey) || apiKey.length > 512) throw new Error("Enter a valid Gemini API key in Settings");
+  const timeout = AbortSignal.timeout(20_000);
+  const aborted = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  const found = new Map<string, string>();
+  try {
+    let pageToken = "";
+    for (let page = 0; page < MAX_PAGES; page++) {
+      aborted.throwIfAborted();
+      const url = new URL("https://generativelanguage.googleapis.com/v1beta/models");
+      url.searchParams.set("pageSize", "1000");
+      if (pageToken) url.searchParams.set("pageToken", pageToken);
+      const response = await fetcher(url, { redirect: "error", signal: aborted, headers: { "x-goog-api-key": apiKey } });
+      if (!response.ok) {
+        await response.body?.cancel();
+        throw new GeminiError(failure(response.status));
+      }
+      const text = await response.text();
+      if (text.length > MAX_REPLY_BYTES) throw new GeminiError("Gemini's model list exceeded its size limit");
+      let body: { models?: unknown; nextPageToken?: unknown };
+      try { body = JSON.parse(text); } catch { throw new GeminiError("Gemini returned an invalid model list. Retry the request."); }
+      if (!Array.isArray(body.models)) throw new GeminiError("Gemini returned no model list. Retry the request.");
+      for (const entry of body.models as { name?: unknown; displayName?: unknown; supportedGenerationMethods?: unknown }[]) {
+        const id = typeof entry?.name === "string" && entry.name.startsWith("models/") ? entry.name.slice("models/".length) : "";
+        const methods = Array.isArray(entry?.supportedGenerationMethods) ? entry.supportedGenerationMethods : [];
+        if (!validGeminiModel(id) || NOT_A_TEXT_MODEL.test(id) || !methods.includes("generateContent")) continue;
+        found.set(id, typeof entry.displayName === "string" && entry.displayName.trim() ? entry.displayName.trim().slice(0, 80) : id);
+      }
+      if (typeof body.nextPageToken !== "string" || !body.nextPageToken) break;
+      pageToken = body.nextPageToken;
+    }
+  } catch (error) {
+    if (signal?.aborted) throw Object.assign(new Error("The model list request was cancelled"), { name: "AbortError" });
+    if (timeout.aborted) throw Object.assign(new Error("Gemini did not answer in time. Retry the request."), { name: "TimeoutError" });
+    if (error instanceof GeminiError) throw error;
+    throw new Error("Could not reach Gemini. Check your connection and retry.");
+  }
+  return [...found].map(([id, label]) => ({ id, label })).sort((a, b) => a.id.localeCompare(b.id));
 }

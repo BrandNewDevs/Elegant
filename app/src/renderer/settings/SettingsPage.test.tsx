@@ -368,3 +368,51 @@ it("keeps the key that was typed when saving it fails", async () => {
   expect(screen.getByRole("alert").textContent).toContain("The keychain is locked");
   expect(field.value).toBe("entered-key");
 });
+
+const gemini = (extra = {}) => ({ ...nothingDone, ai: { provider: "ollama" as const, geminiModel: "gemini-2.5-flash", hasGeminiKey: true, ...extra } });
+
+it("loads the Gemini models from the API and picks one without saving a separate field", async () => {
+  pushSetupState(gemini());
+  vi.mocked(window.electron.setup.geminiModels).mockResolvedValue([{ id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" }, { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" }]);
+  page("Providers");
+  const picker = await screen.findByRole("combobox", { name: "Gemini text model" });
+  expect(window.electron.setup.geminiModels).toHaveBeenCalledTimes(1);
+  expect(picker.textContent).toContain("gemini-2.5-flash");
+  expect(screen.queryByRole("button", { name: "Save model" })).toBeNull();
+
+  openPicker(picker);
+  expect(await screen.findByRole("option", { name: "gemini-2.5-pro" })).toBeTruthy();
+  await act(async () => fireEvent.click(screen.getByRole("option", { name: "gemini-2.5-pro" })));
+  expect(window.electron.setup.configureAI).toHaveBeenCalledWith({ type: "model", model: "gemini-2.5-pro" });
+});
+
+it("asks Google for models only once a key is saved, and says so until then", () => {
+  pushSetupState(gemini({ hasGeminiKey: false }));
+  page("Providers");
+  const picker = screen.getByRole("combobox", { name: "Gemini text model" });
+  expect(picker.hasAttribute("disabled")).toBe(true);
+  expect(picker.textContent).toContain("gemini-2.5-flash");
+  expect(window.electron.setup.geminiModels).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Refresh models" }).hasAttribute("disabled")).toBe(true);
+});
+
+it("keeps the saved model visible when Google no longer lists it, and when the list is still loading", async () => {
+  pushSetupState(gemini({ geminiModel: "gemini-old" }));
+  vi.mocked(window.electron.setup.geminiModels).mockResolvedValue([{ id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" }]);
+  page("Providers");
+  const picker = screen.getByRole("combobox", { name: "Gemini text model" });
+  expect(picker.textContent).toContain("gemini-old");
+  await vi.waitFor(() => expect(window.electron.setup.geminiModels).toHaveBeenCalled());
+  openPicker(picker);
+  expect(await screen.findByRole("option", { name: "gemini-old (not listed)" })).toBeTruthy();
+});
+
+it("says why the model list could not be loaded and asks again on Refresh", async () => {
+  pushSetupState(gemini());
+  vi.mocked(window.electron.setup.geminiModels).mockRejectedValueOnce(new Error("Gemini access was denied. Check your API key.")).mockResolvedValue([{ id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" }]);
+  page("Providers");
+  expect(await screen.findByText("Gemini access was denied. Check your API key.")).toBeTruthy();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Refresh models" })));
+  expect(window.electron.setup.geminiModels).toHaveBeenCalledTimes(2);
+  expect(screen.queryByText("Gemini access was denied. Check your API key.")).toBeNull();
+});
