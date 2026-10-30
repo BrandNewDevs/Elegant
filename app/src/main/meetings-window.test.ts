@@ -285,6 +285,20 @@ describe("Meetings window application bridge", () => {
     });
   });
 
+  it("stores the Keep audio switch from the page, publishes it, and follows a change made elsewhere", () => {
+    const ctx = context();
+    expect(latest(ctx).keepAudio).toBe(false);
+    emit(ctx, "meetings:keep-audio", true);
+    expect(ctx.core.keepAudio).toBe(true);
+    expect(latest(ctx).keepAudio).toBe(true);
+    emit(ctx, "meetings:keep-audio", "false");
+    emit(ctx, "meetings:keep-audio", false, {});
+    expect(ctx.core.keepAudio).toBe(true);
+
+    ctx.core.setKeepAudio(false); // the menu bar's checkbox
+    expect(latest(ctx).keepAudio).toBe(false);
+  });
+
   it("stores the Check for updates switch from the page and publishes it", () => {
     const ctx = context();
     expect(latest(ctx).checkForUpdates).toBe(true);

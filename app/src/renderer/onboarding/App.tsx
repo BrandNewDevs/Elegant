@@ -35,7 +35,7 @@ function StageFrame({ icon, title, children, actions }: { icon: ReactNode; title
   );
 }
 
-/** Asks what to call the person; the name stands in for "You" in their Meetings. Optional, and changeable in Profile. */
+/** Asks what to call the person; the name stands in for "You" in their Meetings. Optional, and changeable in Settings. */
 function NameStage({ initial, onContinue }: { initial: string; onContinue: () => void }) {
   const [name, setName] = useState(initial);
   const submit = (e: FormEvent) => {
@@ -56,7 +56,7 @@ function NameStage({ initial, onContinue }: { initial: string; onContinue: () =>
           </Button>
         }
       >
-        <p>Your name appears in place of &ldquo;You&rdquo; in transcripts and summaries. You can change it later in Profile.</p>
+        <p>Your name appears in place of &ldquo;You&rdquo; in transcripts and summaries. You can change it later in Settings.</p>
         <div className="space-y-2 pt-2 text-left">
           <Label htmlFor="user-name">Your name</Label>
           <Input id="user-name" autoFocus autoComplete="name" maxLength={100} value={name} onChange={(e) => setName(e.target.value)} placeholder="Kenny" />

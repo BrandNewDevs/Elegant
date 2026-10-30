@@ -71,6 +71,7 @@ export class MeetingsWindow {
     core.onRecordingChange(() => this.pushState());
     core.onMeetingsChanged(() => this.pushState());
     core.onShowInDockChange(() => this.pushState());
+    core.onKeepAudioChange(() => this.pushState());
     core.onChatChanged(() => this.pushState());
     core.jobs.onChange(() => this.pushState());
     setup.onUserNameChange(() => this.pushState());
@@ -99,6 +100,10 @@ export class MeetingsWindow {
     ipcMain.on("meetings:show-in-dock", (event, show: unknown) => {
       if (!this.fromThis(event.sender) || typeof show !== "boolean") return;
       this.core.setShowInDock(show);
+    });
+    ipcMain.on("meetings:keep-audio", (event, keep: unknown) => {
+      if (!this.fromThis(event.sender) || typeof keep !== "boolean") return;
+      this.core.setKeepAudio(keep);
     });
     ipcMain.on("meetings:check-for-updates", (event, check: unknown) => {
       if (!this.fromThis(event.sender) || typeof check !== "boolean") return;
@@ -295,6 +300,7 @@ export class MeetingsWindow {
     const payload: MeetingsViewState = {
       settingsOpen: this.settingsOpen,
       showInDock: this.core.showInDock,
+      keepAudio: this.core.keepAudio,
       checkForUpdates: this.core.checkForUpdates,
       meetings,
       selected,

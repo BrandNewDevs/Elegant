@@ -90,6 +90,7 @@ it("asks for a name after the welcome, saves it, and moves on to the permissions
   fireEvent.click(screen.getByRole("button", { name: "Get started" }));
   expect(screen.getByRole("heading", { name: "What should we call you?" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Allow microphone" })).toBeNull();
+  expect(screen.getByText(/change it later in Settings/)).toBeTruthy(); // there is no Profile page any more
 
   fireEvent.change(screen.getByLabelText("Your name"), { target: { value: "  Kenny " } });
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));

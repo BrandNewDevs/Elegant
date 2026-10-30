@@ -80,7 +80,7 @@ macOS ties the microphone and system-audio permissions to the signing identity, 
 ### First run
 
 1. **Onboarding** asks for your name (optional) and walks through the two macOS permissions, one screen each: **Microphone** and **System audio capture**. Nothing is requested until you press its button.
-2. **Settings** (⌘, or the Settings entry in the sidebar) is a page with sections: General (your name, **Show in Dock**), Permissions, Models (the speech and speaker model downloads and the Ollama check) and Updates. If Ollama isn't running or lacks the model, Settings tells you the command to run. Missing models also download on first use, so none of this blocks recording.
+2. **Settings** (⌘, or the Settings entry in the sidebar) is a page with sections: General (your name, **Show in Dock**, **Keep audio after transcription**), Permissions, Models (the speech and speaker model downloads and the Ollama check) and Updates. If Ollama isn't running or lacks the model, Settings tells you the command to run. Missing models also download on first use, so none of this blocks recording.
 
 If you turn a permission off later, Settings reports where to turn it back on in System Settings, and **Check again** picks it up.
 

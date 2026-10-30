@@ -1605,6 +1605,22 @@ describe("searching Meetings", () => {
   });
 });
 
+describe("keep audio", () => {
+  it("is off until the user turns it on, and each change is announced once, from wherever it is made", () => {
+    const { core } = setup();
+    const changes: boolean[] = [];
+    core.onKeepAudioChange((keep) => changes.push(keep));
+    expect(core.keepAudio).toBe(false);
+
+    core.setKeepAudio(false);
+    core.setKeepAudio(true);
+    core.setKeepAudio(true);
+    expect(core.keepAudio).toBe(true);
+    core.setKeepAudio(false);
+    expect(changes).toEqual([true, false]);
+  });
+});
+
 describe("show in Dock", () => {
   it("is on until the user turns it off, and each change is announced once", () => {
     const { core } = setup();

@@ -12,6 +12,7 @@ export interface MeetingsApi {
   onState(callback: (state: MeetingsViewState) => void): () => void;
   settings(open: boolean): void;
   setShowInDock(show: boolean): void;
+  setKeepAudio(keep: boolean): void;
   setCheckForUpdates(check: boolean): void;
   /** Runs as an update downloads, is ready or fails, once the window is open to show it. */
   onUpdate(callback: (update: Exclude<UpdateState, { status: "idle" }>) => void): () => void;

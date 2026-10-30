@@ -14,6 +14,7 @@ import { SettingsPage, type SettingsSection } from "../settings/SettingsPage";
 export function MeetingsApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showInDock, setShowInDock] = useState(true);
+  const [keepAudio, setKeepAudio] = useState(false);
   const [checkForUpdates, setCheckForUpdates] = useState(true);
   const [section, setSection] = useState<SettingsSection>("General");
   const [recording, setRecording] = useState<MeetingsViewState["recording"]>();
@@ -37,6 +38,7 @@ export function MeetingsApp() {
       setJobs(state.jobs);
       setSettingsOpen(state.settingsOpen);
       setShowInDock(state.showInDock);
+      setKeepAudio(state.keepAudio ?? false);
       setCheckForUpdates(state.checkForUpdates);
       setQuery(state.query);
       setMeetings(state.meetings);
@@ -107,6 +109,7 @@ export function MeetingsApp() {
             onSectionChange={setSection}
             onBack={() => window.electron.meetings.settings(false)}
             showInDock={showInDock}
+            keepAudio={keepAudio}
             checkForUpdates={checkForUpdates}
             update={update}
             appVersion={appVersion}

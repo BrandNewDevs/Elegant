@@ -80,10 +80,7 @@ function render(): void {
         label: "Keep audio after transcription",
         type: "checkbox",
         checked: core.keepAudio,
-        click: (item) => {
-          core?.setKeepAudio(item.checked);
-          render();
-        },
+        click: (item) => core?.setKeepAudio(item.checked),
       },
       {
         label: "Show in Dock",
@@ -163,6 +160,7 @@ app.whenReady().then(() => {
 
   // A menu-bar app at start (LSUIElement); the "Show in Dock" setting, on unless turned off, adds a Dock icon, whose click opens the main window ("activate").
   applyShowInDock(core.showInDock);
+  core.onKeepAudioChange(render); // the Settings page can change it too
   core.onShowInDockChange((show) => {
     applyShowInDock(show);
     render();

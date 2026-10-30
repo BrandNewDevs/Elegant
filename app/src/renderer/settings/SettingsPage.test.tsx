@@ -100,6 +100,20 @@ it("turns Show in Dock on and off, starting from the stored setting", () => {
   expect(send.setShowInDock).toHaveBeenLastCalledWith(false);
 });
 
+it("turns Keep audio after transcription on and off, starting from the stored setting, and says it is off by default", () => {
+  const send = pushSetupState(nothingDone);
+  const { rerender } = page("General");
+  const toggle = screen.getByRole("switch", { name: "Keep audio after transcription" });
+  expect(toggle.getAttribute("aria-checked")).toBe("false");
+  fireEvent.click(toggle);
+  expect(send.setKeepAudio).toHaveBeenLastCalledWith(true);
+
+  rerender(<SettingsPage section="General" onSectionChange={() => {}} onBack={() => {}} keepAudio />);
+  expect(toggle.getAttribute("aria-checked")).toBe("true");
+  fireEvent.click(toggle);
+  expect(send.setKeepAudio).toHaveBeenLastCalledWith(false);
+});
+
 it("turns Check for updates on and off, starting from the stored setting", () => {
   const send = pushSetupState(nothingDone);
   const { rerender } = page("Updates", { checkForUpdates: false });

@@ -17,6 +17,7 @@ const meetings = {
   onState: (callback: (state: MeetingsViewState) => void) => subscribe("meetings:state", callback),
   settings: (open: boolean) => ipcRenderer.send("meetings:settings", open),
   setShowInDock: (show: boolean) => ipcRenderer.send("meetings:show-in-dock", show),
+  setKeepAudio: (keep: boolean) => ipcRenderer.send("meetings:keep-audio", keep),
   setCheckForUpdates: (check: boolean) => ipcRenderer.send("meetings:check-for-updates", check),
   onUpdate: (callback: (update: Exclude<UpdateState, { status: "idle" }>) => void) => subscribe("meetings:update", callback),
   restartForUpdate: () => ipcRenderer.invoke("meetings:restart-for-update"),
