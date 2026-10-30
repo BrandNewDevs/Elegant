@@ -1,4 +1,7 @@
 import { expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { openStore } from "../store/store.js";
 import { AISettings, type CredentialEncryption } from "./ai-settings.js";
 
@@ -90,4 +93,32 @@ it("waits for pending credential work before storage can close and rejects new w
   await stopped;
   expect(f.settings.view.hasGeminiKey).toBe(false);
   f.store.close();
+});
+
+it("restores provider and encrypted credentials from disk without rewriting an existing Summary", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "elegant-ai-settings-"));
+  const encryption: CredentialEncryption = {
+    isAsyncEncryptionAvailable: async () => true,
+    encryptStringAsync: async key => Buffer.from("test-encryption:" + key),
+    decryptStringAsync: async buffer => ({ result: buffer.toString().slice(16), shouldReEncrypt: false }),
+  };
+  let store: ReturnType<typeof openStore> | undefined;
+  try {
+    const path = join(directory, "meetings.db");
+    store = openStore(path);
+    const id = store.createMeeting({ app: "Synthetic", startedAt: "2026-10-30T10:00:00Z" });
+    const previous = { tldr: "Previously saved local Summary", participants: [] };
+    store.saveSummary(id, previous);
+    const settings = new AISettings(store, encryption);
+    await settings.configure({ type: "save-key", key: "synthetic-key" });
+    await settings.configure({ type: "select", provider: "gemini", consent: true });
+    await settings.shutdown();
+    store.close(); store = undefined;
+    store = openStore(path);
+    const restored = new AISettings(store, encryption);
+    expect(await restored.snapshot()).toMatchObject({ provider: "gemini", apiKey: "synthetic-key" });
+    expect(store.getMeeting(id)?.summary).toEqual(previous);
+    await restored.configure({ type: "select", provider: "ollama" });
+    expect(store.getMeeting(id)?.summary).toEqual(previous);
+  } finally { store?.close(); rmSync(directory, { recursive: true, force: true }); }
 });
