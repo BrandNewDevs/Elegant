@@ -14,6 +14,10 @@ export interface MeetingsApi {
   settings(open: boolean): void;
   setShowInDock(show: boolean): void;
   setAppearance(appearance: Appearance): void;
+  /** Chooses the Ollama model that writes Summaries and answers chat. */
+  setSummaryModel(model: string): void;
+  /** The models pulled into Ollama, empty when it is not running. */
+  installedModels(): Promise<string[]>;
   setKeepAudio(keep: boolean): void;
   setCheckForUpdates(check: boolean): void;
   /** Runs as an update downloads, is ready or fails, once the window is open to show it. */

@@ -1676,6 +1676,39 @@ describe("appearance", () => {
   });
 });
 
+describe("summary model", () => {
+  it("is the tested default until the user chooses, and each change is announced once", () => {
+    const { core } = setup();
+    const changes: string[] = [];
+    core.onSummaryModelChange((model) => changes.push(model));
+    expect(core.summaryModel).toBe("gemma3:4b");
+
+    core.setSummaryModel("gemma3:4b");
+    core.setSummaryModel("llama3.2:3b");
+    core.setSummaryModel("llama3.2:3b");
+    core.setSummaryModel("gemma3:4b");
+    expect(core.summaryModel).toBe("gemma3:4b");
+    expect(changes).toEqual(["llama3.2:3b", "gemma3:4b"]);
+  });
+
+  it("remembers the choice across a restart", () => {
+    const store = openStore(":memory:");
+    new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).setSummaryModel("hf.co/user/repo:Q4_K_M");
+    expect(new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).summaryModel).toBe("hf.co/user/repo:Q4_K_M");
+  });
+
+  it("refuses a name that is not a model name, and falls back when a stored one is not", () => {
+    const store = openStore(":memory:");
+    const core = new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() });
+    core.setSummaryModel("two words");
+    core.setSummaryModel("");
+    core.setSummaryModel("../../etc");
+    expect(core.summaryModel).toBe("gemma3:4b");
+    store.setSetting("summaryModel", "bad name!");
+    expect(new AppCore({ engine: new FakeEngine(), store, pipeline: fakePipeline() }).summaryModel).toBe("gemma3:4b");
+  });
+});
+
 describe("update check settings", () => {
   it("checks until the user turns it off, and a stored false is kept across a restart", () => {
     const store = openStore(":memory:");

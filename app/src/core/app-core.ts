@@ -14,6 +14,7 @@ import { resolveReference, transcriptRevision, type TranscriptReference } from "
 import { discardAudio, PipelineRunner } from "../pipeline/runner.js";
 import type { Appearance } from "../shared/appearance.js";
 import { isAppearance } from "../shared/appearance.js";
+import { DEFAULT_SUMMARY_MODEL, isModelName } from "../shared/summary-model.js";
 import type { Meeting, MeetingListItem, Store } from "../store/store.js";
 
 /** The store setting behind `AppCore.keepAudio`. */
@@ -24,6 +25,9 @@ const SHOW_IN_DOCK_SETTING = "showInDock";
 
 /** The store setting behind `AppCore.appearance`. */
 const APPEARANCE_SETTING = "appearance";
+
+/** The store setting behind `AppCore.summaryModel`. */
+const SUMMARY_MODEL_SETTING = "summaryModel";
 
 /** The store setting behind `AppCore.checkForUpdates`. */
 const CHECK_FOR_UPDATES_SETTING = "checkForUpdates";
@@ -85,6 +89,7 @@ export class AppCore {
   private stopNudgeListeners: ((app: string) => void)[] = [];
   private showInDockListeners: ((show: boolean) => void)[] = [];
   private appearanceListeners: ((appearance: Appearance) => void)[] = [];
+  private summaryModelListeners: ((model: string) => void)[] = [];
   private keepAudioListeners: ((keep: boolean) => void)[] = [];
   private recordingSettledWaiters: (() => void)[] = [];
   private stopTimer: ReturnType<typeof setTimeout> | undefined;
@@ -363,6 +368,23 @@ export class AppCore {
 
   onAppearanceChange(listener: (appearance: Appearance) => void): void {
     this.appearanceListeners.push(listener);
+  }
+
+  /** The Ollama model that writes Summaries and answers chat. The tested default until the user chooses another. */
+  get summaryModel(): string {
+    const stored = this.deps.store.getSetting(SUMMARY_MODEL_SETTING);
+    return isModelName(stored) ? stored : DEFAULT_SUMMARY_MODEL;
+  }
+
+  /** Remembers the choice and tells the listeners. It applies from the next request; Summaries already written keep the model they record. */
+  setSummaryModel(model: string): void {
+    if (!isModelName(model) || model === this.summaryModel) return;
+    this.deps.store.setSetting(SUMMARY_MODEL_SETTING, model);
+    for (const l of this.summaryModelListeners) l(model);
+  }
+
+  onSummaryModelChange(listener: (model: string) => void): void {
+    this.summaryModelListeners.push(listener);
   }
 
   /** Whether the app asks GitHub at launch for a newer release. On unless the user turned it off. */

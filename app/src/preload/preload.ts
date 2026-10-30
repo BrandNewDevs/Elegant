@@ -19,6 +19,8 @@ const meetings = {
   settings: (open: boolean) => ipcRenderer.send("meetings:settings", open),
   setShowInDock: (show: boolean) => ipcRenderer.send("meetings:show-in-dock", show),
   setAppearance: (appearance: Appearance) => ipcRenderer.send("meetings:appearance", appearance),
+  setSummaryModel: (model: string) => ipcRenderer.send("meetings:summary-model", model),
+  installedModels: () => ipcRenderer.invoke("meetings:installed-models"),
   setKeepAudio: (keep: boolean) => ipcRenderer.send("meetings:keep-audio", keep),
   setCheckForUpdates: (check: boolean) => ipcRenderer.send("meetings:check-for-updates", check),
   onUpdate: (callback: (update: Exclude<UpdateState, { status: "idle" }>) => void) => subscribe("meetings:update", callback),

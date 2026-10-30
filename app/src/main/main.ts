@@ -120,7 +120,7 @@ app.whenReady().then(() => {
   const store = openStore(join(dataDir, "meetings.db"));
   const engine = new ProcessEngine({ command: process.env.MEETING_RECORDER_ENGINE ?? engineCommand });
   ignoredAppsPath = join(dataDir, "ignored-apps.json");
-  const textModel = new OllamaClient();
+  const textModel = new OllamaClient({ model: () => core?.summaryModel ?? DEFAULT_SUMMARY_MODEL });
   core = new AppCore({
     chat: createMeetingChat({ store, model: textModel, modelName: DEFAULT_SUMMARY_MODEL }),
     engine,
@@ -136,7 +136,7 @@ app.whenReady().then(() => {
     jobs: core.jobs,
     speechModel: SPEECH_MODEL,
     modelsDirectory: join(dataDir, "models"),
-    checkOllama: () => checkOllama(),
+    checkOllama: () => checkOllama({ model: core?.summaryModel }),
   });
   const setupBridge = new SetupBridge(setup, {
     done: (sender) => BrowserWindow.fromWebContents(sender)?.close(),
@@ -165,6 +165,7 @@ app.whenReady().then(() => {
   core.onAppearanceChange((appearance) => {
     nativeTheme.themeSource = appearance;
   });
+  core.onSummaryModelChange(() => void setup.checkOllama()); // the readiness shown in Settings is for the model now chosen
   core.onKeepAudioChange(render); // the Settings page can change it too
   core.onShowInDockChange((show) => {
     applyShowInDock(show);

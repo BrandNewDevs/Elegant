@@ -6,6 +6,8 @@ import { isGithubUrl } from "../core/update-check.js";
 import type { Updater, UpdateState } from "../core/updater.js";
 import type { Setup } from "../setup/setup.js";
 import { isAppearance } from "../shared/appearance.js";
+import { isModelName } from "../shared/summary-model.js";
+import { listOllamaModels } from "../pipeline/ollama.js";
 import type { MeetingsViewState } from "../shared/meetings-view-state.js";
 import type { SetupBridge } from "./setup-bridge.js";
 import { preloadPath, rendererPagePath, windowBackground } from "./window-ui.js";
@@ -73,6 +75,7 @@ export class MeetingsWindow {
     core.onMeetingsChanged(() => this.pushState());
     core.onShowInDockChange(() => this.pushState());
     core.onAppearanceChange(() => this.pushState());
+    core.onSummaryModelChange(() => this.pushState());
     core.onKeepAudioChange(() => this.pushState());
     core.onChatChanged(() => this.pushState());
     core.jobs.onChange(() => this.pushState());
@@ -106,6 +109,14 @@ export class MeetingsWindow {
     ipcMain.on("meetings:appearance", (event, appearance: unknown) => {
       if (!this.fromThis(event.sender) || !isAppearance(appearance)) return;
       this.core.setAppearance(appearance);
+    });
+    ipcMain.on("meetings:summary-model", (event, model: unknown) => {
+      if (!this.fromThis(event.sender) || !isModelName(model)) return;
+      this.core.setSummaryModel(model);
+    });
+    ipcMain.handle("meetings:installed-models", (event) => {
+      this.requireFromThis(event.sender);
+      return listOllamaModels();
     });
     ipcMain.on("meetings:keep-audio", (event, keep: unknown) => {
       if (!this.fromThis(event.sender) || typeof keep !== "boolean") return;
@@ -307,6 +318,7 @@ export class MeetingsWindow {
       settingsOpen: this.settingsOpen,
       showInDock: this.core.showInDock,
       appearance: this.core.appearance,
+      summaryModel: this.core.summaryModel,
       keepAudio: this.core.keepAudio,
       checkForUpdates: this.core.checkForUpdates,
       meetings,

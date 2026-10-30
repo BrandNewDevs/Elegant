@@ -1,8 +1,9 @@
 import { Bell, CheckCircle2, Cpu, Download, ExternalLink, Loader2, Monitor, Moon, RefreshCw, ShieldCheck, SlidersHorizontal, Sun, XCircle, AlertCircle, type LucideIcon } from "lucide-react";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { UpdateState } from "../../core/updater";
 import { APPEARANCES, type Appearance } from "../../shared/appearance";
+import { DEFAULT_SUMMARY_MODEL } from "../../shared/summary-model";
 import type { Step } from "../../setup/setup";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -180,7 +181,39 @@ function Permissions({ state, name }: { state: { microphone: PermissionStep; sys
   );
 }
 
-function Models({ models, ollama, name }: { models: Step & { fraction: number }; ollama: Step; name: string }) {
+/** Picks the Ollama model that writes Summaries from the ones pulled; the tested default is marked, anything else is cautioned. */
+function SummaryModelPicker({ model, ollama }: { model: string; ollama: Step["status"] }) {
+  const [installed, setInstalled] = useState<string[]>([]);
+  useEffect(() => {
+    let current = true;
+    void window.electron.meetings.installedModels().then((names) => current && setInstalled(names));
+    return () => {
+      current = false;
+    };
+  }, [ollama]); // look again once Ollama is found or its check finishes
+  const options = [...new Set([...installed, model])].sort((a, b) => a.localeCompare(b));
+  const label = (option: string) =>
+    option + (option === DEFAULT_SUMMARY_MODEL ? " (tested)" : "") + (installed.length > 0 && !installed.includes(option) ? " (not pulled)" : "");
+  return (
+    <select
+      id="summary-model"
+      value={model}
+      onChange={(e) => {
+        window.electron.meetings.setSummaryModel(e.target.value);
+        toast("Summary model changed", { description: "New Summaries use it. Regenerate a Summary to redo an existing one." });
+      }}
+      className="h-9 w-56 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    >
+      {options.map((option) => (
+        <option key={option} value={option}>
+          {label(option)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function Models({ models, ollama, summaryModel, name }: { models: Step & { fraction: number }; ollama: Step; summaryModel: string; name: string }) {
   const percent = Math.round(models.fraction * 100);
   return (
     <div className="divide-y">
@@ -209,6 +242,13 @@ function Models({ models, ollama, name }: { models: Step & { fraction: number };
         {models.status === "working" && <Status label="Downloading…" variant="warning" />}
         {models.status === "problem" && <Status label="Failed" variant="destructive" />}
         {models.status === "todo" && <Status label="Not downloaded" variant="secondary" />}
+      </SettingRow>
+      <SettingRow
+        title="Summary model"
+        htmlFor="summary-model"
+        description={summaryModel === DEFAULT_SUMMARY_MODEL ? undefined : "Not tested with Elegant's Summaries, so results may be worse or fail validation."}
+      >
+        <SummaryModelPicker model={summaryModel} ollama={ollama.status} />
       </SettingRow>
       <SettingRow
         title="Summaries"
@@ -277,6 +317,7 @@ export function SettingsPage({
   onSectionChange,
   onBack,
   appearance = "system",
+  summaryModel = DEFAULT_SUMMARY_MODEL,
   showInDock = true,
   keepAudio = false,
   checkForUpdates = true,
@@ -287,6 +328,7 @@ export function SettingsPage({
   onSectionChange: (section: SettingsSection) => void;
   onBack: () => void;
   appearance?: Appearance;
+  summaryModel?: string;
   showInDock?: boolean;
   keepAudio?: boolean;
   checkForUpdates?: boolean;
@@ -329,7 +371,7 @@ export function SettingsPage({
               <>
                 {section === "General" && <General appearance={appearance} showInDock={showInDock} keepAudio={keepAudio} userName={view.userName} />}
                 {section === "Permissions" && <Permissions state={view.state} name={view.name} />}
-                {section === "Models" && <Models models={view.state.models} ollama={view.state.ollama} name={view.name} />}
+                {section === "Models" && <Models models={view.state.models} ollama={view.state.ollama} summaryModel={summaryModel} name={view.name} />}
                 {section === "Updates" && <Updates checkForUpdates={checkForUpdates} update={update} appVersion={appVersion} name={view.name} />}
               </>
             )}

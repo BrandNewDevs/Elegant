@@ -12,6 +12,8 @@ export type MeetingsViewState = {
   showInDock: boolean;
   /** The Appearance setting, shown in Settings. Absent in older renderer state fixtures. */
   appearance?: Appearance;
+  /** The Summary model setting, shown in Settings. Absent in older renderer state fixtures. */
+  summaryModel?: string;
   /** The "Keep audio after transcription" setting, shown in Settings. Absent in older renderer state fixtures. */
   keepAudio?: boolean;
   /** The "Check for updates" setting, shown in Settings. */

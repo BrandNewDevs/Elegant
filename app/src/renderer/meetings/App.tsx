@@ -16,6 +16,7 @@ export function MeetingsApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showInDock, setShowInDock] = useState(true);
   const [appearance, setAppearance] = useState<Appearance>("system");
+  const [summaryModel, setSummaryModel] = useState<string>();
   const [keepAudio, setKeepAudio] = useState(false);
   const [checkForUpdates, setCheckForUpdates] = useState(true);
   const [section, setSection] = useState<SettingsSection>("General");
@@ -41,6 +42,7 @@ export function MeetingsApp() {
       setSettingsOpen(state.settingsOpen);
       setShowInDock(state.showInDock);
       setAppearance(state.appearance ?? "system");
+      setSummaryModel(state.summaryModel);
       setKeepAudio(state.keepAudio ?? false);
       setCheckForUpdates(state.checkForUpdates);
       setQuery(state.query);
@@ -121,6 +123,7 @@ export function MeetingsApp() {
           onBack={() => window.electron.meetings.settings(false)}
           showInDock={showInDock}
           appearance={appearance}
+          summaryModel={summaryModel}
           keepAudio={keepAudio}
           checkForUpdates={checkForUpdates}
           update={update}

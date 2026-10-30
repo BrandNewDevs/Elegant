@@ -103,6 +103,28 @@ it("shows the chosen Appearance and asks to change it", () => {
   expect(send.setAppearance).toHaveBeenLastCalledWith("light");
 });
 
+it("picks the Summary model from the pulled ones, marks the tested default and cautions about any other", async () => {
+  const send = pushSetupState(nothingDone);
+  vi.mocked(window.electron.meetings.installedModels).mockResolvedValue(["llama3.2:3b", "gemma3:4b"]);
+  const { rerender } = page("Models");
+  const picker = (await screen.findByRole("combobox", { name: "Summary model" })) as HTMLSelectElement;
+  expect(await screen.findByRole("option", { name: "gemma3:4b (tested)" })).toBeTruthy();
+  expect(picker.value).toBe("gemma3:4b");
+  expect(screen.queryByText(/Not tested/)).toBeNull();
+
+  fireEvent.change(picker, { target: { value: "llama3.2:3b" } });
+  expect(send.setSummaryModel).toHaveBeenLastCalledWith("llama3.2:3b");
+
+  rerender(<SettingsPage section="Models" onSectionChange={() => {}} onBack={() => {}} summaryModel="llama3.2:3b" />);
+  expect(screen.getByText(/Not tested with/)).toBeTruthy();
+});
+
+it("keeps a chosen model in the list even when Ollama is not running or no longer has it", async () => {
+  pushSetupState(nothingDone);
+  page("Models", { summaryModel: "qwen3:4b" });
+  expect(await screen.findByRole("option", { name: "qwen3:4b" })).toBeTruthy();
+});
+
 it("turns Show in Dock on and off, starting from the stored setting", () => {
   const send = pushSetupState(nothingDone);
   const { rerender } = page("General", { showInDock: false });

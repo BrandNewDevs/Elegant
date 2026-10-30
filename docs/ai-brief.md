@@ -22,7 +22,7 @@ Linux can exercise Summary and chat logic and provide development measurements. 
 
 ## Constraints
 
-- **Fully local, open-weight only.** Nothing may call a cloud API ([ADR 0002](./adr/0002-fully-local-processing.md)). Summaries use models served by Ollama; the default is `gemma3:4b`.
+- **Fully local, open-weight only.** Nothing may call a cloud API ([ADR 0002](./adr/0002-fully-local-processing.md)). Summaries use models served by Ollama; the default is `gemma3:4b`. Settings → Models lets the person pick any model pulled into Ollama (the `summaryModel` setting). Only `gemma3:4b` has passed the evaluation gates, so any other choice is shown as untested.
 - **English only.**
 - **Transcription runs after the Meeting, in one batch.** Live or streaming transcription is out of scope.
 

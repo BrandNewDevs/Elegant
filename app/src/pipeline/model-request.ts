@@ -1,8 +1,9 @@
+import { DEFAULT_SUMMARY_MODEL } from "../shared/summary-model.js";
 import type { TextRequest } from "./language-model.js";
 
 /** Shared by generation, readiness checks and request construction. */
 export const AI_SETTINGS = Object.freeze({
-  model: "gemma3:4b",
+  model: DEFAULT_SUMMARY_MODEL,
   numCtx: 8192,
   maxOutputTokens: 2048,
   maxInputBytes: 5500,
