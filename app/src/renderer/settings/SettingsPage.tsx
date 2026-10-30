@@ -48,13 +48,13 @@ function Problem({ children }: { children: ReactNode }) {
 }
 
 /** One setting: a title and what it does on the left, its control on the right. */
-function SettingRow({ title, htmlFor, description, children, below, stacked }: { title: string; htmlFor?: string; description: ReactNode; children?: ReactNode; below?: ReactNode; stacked?: boolean }) {
+function SettingRow({ title, htmlFor, description, children, below, stacked }: { title: string; htmlFor?: string; description?: ReactNode; children?: ReactNode; below?: ReactNode; stacked?: boolean }) {
   return (
     <div className="py-4">
-      <div className={cn("flex gap-x-6 gap-y-3", stacked ? "flex-col" : "items-start justify-between")}>
+      <div className={cn("flex gap-x-6 gap-y-3", stacked ? "flex-col" : description ? "items-start justify-between" : "items-center justify-between")}>
         <div className="min-w-0 space-y-1">
           {htmlFor ? <Label htmlFor={htmlFor} className="text-sm font-medium">{title}</Label> : <h3 className="text-sm font-medium">{title}</h3>}
-          <p className="text-sm text-muted-foreground">{description}</p>
+          {description && <p className="text-sm text-muted-foreground">{description}</p>}
         </div>
         {children && <div className="shrink-0">{children}</div>}
       </div>
@@ -114,17 +114,17 @@ function AppearancePicker({ appearance }: { appearance: Appearance }) {
   );
 }
 
-function General({ appearance, showInDock, keepAudio, name, userName }: { appearance: Appearance; showInDock: boolean; keepAudio: boolean; name: string; userName: string }) {
+function General({ appearance, showInDock, keepAudio, userName }: { appearance: Appearance; showInDock: boolean; keepAudio: boolean; userName: string }) {
   return (
     <div className="divide-y">
       <SettingRow stacked title="Your name" htmlFor="user-name" description={<>Used instead of &ldquo;You&rdquo; in every Transcript, Summary and export. Stays on this Mac.</>}>
         {/* Keyed on the saved name so the field follows a change made elsewhere. */}
         <NameForm key={userName} userName={userName} />
       </SettingRow>
-      <SettingRow title="Appearance" description={`Choose light or dark for ${name}, or follow your Mac's setting.`}>
+      <SettingRow title="Appearance">
         <AppearancePicker appearance={appearance} />
       </SettingRow>
-      <SettingRow title="Show in Dock" htmlFor="show-in-dock" description={`Show ${name} in the Dock as well as the menu bar. Clicking the Dock icon opens ${name}, and minimised windows go there.`}>
+      <SettingRow title="Show in Dock" htmlFor="show-in-dock">
         <Switch id="show-in-dock" checked={showInDock} onCheckedChange={(checked) => window.electron.meetings.setShowInDock(checked)} />
       </SettingRow>
       <SettingRow title="Keep audio after transcription" htmlFor="keep-audio" description="Keep each Recording's audio on this Mac after it is transcribed, until you delete the Meeting. Off by default, so the audio is deleted once the Transcript exists. Applies from the next transcription.">
@@ -264,7 +264,7 @@ function Updates({ checkForUpdates, update, appVersion, name }: { checkForUpdate
       <SettingRow
         title="Check for updates"
         htmlFor="check-for-updates"
-        description={`Look for a newer release on GitHub when ${name} starts, and download it in the background. You choose when to restart, never during a Recording or while a Meeting is processing. Nothing about you or your Meetings is sent.`}
+        description="Asks GitHub for a newer release when it starts. Nothing about you or your Meetings is sent."
       >
         <Switch id="check-for-updates" checked={checkForUpdates} onCheckedChange={(checked) => window.electron.meetings.setCheckForUpdates(checked)} />
       </SettingRow>
@@ -331,7 +331,7 @@ export function SettingsPage({
             </DialogTitle>
             {view && (
               <>
-                {section === "General" && <General appearance={appearance} showInDock={showInDock} keepAudio={keepAudio} name={view.name} userName={view.userName} />}
+                {section === "General" && <General appearance={appearance} showInDock={showInDock} keepAudio={keepAudio} userName={view.userName} />}
                 {section === "Permissions" && <Permissions state={view.state} name={view.name} />}
                 {section === "Models" && <Models models={view.state.models} ollama={view.state.ollama} name={view.name} />}
                 {section === "Updates" && <Updates checkForUpdates={checkForUpdates} update={update} appVersion={appVersion} name={view.name} />}
