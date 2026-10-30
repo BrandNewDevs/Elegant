@@ -147,3 +147,34 @@ it("cancels an active test outside the serialized mutation queue", async () => {
   await f.settings.configure({ type: "select", provider: "ollama" });
   f.store.close();
 });
+it("cancels a test that has not reached Gemini yet", async () => {
+  const f = fixture();
+  await f.settings.configure({ type: "save-key", key: "synthetic" });
+  let unlock!: () => void;
+  vi.mocked(f.encryption.decryptStringAsync).mockImplementationOnce(buffer => new Promise(resolve => { unlock = () => resolve({ result: buffer.toString().slice(10), shouldReEncrypt: false }); }));
+  const work = f.settings.configure({ type: "test" });
+  await vi.waitFor(() => expect(f.encryption.decryptStringAsync).toHaveBeenCalled());
+  await f.settings.configure({ type: "cancel-test" });
+  unlock();
+  await expect(work).rejects.toThrow("cancelled");
+  expect(f.complete).not.toHaveBeenCalled();
+  f.store.close();
+});
+it("explains a connection-test timeout as a setup problem", async () => {
+  const f = fixture();
+  await f.settings.configure({ type: "save-key", key: "synthetic" });
+  f.complete.mockRejectedValue(Object.assign(new Error("Gemini request timed out. Retry or ask a narrower question."), { name: "TimeoutError" }));
+  await expect(f.settings.configure({ type: "test" })).rejects.toThrow("timed out after 60 seconds. Check network access and the saved model");
+  f.store.close();
+});
+it("requests low thinking only for the default model", async () => {
+  const f = fixture();
+  await f.settings.configure({ type: "save-key", key: "synthetic" });
+  await f.settings.configure({ type: "test" });
+  await f.settings.configure({ type: "model", model: "gemini-other" });
+  await f.settings.configure({ type: "test" });
+  const requests = f.complete.mock.calls.map(call => (call as unknown[])[0]);
+  expect(requests[0]).toMatchObject({ thinkingLevel: "low" });
+  expect(requests[1]).not.toHaveProperty("thinkingLevel");
+  f.store.close();
+});

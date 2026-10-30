@@ -14,6 +14,7 @@ export interface TextRequest {
   signal?: AbortSignal;
   timeoutMs?: number;
   maxOutputTokens?: number;
+  /** Gemini only; other providers ignore it. */
   thinkingLevel?: "low";
 }
 
