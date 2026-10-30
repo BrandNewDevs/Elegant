@@ -103,16 +103,23 @@ it("shows the chosen Appearance and asks to change it", () => {
   expect(send.setAppearance).toHaveBeenLastCalledWith("light");
 });
 
+/** Radix opens a Select on a key press on its trigger; happy-dom has no pointer capture for its click path. */
+function openPicker(picker: HTMLElement) {
+  picker.focus();
+  fireEvent.keyDown(picker, { key: "Enter" });
+}
+
 it("picks the Summary model from the pulled ones, marks the tested default and cautions about any other", async () => {
   const send = pushSetupState(nothingDone);
   vi.mocked(window.electron.meetings.installedModels).mockResolvedValue(["llama3.2:3b", "gemma3:4b"]);
   const { rerender } = page("Models");
-  const picker = (await screen.findByRole("combobox", { name: "Summary model" })) as HTMLSelectElement;
-  expect(await screen.findByRole("option", { name: "gemma3:4b (tested)" })).toBeTruthy();
-  expect(picker.value).toBe("gemma3:4b");
+  const picker = await screen.findByRole("combobox", { name: "Summary model" });
+  expect(picker.textContent).toContain("gemma3:4b");
   expect(screen.queryByText(/Not tested/)).toBeNull();
 
-  fireEvent.change(picker, { target: { value: "llama3.2:3b" } });
+  openPicker(picker);
+  expect(await screen.findByRole("option", { name: "gemma3:4b (tested)" })).toBeTruthy();
+  fireEvent.click(await screen.findByRole("option", { name: "llama3.2:3b" }));
   expect(send.setSummaryModel).toHaveBeenLastCalledWith("llama3.2:3b");
 
   rerender(<SettingsPage section="Models" onSectionChange={() => {}} onBack={() => {}} summaryModel="llama3.2:3b" />);
@@ -122,6 +129,9 @@ it("picks the Summary model from the pulled ones, marks the tested default and c
 it("keeps a chosen model in the list even when Ollama is not running or no longer has it", async () => {
   pushSetupState(nothingDone);
   page("Models", { summaryModel: "qwen3:4b" });
+  const picker = await screen.findByRole("combobox", { name: "Summary model" });
+  expect(picker.textContent).toContain("qwen3:4b");
+  openPicker(picker);
   expect(await screen.findByRole("option", { name: "qwen3:4b" })).toBeTruthy();
 });
 

@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { PERMISSIONS, type PermissionCopy, type PermissionStep } from "@/lib/permissions";
 import { useSetup } from "@/lib/use-setup";
@@ -195,21 +196,24 @@ function SummaryModelPicker({ model, ollama }: { model: string; ollama: Step["st
   const label = (option: string) =>
     option + (option === DEFAULT_SUMMARY_MODEL ? " (tested)" : "") + (installed.length > 0 && !installed.includes(option) ? " (not pulled)" : "");
   return (
-    <select
-      id="summary-model"
+    <Select
       value={model}
-      onChange={(e) => {
-        window.electron.meetings.setSummaryModel(e.target.value);
+      onValueChange={(next) => {
+        window.electron.meetings.setSummaryModel(next);
         toast("Summary model changed", { description: "New Summaries use it. Regenerate a Summary to redo an existing one." });
       }}
-      className="h-9 w-56 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
-      {options.map((option) => (
-        <option key={option} value={option}>
-          {label(option)}
-        </option>
-      ))}
-    </select>
+      <SelectTrigger id="summary-model" className="w-56">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem key={option} value={option}>
+            {label(option)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
