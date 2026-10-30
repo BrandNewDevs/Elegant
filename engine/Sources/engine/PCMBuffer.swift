@@ -1,5 +1,6 @@
 // The most recent audio of one track, held in memory only. From Detection until the Prompt is answered the engine
-// captures into one of these; accepting flushes it to the start of the Recording, declining throws it away.
+// captures into one of these; accepting flushes it to the start of the Recording, closing the Prompt throws it away.
+// It never grows past `capacityFrames`, so a Prompt left up for hours holds the same last few minutes.
 // Nothing here touches the disk.
 import Foundation
 

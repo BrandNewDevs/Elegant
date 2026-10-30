@@ -1,14 +1,19 @@
-import { ArrowLeft, Bell, CheckCircle2, Cpu, Download, ExternalLink, Loader2, RefreshCw, ShieldCheck, SlidersHorizontal, XCircle, AlertCircle, type LucideIcon } from "lucide-react";
+import { Bell, CheckCircle2, Cpu, Download, ExternalLink, Loader2, Monitor, Moon, RefreshCw, ShieldCheck, SlidersHorizontal, Sun, Trash2, XCircle, AlertCircle, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { UpdateState } from "../../core/updater";
+import { APPEARANCES, type Appearance } from "../../shared/appearance";
+import { DEFAULT_SUMMARY_MODEL } from "../../shared/summary-model";
+import { MODEL_KINDS, type ModelFile, type ModelKind } from "../../shared/model-kinds";
 import type { Step } from "../../setup/setup";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { PERMISSIONS, type PermissionCopy, type PermissionStep } from "@/lib/permissions";
 import { useSetup } from "@/lib/use-setup";
@@ -46,13 +51,13 @@ function Problem({ children }: { children: ReactNode }) {
 }
 
 /** One setting: a title and what it does on the left, its control on the right. */
-function SettingRow({ title, htmlFor, description, children, below, stacked }: { title: string; htmlFor?: string; description: ReactNode; children?: ReactNode; below?: ReactNode; stacked?: boolean }) {
+function SettingRow({ title, htmlFor, description, children, below, stacked }: { title: string; htmlFor?: string; description?: ReactNode; children?: ReactNode; below?: ReactNode; stacked?: boolean }) {
   return (
     <div className="py-4">
-      <div className={cn("flex gap-x-6 gap-y-3", stacked ? "flex-col" : "items-start justify-between")}>
+      <div className={cn("flex gap-x-6 gap-y-3", stacked ? "flex-col" : description ? "items-start justify-between" : "items-center justify-between")}>
         <div className="min-w-0 space-y-1">
           {htmlFor ? <Label htmlFor={htmlFor} className="text-sm font-medium">{title}</Label> : <h3 className="text-sm font-medium">{title}</h3>}
-          <p className="text-sm text-muted-foreground">{description}</p>
+          {description && <p className="text-sm text-muted-foreground">{description}</p>}
         </div>
         {children && <div className="shrink-0">{children}</div>}
       </div>
@@ -79,17 +84,53 @@ function NameForm({ userName }: { userName: string }) {
   );
 }
 
-function General({ showInDock, keepAudio, name, userName }: { showInDock: boolean; keepAudio: boolean; name: string; userName: string }) {
+const APPEARANCE_OPTION: Record<Appearance, { label: string; Icon: LucideIcon }> = {
+  system: { label: "System", Icon: Monitor },
+  light: { label: "Light", Icon: Sun },
+  dark: { label: "Dark", Icon: Moon },
+};
+
+/** Picks how the windows are coloured; one option is always chosen. */
+function AppearancePicker({ appearance }: { appearance: Appearance }) {
+  return (
+    <div role="radiogroup" aria-label="Appearance" className="inline-flex gap-0.5 rounded-lg border bg-muted/40 p-0.5">
+      {APPEARANCES.map((id) => {
+        const { label, Icon } = APPEARANCE_OPTION[id];
+        const chosen = appearance === id;
+        return (
+          <Button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={chosen}
+            size="sm"
+            variant={chosen ? "secondary" : "ghost"}
+            className={cn("h-7 px-2.5", chosen ? "bg-background shadow-sm hover:bg-background" : "text-muted-foreground")}
+            onClick={() => window.electron.meetings.setAppearance(id)}
+          >
+            <Icon aria-hidden />
+            {label}
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
+
+function General({ appearance, showInDock, keepAudio, userName }: { appearance: Appearance; showInDock: boolean; keepAudio: boolean; userName: string }) {
   return (
     <div className="divide-y">
-      <SettingRow stacked title="Your name" htmlFor="user-name" description={<>Shown in place of &ldquo;You&rdquo; in transcripts, summaries and exports, in every Meeting. It is kept on this Mac only.</>}>
+      <SettingRow stacked title="Your name" htmlFor="user-name" description={<>Used instead of &ldquo;You&rdquo; in every Transcript, Summary and export. Stays on this Mac.</>}>
         {/* Keyed on the saved name so the field follows a change made elsewhere. */}
         <NameForm key={userName} userName={userName} />
       </SettingRow>
-      <SettingRow title="Show in Dock" htmlFor="show-in-dock" description={`${name} always has its menu bar icon. With this on, it also shows in the Dock: click the icon to open ${name}, and minimised windows go there.`}>
+      <SettingRow title="Appearance">
+        <AppearancePicker appearance={appearance} />
+      </SettingRow>
+      <SettingRow title="Show in Dock" htmlFor="show-in-dock">
         <Switch id="show-in-dock" checked={showInDock} onCheckedChange={(checked) => window.electron.meetings.setShowInDock(checked)} />
       </SettingRow>
-      <SettingRow title="Keep audio after transcription" htmlFor="keep-audio" description="Off by default: a Recording's audio is deleted once its Transcript exists. With this on, the audio stays on this Mac until you delete the Meeting. It applies from the next transcription on.">
+      <SettingRow title="Keep audio after transcription" htmlFor="keep-audio" description="Keep each Recording's audio on this Mac after it is transcribed, until you delete the Meeting. Off by default, so the audio is deleted once the Transcript exists. Applies from the next transcription.">
         <Switch id="keep-audio" checked={keepAudio} onCheckedChange={(checked) => window.electron.meetings.setKeepAudio(checked)} />
       </SettingRow>
     </div>
@@ -133,7 +174,7 @@ function PermissionRow({ copy, step, name }: { copy: PermissionCopy; step: Permi
 function Permissions({ state, name }: { state: { microphone: PermissionStep; systemAudio: PermissionStep }; name: string }) {
   return (
     <>
-      <p className="text-sm text-muted-foreground">macOS remembers your answer, so each permission is asked for once.</p>
+      <p className="text-sm text-muted-foreground">macOS asks once and remembers your answer.</p>
       <div className="divide-y">
         <PermissionRow copy={PERMISSIONS.microphone} step={state.microphone} name={name} />
         <PermissionRow copy={PERMISSIONS.systemAudio} step={state.systemAudio} name={name} />
@@ -142,39 +183,162 @@ function Permissions({ state, name }: { state: { microphone: PermissionStep; sys
   );
 }
 
-function Models({ models, ollama, name }: { models: Step & { fraction: number }; ollama: Step; name: string }) {
+/** Picks the Ollama model that writes Summaries from the ones pulled; any model but the tested default is cautioned about. */
+function SummaryModelPicker({ model, ollama }: { model: string; ollama: Step["status"] }) {
+  const [installed, setInstalled] = useState<string[]>([]);
+  useEffect(() => {
+    let current = true;
+    void window.electron.meetings.installedModels().then((names) => current && setInstalled(names));
+    return () => {
+      current = false;
+    };
+  }, [ollama]); // look again once Ollama is found or its check finishes
+  const options = [...new Set([...installed, model])].sort((a, b) => a.localeCompare(b));
+  const label = (option: string) =>
+    option + (installed.length > 0 && !installed.includes(option) ? " (not pulled)" : "");
+  return (
+    <Select
+      value={model}
+      onValueChange={(next) => {
+        window.electron.meetings.setSummaryModel(next);
+        toast("Summary model changed", { description: "New Summaries use it. Regenerate a Summary to redo an existing one." });
+      }}
+    >
+      <SelectTrigger id="summary-model" className="w-56">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem key={option} value={option}>
+            {label(option)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+const MODEL_ROW: Record<ModelKind, { title: string; description: string; noun: string }> = {
+  speech: { title: "Speech model", description: "Whisper large-v3 turns speech into text.", noun: "speech model" },
+  speaker: { title: "Speaker model", description: "Pyannote tells Participants apart.", noun: "speaker model" },
+};
+
+const formatSize = (bytes: number) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`);
+
+/**
+ * The speech and speaker models on this Mac, each with its size and buttons to remove it or fetch it again, and the one
+ * download that fetches whatever is missing. Both kinds are fetched together, so their progress and problems are shared.
+ */
+function DownloadedModels({ models, name }: { models: Step & { fraction: number }; name: string }) {
+  const [files, setFiles] = useState<ModelFile[]>();
+  const [asked, setAsked] = useState<{ kind: ModelKind; action: "remove" | "redownload" }>();
+  useEffect(() => {
+    let current = true;
+    void window.electron.meetings.modelFiles().then((found) => current && setFiles(found));
+    return () => {
+      current = false;
+    };
+  }, [models.status]); // a download starting, finishing or failing, or a removal, changes what is on disk
+  const downloading = models.status === "working";
+  const percent = Math.round(models.fraction * 100);
+  const anyMissing = files !== undefined && MODEL_KINDS.some((kind) => !files.find((file) => file.kind === kind)?.present);
+
+  const confirm = async () => {
+    if (!asked) return;
+    const { kind, action } = asked;
+    setAsked(undefined);
+    const result = await (action === "remove" ? window.electron.meetings.removeModel(kind) : window.electron.meetings.redownloadModel(kind));
+    if (!result.ok) toast.error(result.reason);
+    setFiles(await window.electron.meetings.modelFiles());
+  };
+
+  return (
+    <>
+      {MODEL_KINDS.map((kind) => {
+        const file = files?.find((f) => f.kind === kind);
+        const copy = MODEL_ROW[kind];
+        return (
+          <SettingRow
+            key={kind}
+            title={copy.title}
+            description={copy.description}
+            below={
+              file?.present && !downloading ? (
+                <div className="flex gap-2 pt-3">
+                  <Button type="button" size="sm" variant="outline" onClick={() => setAsked({ kind, action: "redownload" })}>
+                    <RefreshCw aria-hidden />
+                    Redownload
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setAsked({ kind, action: "remove" })}>
+                    <Trash2 aria-hidden />
+                    Remove
+                  </Button>
+                </div>
+              ) : undefined
+            }
+          >
+            {downloading && <Status label="Downloading…" variant="warning" />}
+            {!downloading && file?.present && <Status label={`Downloaded · ${formatSize(file.bytes)}`} variant="success" />}
+            {!downloading && file && !file.present && <Status label="Not downloaded" variant="secondary" />}
+          </SettingRow>
+        );
+      })}
+      {(downloading || models.status === "problem" || (files && anyMissing)) && (
+        <div className="space-y-3 py-4">
+          {downloading && (
+            <div className="space-y-1">
+              <Progress value={percent} aria-label="Model download" />
+              <p className="text-sm text-muted-foreground">{models.fraction >= 1 ? "Preparing the models…" : `${percent}% downloaded`}</p>
+            </div>
+          )}
+          {models.status === "problem" && models.message && <Problem>{models.message}</Problem>}
+          {!downloading && (
+            <Button type="button" onClick={() => window.electron.setup.act("models")}>
+              {models.status === "problem" ? <RefreshCw aria-hidden /> : <Download aria-hidden />}
+              {models.status === "problem" ? "Try again" : "Download models"}
+            </Button>
+          )}
+        </div>
+      )}
+      <Dialog open={asked !== undefined} onOpenChange={(open) => !open && setAsked(undefined)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{asked?.action === "remove" ? "Remove" : "Redownload"} the {asked ? MODEL_ROW[asked.kind].noun : "model"}?</DialogTitle>
+            <DialogDescription>
+              {asked?.action === "remove"
+                ? `It is deleted from this Mac and downloaded again the next time ${name} needs it, so the next Transcript waits for the download.`
+                : "It is deleted and downloaded again, which needs an internet connection. Nothing can be recorded or transcribed until it finishes."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setAsked(undefined)}>
+              Cancel
+            </Button>
+            <Button type="button" variant={asked?.action === "remove" ? "destructive" : "default"} onClick={() => void confirm()}>
+              {asked?.action === "remove" ? "Remove" : "Redownload"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function Models({ models, ollama, summaryModel, name }: { models: Step & { fraction: number }; ollama: Step; summaryModel: string; name: string }) {
   const percent = Math.round(models.fraction * 100);
   return (
     <div className="divide-y">
+      <DownloadedModels models={models} name={name} />
       <SettingRow
-        title="Speech and speaker models"
-        description={`${name} turns speech into text and tells speakers apart on your Mac, with no cloud service. The models need a one-time download.`}
-        below={
-          <div className="space-y-3 pt-3">
-            {models.status === "working" && (
-              <div className="space-y-1">
-                <Progress value={percent} aria-label="Model download" />
-                <p className="text-sm text-muted-foreground">{models.fraction >= 1 ? "Preparing the models…" : `${percent}% downloaded`}</p>
-              </div>
-            )}
-            {models.status === "problem" && models.message && <Problem>{models.message}</Problem>}
-            {(models.status === "todo" || models.status === "problem") && (
-              <Button type="button" onClick={() => window.electron.setup.act("models")}>
-                {models.status === "problem" ? <RefreshCw aria-hidden /> : <Download aria-hidden />}
-                {models.status === "problem" ? "Try again" : "Download models"}
-              </Button>
-            )}
-          </div>
-        }
+        title="Summary model"
+        htmlFor="summary-model"
+        description={summaryModel === DEFAULT_SUMMARY_MODEL ? undefined : "Not tested with Elegant's Summaries, so results may be worse or fail validation."}
       >
-        {models.status === "done" && <Status label="Downloaded" variant="success" />}
-        {models.status === "working" && <Status label="Downloading…" variant="warning" />}
-        {models.status === "problem" && <Status label="Failed" variant="destructive" />}
-        {models.status === "todo" && <Status label="Not downloaded" variant="secondary" />}
+        <SummaryModelPicker model={summaryModel} ollama={ollama.status} />
       </SettingRow>
       <SettingRow
         title="Summaries"
-        description="Summaries are written by a model running in Ollama on your Mac. Ollama must be running with the model pulled. You can record without it and summarise later."
+        description="A model running in Ollama on your Mac writes each Summary. Start Ollama and pull the model first; you can record without it and summarise later."
         below={
           <div className="space-y-3 pt-3">
             {ollama.status === "problem" && ollama.message && <Problem>{ollama.message}</Problem>}
@@ -223,11 +387,7 @@ function Updates({ checkForUpdates, update, appVersion, name }: { checkForUpdate
         )}
         {update.status === "idle" && <Status label={checkForUpdates ? "No update waiting" : "Checks are off"} variant="secondary" />}
       </SettingRow>
-      <SettingRow
-        title="Check for updates"
-        htmlFor="check-for-updates"
-        description={`When ${name} starts, it asks GitHub whether a newer release is out and downloads it in the background. You choose when to restart into it, and not while a Recording or a Meeting's processing is under way. It sends nothing about you or your Meetings.`}
-      >
+      <SettingRow title="Check for updates" htmlFor="check-for-updates">
         <Switch id="check-for-updates" checked={checkForUpdates} onCheckedChange={(checked) => window.electron.meetings.setCheckForUpdates(checked)} />
       </SettingRow>
     </div>
@@ -235,13 +395,15 @@ function Updates({ checkForUpdates, update, appVersion, name }: { checkForUpdate
 }
 
 /**
- * Settings, as a page in the main area: a list of sections on the left and one section at a time on the right. Back (or Esc)
- * returns to the Meeting that was open.
+ * Settings, as a modal over the Meetings window: a list of sections on the left and one section at a time on the right. Its
+ * close button, Esc, or a click outside close it (`onBack`), which returns to the Meeting that was open.
  */
 export function SettingsPage({
   section,
   onSectionChange,
   onBack,
+  appearance = "system",
+  summaryModel = DEFAULT_SUMMARY_MODEL,
   showInDock = true,
   keepAudio = false,
   checkForUpdates = true,
@@ -251,6 +413,8 @@ export function SettingsPage({
   section: SettingsSection;
   onSectionChange: (section: SettingsSection) => void;
   onBack: () => void;
+  appearance?: Appearance;
+  summaryModel?: string;
   showInDock?: boolean;
   keepAudio?: boolean;
   checkForUpdates?: boolean;
@@ -258,52 +422,48 @@ export function SettingsPage({
   appVersion?: string;
 }) {
   const view = useSetup();
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !event.defaultPrevented) onBack();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onBack]);
 
   return (
-    <section aria-label="Settings" className="flex h-full min-h-0">
-      <nav aria-label="Settings sections" className="w-40 shrink-0 space-y-1 border-r p-3">
-        <Button type="button" variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground" onClick={onBack}>
-          <ArrowLeft aria-hidden />
-          Meetings
-        </Button>
-        {SECTIONS.map((id) => {
-          const Icon = SECTION_ICON[id];
-          return (
-            <button
-              key={id}
-              type="button"
-              aria-current={section === id ? "page" : undefined}
-              onClick={() => onSectionChange(id)}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                section === id ? "bg-accent font-medium" : "text-muted-foreground hover:bg-accent/50",
-              )}
-            >
-              <Icon className="size-4" aria-hidden />
-              {id}
-              {id === "Updates" && update.status === "ready" && <span className="ml-auto size-2 rounded-full bg-primary" aria-label="An update is ready" />}
-            </button>
-          );
-        })}
-      </nav>
-      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-6">
-        <h1 className="mb-2 text-xl font-semibold tracking-tight">{section}</h1>
-        {view && (
-          <>
-            {section === "General" && <General showInDock={showInDock} keepAudio={keepAudio} name={view.name} userName={view.userName} />}
-            {section === "Permissions" && <Permissions state={view.state} name={view.name} />}
-            {section === "Models" && <Models models={view.state.models} ollama={view.state.ollama} name={view.name} />}
-            {section === "Updates" && <Updates checkForUpdates={checkForUpdates} update={update} appVersion={appVersion} name={view.name} />}
-          </>
-        )}
-      </div>
-    </section>
+    <Dialog open onOpenChange={(open) => !open && onBack()}>
+      <DialogContent aria-describedby={undefined} className="h-[min(40rem,85vh)] max-w-3xl gap-0 overflow-hidden p-0 sm:rounded-xl">
+        <section aria-label="Settings" className="flex h-full min-h-0">
+          <nav aria-label="Settings sections" className="w-44 shrink-0 space-y-1 border-r bg-muted/30 p-3">
+            <p className="mb-3 px-3 pt-1 text-sm font-semibold">Settings</p>
+            {SECTIONS.map((id) => {
+              const Icon = SECTION_ICON[id];
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-current={section === id ? "page" : undefined}
+                  onClick={() => onSectionChange(id)}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    section === id ? "bg-accent font-medium" : "text-muted-foreground hover:bg-accent/50",
+                  )}
+                >
+                  <Icon className="size-4" aria-hidden />
+                  {id}
+                  {id === "Updates" && update.status === "ready" && <span className="ml-auto size-2 rounded-full bg-primary" aria-label="An update is ready" />}
+                </button>
+              );
+            })}
+          </nav>
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-6">
+            <DialogTitle asChild>
+              <h1 className="mb-2 text-xl font-semibold tracking-tight">{section}</h1>
+            </DialogTitle>
+            {view && (
+              <>
+                {section === "General" && <General appearance={appearance} showInDock={showInDock} keepAudio={keepAudio} userName={view.userName} />}
+                {section === "Permissions" && <Permissions state={view.state} name={view.name} />}
+                {section === "Models" && <Models models={view.state.models} ollama={view.state.ollama} summaryModel={summaryModel} name={view.name} />}
+                {section === "Updates" && <Updates checkForUpdates={checkForUpdates} update={update} appVersion={appVersion} name={view.name} />}
+              </>
+            )}
+          </div>
+        </section>
+      </DialogContent>
+    </Dialog>
   );
 }

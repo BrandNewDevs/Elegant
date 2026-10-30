@@ -27,6 +27,7 @@ export class OnboardingWindow {
         backgroundColor: windowBackground(),
         webPreferences: { preload: preloadPath(), contextIsolation: true, sandbox: true },
       });
+      window.on("page-title-updated", (event) => event.preventDefault()); // keep the title above, not the page's own
       window.on("closed", () => {
         this.window = undefined;
         for (const l of this.closedListeners) l();

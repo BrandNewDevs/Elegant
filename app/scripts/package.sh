@@ -51,6 +51,13 @@ plist_set LSUIElement bool true # a menu-bar app: no Dock icon while it starts; 
 plist_set NSMicrophoneUsageDescription string "'$NAME records your side of a call when you choose Record.'"
 plist_set NSAudioCaptureUsageDescription string "'$NAME records the other side of a call when you choose Record.'"
 
+# The app's own icon in place of Electron's, and the menu-bar item's icons, which the main process reads from Resources.
+rm -f "$APP/Contents/Resources/electron.icns"
+cp assets/icon.icns "$APP/Contents/Resources/icon.icns"
+plist_set CFBundleIconFile string icon
+mkdir -p "$APP/Contents/Resources/tray"
+cp assets/tray/iconTemplate.png "assets/tray/iconTemplate@2x.png" "$APP/Contents/Resources/tray/"
+
 # Electron runs Resources/app when it exists; its own default app is not needed.
 rm -f "$APP/Contents/Resources/default_app.asar"
 mkdir -p "$APP/Contents/Resources/app"

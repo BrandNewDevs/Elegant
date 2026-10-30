@@ -12,6 +12,9 @@ import type { MeetingChatGenerator } from "../pipeline/meeting-chat.js";
 import type { ChatRecord } from "../shared/meeting-chat.js";
 import { resolveReference, transcriptRevision, type TranscriptReference } from "../pipeline/evidence.js";
 import { discardAudio, PipelineRunner } from "../pipeline/runner.js";
+import type { Appearance } from "../shared/appearance.js";
+import { isAppearance } from "../shared/appearance.js";
+import { DEFAULT_SUMMARY_MODEL, isModelName } from "../shared/summary-model.js";
 import type { Meeting, MeetingListItem, Store } from "../store/store.js";
 
 /** The store setting behind `AppCore.keepAudio`. */
@@ -19,6 +22,12 @@ const KEEP_AUDIO_SETTING = "keepAudio";
 
 /** The store setting behind `AppCore.showInDock`. */
 const SHOW_IN_DOCK_SETTING = "showInDock";
+
+/** The store setting behind `AppCore.appearance`. */
+const APPEARANCE_SETTING = "appearance";
+
+/** The store setting behind `AppCore.summaryModel`. */
+const SUMMARY_MODEL_SETTING = "summaryModel";
 
 /** The store setting behind `AppCore.checkForUpdates`. */
 const CHECK_FOR_UPDATES_SETTING = "checkForUpdates";
@@ -71,8 +80,6 @@ export class AppCore {
   private readonly inFlight = new Set<Promise<void>>();
   private readonly deletingMeetings = new Set<number>();
   private readonly micWatcher: MicWatcher;
-  private readonly promptTimeoutMs: number;
-  private promptTimer: ReturnType<typeof setTimeout> | undefined;
   private _detectedMeeting: DetectedMeeting | undefined;
   private detectedListeners: ((meeting: DetectedMeeting | undefined) => void)[] = [];
   private _recording: ActiveRecording | undefined;
@@ -81,6 +88,8 @@ export class AppCore {
   private engineProblemListeners: ((message: string) => void)[] = [];
   private stopNudgeListeners: ((app: string) => void)[] = [];
   private showInDockListeners: ((show: boolean) => void)[] = [];
+  private appearanceListeners: ((appearance: Appearance) => void)[] = [];
+  private summaryModelListeners: ((model: string) => void)[] = [];
   private keepAudioListeners: ((keep: boolean) => void)[] = [];
   private recordingSettledWaiters: (() => void)[] = [];
   private stopTimer: ReturnType<typeof setTimeout> | undefined;
@@ -105,7 +114,6 @@ export class AppCore {
       previousOwners = currentOwners;
     });
     const detection = { ...DEFAULT_DETECTION, ...deps.detection };
-    this.promptTimeoutMs = detection.promptTimeoutMs;
     const extraIgnoredApps = deps.extraIgnoredApps ?? (() => []);
     this.micWatcher = new MicWatcher(
       { debounceMs: detection.debounceMs, ignoredMicApps: detection.ignoredMicApps, extraIgnoredApps },
@@ -193,7 +201,10 @@ export class AppCore {
     this.deps.engine.send({ type: "start_recording", app: meeting.app });
   }
 
-  /** The user chose Not now, the Prompt timed out, or the call ended. Nothing about the Meeting is kept. */
+  /**
+   * The user closed the Prompt, or the call ended. Nothing about the Meeting is kept. The app is not asked about
+   * again until it has let go of the microphone (the MicWatcher reports one Detection per hold).
+   */
   declinePrompt(): void {
     if (!this.clearDetectedMeeting()) return;
     this.deps.engine.send({ type: "discard_buffer" });
@@ -340,6 +351,40 @@ export class AppCore {
 
   onShowInDockChange(listener: (show: boolean) => void): void {
     this.showInDockListeners.push(listener);
+  }
+
+  /** Whether the windows follow macOS or stay light or dark. Follows macOS until the user chooses. */
+  get appearance(): Appearance {
+    const stored = this.deps.store.getSetting(APPEARANCE_SETTING);
+    return isAppearance(stored) ? stored : "system";
+  }
+
+  /** Remembers the choice and tells the listeners, which recolour the windows at once. */
+  setAppearance(appearance: Appearance): void {
+    if (appearance === this.appearance) return;
+    this.deps.store.setSetting(APPEARANCE_SETTING, appearance);
+    for (const l of this.appearanceListeners) l(appearance);
+  }
+
+  onAppearanceChange(listener: (appearance: Appearance) => void): void {
+    this.appearanceListeners.push(listener);
+  }
+
+  /** The Ollama model that writes Summaries and answers chat. The tested default until the user chooses another. */
+  get summaryModel(): string {
+    const stored = this.deps.store.getSetting(SUMMARY_MODEL_SETTING);
+    return isModelName(stored) ? stored : DEFAULT_SUMMARY_MODEL;
+  }
+
+  /** Remembers the choice and tells the listeners. It applies from the next request; Summaries already written keep the model they record. */
+  setSummaryModel(model: string): void {
+    if (!isModelName(model) || model === this.summaryModel) return;
+    this.deps.store.setSetting(SUMMARY_MODEL_SETTING, model);
+    for (const l of this.summaryModelListeners) l(model);
+  }
+
+  onSummaryModelChange(listener: (model: string) => void): void {
+    this.summaryModelListeners.push(listener);
   }
 
   /** Whether the app asks GitHub at launch for a newer release. On unless the user turned it off. */
@@ -532,14 +577,12 @@ export class AppCore {
     this._detectedMeeting = { state: "detected", app, detectedAt: new Date().toISOString() };
     // The start of the Meeting must survive a late answer, so audio is held in memory from now on.
     this.deps.engine.send({ type: "start_buffer", app });
-    this.promptTimer = setTimeout(() => this.declinePrompt(), this.promptTimeoutMs);
     this.notifyDetected();
   }
 
   /** Returns whether there was a detected Meeting to clear. */
   private clearDetectedMeeting(): boolean {
     if (!this._detectedMeeting) return false;
-    clearTimeout(this.promptTimer);
     this._detectedMeeting = undefined;
     this.notifyDetected();
     return true;

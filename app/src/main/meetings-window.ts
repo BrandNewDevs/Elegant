@@ -5,6 +5,10 @@ import { DISPLAY_NAME } from "../config.js";
 import { isGithubUrl } from "../core/update-check.js";
 import type { Updater, UpdateState } from "../core/updater.js";
 import type { Setup } from "../setup/setup.js";
+import { isAppearance } from "../shared/appearance.js";
+import { isModelName } from "../shared/summary-model.js";
+import { MODEL_KINDS, type ModelKind } from "../shared/model-kinds.js";
+import { listOllamaModels } from "../pipeline/ollama.js";
 import type { MeetingsViewState } from "../shared/meetings-view-state.js";
 import type { SetupBridge } from "./setup-bridge.js";
 import { preloadPath, rendererPagePath, windowBackground } from "./window-ui.js";
@@ -43,6 +47,8 @@ function reference(value: unknown): { meetingId: number; revision: string; refs:
  * The main window: the Meetings (a list on the left, the selected Meeting on the right), with the Settings dialog over them
  * when it is open. Redraws when Meetings change.
  */
+const isModelKind = (value: unknown): value is ModelKind => (MODEL_KINDS as readonly unknown[]).includes(value);
+
 export class MeetingsWindow {
   private window: BrowserWindow | undefined;
   private settingsOpen = false;
@@ -71,6 +77,8 @@ export class MeetingsWindow {
     core.onRecordingChange(() => this.pushState());
     core.onMeetingsChanged(() => this.pushState());
     core.onShowInDockChange(() => this.pushState());
+    core.onAppearanceChange(() => this.pushState());
+    core.onSummaryModelChange(() => this.pushState());
     core.onKeepAudioChange(() => this.pushState());
     core.onChatChanged(() => this.pushState());
     core.jobs.onChange(() => this.pushState());
@@ -100,6 +108,30 @@ export class MeetingsWindow {
     ipcMain.on("meetings:show-in-dock", (event, show: unknown) => {
       if (!this.fromThis(event.sender) || typeof show !== "boolean") return;
       this.core.setShowInDock(show);
+    });
+    ipcMain.on("meetings:appearance", (event, appearance: unknown) => {
+      if (!this.fromThis(event.sender) || !isAppearance(appearance)) return;
+      this.core.setAppearance(appearance);
+    });
+    ipcMain.on("meetings:summary-model", (event, model: unknown) => {
+      if (!this.fromThis(event.sender) || !isModelName(model)) return;
+      this.core.setSummaryModel(model);
+    });
+    ipcMain.handle("meetings:model-files", (event) => {
+      this.requireFromThis(event.sender);
+      return this.setup.listModels();
+    });
+    ipcMain.handle("meetings:remove-model", (event, kind: unknown) => {
+      this.requireFromThis(event.sender);
+      return isModelKind(kind) ? this.setup.removeModel(kind) : { ok: false as const, reason: "Unknown model." };
+    });
+    ipcMain.handle("meetings:redownload-model", (event, kind: unknown) => {
+      this.requireFromThis(event.sender);
+      return isModelKind(kind) ? this.setup.redownloadModel(kind) : { ok: false as const, reason: "Unknown model." };
+    });
+    ipcMain.handle("meetings:installed-models", (event) => {
+      this.requireFromThis(event.sender);
+      return listOllamaModels();
     });
     ipcMain.on("meetings:keep-audio", (event, keep: unknown) => {
       if (!this.fromThis(event.sender) || typeof keep !== "boolean") return;
@@ -200,10 +232,15 @@ export class MeetingsWindow {
       const window = new BrowserWindow({
         width: 900,
         height: 640,
-        title: `${DISPLAY_NAME}: Meetings`,
+        title: DISPLAY_NAME,
+        // No native title bar: the page draws a transparent drag strip, and the traffic lights sit inside it.
+        titleBarStyle: "hiddenInset",
+        trafficLightPosition: { x: 16, y: 13 },
         backgroundColor: windowBackground(),
         webPreferences: { preload: preloadPath(), contextIsolation: true, sandbox: true },
       });
+      // The page has its own <title>, which would replace this one in the Dock's window list and the window menu.
+      window.on("page-title-updated", (event) => event.preventDefault());
       window.on("closed", () => {
         this.window = undefined;
         this.pageLoaded = false;
@@ -300,6 +337,8 @@ export class MeetingsWindow {
     const payload: MeetingsViewState = {
       settingsOpen: this.settingsOpen,
       showInDock: this.core.showInDock,
+      appearance: this.core.appearance,
+      summaryModel: this.core.summaryModel,
       keepAudio: this.core.keepAudio,
       checkForUpdates: this.core.checkForUpdates,
       meetings,

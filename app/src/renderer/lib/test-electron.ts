@@ -19,6 +19,8 @@ export function pushSetupState(view: SetupViewState) {
   const act = vi.fn();
   const setUserName = vi.fn();
   const setShowInDock = vi.fn();
+  const setAppearance = vi.fn();
+  const setSummaryModel = vi.fn();
   const setKeepAudio = vi.fn();
   const setCheckForUpdates = vi.fn();
   window.electron = {
@@ -31,10 +33,10 @@ export function pushSetupState(view: SetupViewState) {
       act,
       setUserName,
     },
-    meetings: createMeetingsApi({ setShowInDock, setKeepAudio, setCheckForUpdates }),
+    meetings: createMeetingsApi({ setShowInDock, setAppearance, setSummaryModel, setKeepAudio, setCheckForUpdates }),
     prompt: {} as Window["electron"]["prompt"],
   };
-  return Object.assign(act, { setUserName, setShowInDock, setKeepAudio, setCheckForUpdates });
+  return Object.assign(act, { setUserName, setShowInDock, setAppearance, setSummaryModel, setKeepAudio, setCheckForUpdates });
 }
 
 export function withState(patch: Partial<SetupViewState["state"]>, permissionsGranted = false): SetupViewState {
@@ -47,7 +49,7 @@ export function createMeetingsApi(overrides: Partial<MeetingsApi> = {}) {
   const api = {
     ready: vi.fn(),
     onState: vi.fn((_callback: Parameters<MeetingsApi["onState"]>[0]) => () => {}),
-    settings: vi.fn(), setShowInDock: vi.fn(), setKeepAudio: vi.fn(), setCheckForUpdates: vi.fn(), openRelease: vi.fn(),
+    settings: vi.fn(), setAppearance: vi.fn(), setSummaryModel: vi.fn(), modelFiles: vi.fn(async () => [] as Awaited<ReturnType<MeetingsApi["modelFiles"]>>), removeModel: vi.fn(async () => ({ ok: true as const })), redownloadModel: vi.fn(async () => ({ ok: true as const })), installedModels: vi.fn(async () => [] as string[]), setShowInDock: vi.fn(), setKeepAudio: vi.fn(), setCheckForUpdates: vi.fn(), openRelease: vi.fn(),
     onUpdate: vi.fn((_callback: Parameters<MeetingsApi["onUpdate"]>[0]) => () => {}), restartForUpdate: vi.fn(async () => ({ ok: true as const })), stopRecording: vi.fn(), select: vi.fn(), search: vi.fn(), rename: vi.fn(), export: vi.fn(),
     regenerate: vi.fn(async () => {}), delete: vi.fn(async () => {}),
     sendQuestion: vi.fn(async (_payload: Parameters<MeetingsApi["sendQuestion"]>[0]) => {}),

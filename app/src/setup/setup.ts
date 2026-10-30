@@ -3,6 +3,7 @@ import type { Engine, Permission } from "../engine/protocol.js";
 import type { OllamaStatus } from "../pipeline/ollama.js";
 import { USER_NAME_SETTING } from "../core/participants.js";
 import type { Store } from "../store/store.js";
+import { modelFiles, removeModelFiles, type ModelFile, type ModelKind } from "./model-files.js";
 
 /** The store settings that remember what is already done, so a later launch never asks for it again. */
 const PERMISSION_SETTING: Record<Permission, string> = {
@@ -35,7 +36,11 @@ export interface SetupOptions {
   modelsDirectory: string;
   checkOllama: () => Promise<OllamaStatus>;
   jobs?: AIJobQueue;
+  /** Why the models cannot be removed right now (a Recording or AI work is running), or undefined when nothing is using them. */
+  busyReason?: () => string | undefined;
 }
+
+export type ModelChange = { ok: true } | { ok: false; reason: string };
 
 const PERMISSION_DENIED: Record<Permission, string> = {
   microphone: "Microphone access was not allowed. Allow it in System Settings > Privacy & Security > Microphone, then try again.",
@@ -65,7 +70,8 @@ export class Setup {
     private readonly store: Store,
     private readonly options: SetupOptions,
   ) {
-    const modelsReady = store.getSetting(MODELS_READY_SETTING) === "true" || this.finishedEarlierSetup();
+    const remembered = store.getSetting(MODELS_READY_SETTING);
+    const modelsReady = remembered === "true" || (remembered === undefined && this.finishedEarlierSetup());
     this._state = {
       microphone: { status: this.granted("microphone") ? "done" : "todo" },
       systemAudio: { status: this.granted("system_audio") ? "done" : "todo" },
@@ -196,6 +202,35 @@ export class Setup {
       ? this.options.jobs.enqueue({ id: "setup-models", owner: "setup", kind: "speech-model-preparation" }, prepare)
       : prepare();
     void work.catch(() => this.update({ models: { status: "problem", fraction: 0, message: "Speech model preparation stopped. Restart the app and retry." } }));
+  }
+
+  /** What is downloaded, with its size, as it is on disk now. */
+  listModels(): Promise<ModelFile[]> {
+    return modelFiles(this.options.modelsDirectory);
+  }
+
+  /**
+   * Deletes one kind of model, to free the space or to fetch it clean. It is refused while a download, a Recording or AI work
+   * is using them. Afterwards the models count as not downloaded, so the next download fetches what is missing.
+   */
+  async removeModel(kind: ModelKind): Promise<ModelChange> {
+    const busy = this._state.models.status === "working" ? "The models are downloading." : this.options.busyReason?.();
+    if (busy) return { ok: false, reason: busy };
+    try {
+      await removeModelFiles(this.options.modelsDirectory, kind);
+    } catch (error) {
+      return { ok: false, reason: `Could not remove the model: ${error instanceof Error ? error.message : String(error)}` };
+    }
+    this.store.setSetting(MODELS_READY_SETTING, "false");
+    this.update({ models: { status: "todo", fraction: 0 } });
+    return { ok: true };
+  }
+
+  /** Removes one kind of model and downloads it again. */
+  async redownloadModel(kind: ModelKind): Promise<ModelChange> {
+    const removed = await this.removeModel(kind);
+    if (removed.ok) this.downloadModels();
+    return removed;
   }
 
   /** Checks that Ollama is running with the Summary model pulled. Safe to repeat once the user has fixed it. */

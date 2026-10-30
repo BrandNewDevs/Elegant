@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import type { UpdateState } from "../../core/updater";
 import { nothingDone, pushSetupState, withState } from "@/lib/test-electron";
@@ -21,11 +21,12 @@ it("lists the sections, marks the open one, and asks to change section", () => {
   expect(changes).toEqual(["Permissions"]);
 });
 
-it("goes back to the Meetings from the back button and from Esc", () => {
+it("is a modal named for its section, closed from the close button and from Esc", () => {
   pushSetupState(nothingDone);
   const onBack = vi.fn();
   render(<SettingsPage section="General" onSectionChange={() => {}} onBack={onBack} />);
-  fireEvent.click(screen.getByRole("button", { name: "Meetings" }));
+  expect(screen.getByRole("dialog", { name: "General" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
   fireEvent.keyDown(document, { key: "Escape" });
   expect(onBack).toHaveBeenCalledTimes(2);
 });
@@ -56,10 +57,14 @@ it("links each missing permission to its own System Settings pane, and not an al
   expect(act).toHaveBeenCalledWith("settings-system-audio");
 });
 
-it("downloads the models from here, showing progress while it runs", () => {
+const absent = (kind: "speech" | "speaker") => ({ kind, present: false, bytes: 0 });
+const present = (kind: "speech" | "speaker", bytes: number) => ({ kind, present: true, bytes });
+
+it("downloads the models from here, showing progress while it runs", async () => {
   const act = pushSetupState(nothingDone);
+  vi.mocked(window.electron.meetings.modelFiles).mockResolvedValue([absent("speech"), absent("speaker")]);
   const { unmount } = page("Models");
-  expect(screen.getByText("Not downloaded")).toBeTruthy();
+  expect(await screen.findAllByText("Not downloaded")).toHaveLength(2);
   fireEvent.click(screen.getByRole("button", { name: "Download models" }));
   expect(act).toHaveBeenCalledWith("models");
   unmount();
@@ -69,13 +74,59 @@ it("downloads the models from here, showing progress while it runs", () => {
   expect(screen.getByText("42% downloaded")).toBeTruthy();
   expect(screen.getByRole("progressbar", { name: "Model download" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Download models" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Remove|Redownload/ })).toBeNull();
 });
 
-it("shows downloaded models without offering the download again", () => {
+it("shows each downloaded model with its size, and offers Remove and Redownload but not the download", async () => {
   pushSetupState(withState({ models: { status: "done", fraction: 1 } }));
+  vi.mocked(window.electron.meetings.modelFiles).mockResolvedValue([present("speech", 601e6), present("speaker", 11e6)]);
   page("Models");
-  expect(screen.getByText("Downloaded")).toBeTruthy();
+  expect(await screen.findByText("Downloaded · 601 MB")).toBeTruthy();
+  expect(screen.getByText("Downloaded · 11 MB")).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: "Remove" })).toHaveLength(2);
+  expect(screen.getAllByRole("button", { name: "Redownload" })).toHaveLength(2);
   expect(screen.queryByRole("button", { name: /Download models|Try again/ })).toBeNull();
+});
+
+it("asks before removing a model, and only then removes that one", async () => {
+  pushSetupState(withState({ models: { status: "done", fraction: 1 } }));
+  const meetings = window.electron.meetings;
+  vi.mocked(meetings.modelFiles).mockResolvedValue([present("speech", 601e6), present("speaker", 11e6)]);
+  page("Models");
+  await screen.findByText("Downloaded · 601 MB");
+
+  fireEvent.click(screen.getAllByRole("button", { name: "Remove" })[0]!);
+  const dialog = await screen.findByRole("dialog", { name: "Remove the speech model?" });
+  expect(meetings.removeModel).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  expect(meetings.removeModel).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getAllByRole("button", { name: "Remove" })[1]!);
+  fireEvent.click(within(await screen.findByRole("dialog", { name: "Remove the speaker model?" })).getByRole("button", { name: "Remove" }));
+  expect(meetings.removeModel).toHaveBeenCalledExactlyOnceWith("speaker");
+});
+
+it("redownloads a model after confirming", async () => {
+  pushSetupState(withState({ models: { status: "done", fraction: 1 } }));
+  const meetings = window.electron.meetings;
+  vi.mocked(meetings.modelFiles).mockResolvedValue([present("speech", 601e6), present("speaker", 11e6)]);
+  page("Models");
+  await screen.findByText("Downloaded · 601 MB");
+  fireEvent.click(screen.getAllByRole("button", { name: "Redownload" })[0]!);
+  fireEvent.click(within(await screen.findByRole("dialog", { name: "Redownload the speech model?" })).getByRole("button", { name: "Redownload" }));
+  expect(meetings.redownloadModel).toHaveBeenCalledExactlyOnceWith("speech");
+});
+
+it("says why a model could not be removed", async () => {
+  pushSetupState(withState({ models: { status: "done", fraction: 1 } }));
+  const meetings = window.electron.meetings;
+  vi.mocked(meetings.modelFiles).mockResolvedValue([present("speech", 601e6), present("speaker", 11e6)]);
+  vi.mocked(meetings.removeModel).mockResolvedValue({ ok: false, reason: "A Recording is in progress." });
+  render(<><SettingsPage section="Models" onSectionChange={() => {}} onBack={() => {}} /><Toaster /></>);
+  await screen.findByText("Downloaded · 601 MB");
+  fireEvent.click(screen.getAllByRole("button", { name: "Remove" })[0]!);
+  fireEvent.click(within(await screen.findByRole("dialog", { name: "Remove the speech model?" })).getByRole("button", { name: "Remove" }));
+  expect(await screen.findByText("A Recording is in progress.")).toBeTruthy();
 });
 
 it("says why Summaries are not ready and checks Ollama again on request", () => {
@@ -84,6 +135,54 @@ it("says why Summaries are not ready and checks Ollama again on request", () => 
   expect(screen.getByText("Run: ollama pull gemma3:4b")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Check again" }));
   expect(act).toHaveBeenCalledWith("ollama");
+});
+
+it("shows the chosen Appearance and asks to change it", () => {
+  const send = pushSetupState(nothingDone);
+  const { rerender } = page("General");
+  const options = () => screen.getAllByRole("radio").map((o) => [o.textContent, o.getAttribute("aria-checked")]);
+  expect(screen.getByRole("radiogroup", { name: "Appearance" })).toBeTruthy();
+  expect(options()).toEqual([["System", "true"], ["Light", "false"], ["Dark", "false"]]);
+
+  fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
+  expect(send.setAppearance).toHaveBeenLastCalledWith("dark");
+
+  rerender(<SettingsPage section="General" onSectionChange={() => {}} onBack={() => {}} appearance="dark" />);
+  expect(options()).toEqual([["System", "false"], ["Light", "false"], ["Dark", "true"]]);
+  fireEvent.click(screen.getByRole("radio", { name: "Light" }));
+  expect(send.setAppearance).toHaveBeenLastCalledWith("light");
+});
+
+/** Radix opens a Select on a key press on its trigger; happy-dom has no pointer capture for its click path. */
+function openPicker(picker: HTMLElement) {
+  picker.focus();
+  fireEvent.keyDown(picker, { key: "Enter" });
+}
+
+it("picks the Summary model from the pulled ones, and cautions about any but the tested default", async () => {
+  const send = pushSetupState(nothingDone);
+  vi.mocked(window.electron.meetings.installedModels).mockResolvedValue(["llama3.2:3b", "gemma3:4b"]);
+  const { rerender } = page("Models");
+  const picker = await screen.findByRole("combobox", { name: "Summary model" });
+  expect(picker.textContent).toBe("gemma3:4b");
+  expect(screen.queryByText(/Not tested/)).toBeNull();
+
+  openPicker(picker);
+  expect(await screen.findByRole("option", { name: "gemma3:4b" })).toBeTruthy();
+  fireEvent.click(await screen.findByRole("option", { name: "llama3.2:3b" }));
+  expect(send.setSummaryModel).toHaveBeenLastCalledWith("llama3.2:3b");
+
+  rerender(<SettingsPage section="Models" onSectionChange={() => {}} onBack={() => {}} summaryModel="llama3.2:3b" />);
+  expect(screen.getByText(/Not tested with/)).toBeTruthy();
+});
+
+it("keeps a chosen model in the list even when Ollama is not running or no longer has it", async () => {
+  pushSetupState(nothingDone);
+  page("Models", { summaryModel: "qwen3:4b" });
+  const picker = await screen.findByRole("combobox", { name: "Summary model" });
+  expect(picker.textContent).toContain("qwen3:4b");
+  openPicker(picker);
+  expect(await screen.findByRole("option", { name: "qwen3:4b" })).toBeTruthy();
 });
 
 it("turns Show in Dock on and off, starting from the stored setting", () => {
