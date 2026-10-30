@@ -14,6 +14,7 @@ export interface TextRequest {
   signal?: AbortSignal;
   timeoutMs?: number;
   maxOutputTokens?: number;
+  thinkingLevel?: "low";
 }
 
 /** Operational measurements only: never prompts, Transcript text or generated content. */

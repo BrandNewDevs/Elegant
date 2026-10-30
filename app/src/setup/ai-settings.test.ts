@@ -122,3 +122,28 @@ it("restores provider and encrypted credentials from disk without rewriting an e
     expect(store.getMeeting(id)?.summary).toEqual(previous);
   } finally { store?.close(); rmSync(directory, { recursive: true, force: true }); }
 });
+
+it("rejects false and malformed connection confirmations", async () => {
+  const f = fixture();
+  await f.settings.configure({ type: "save-key", key: "synthetic" });
+  for (const text of ['{"ok":false}', 'not JSON']) {
+    f.complete.mockResolvedValue({ text, metadata: { model: "synthetic", elapsedMs: 1 } });
+    await expect(f.settings.configure({ type: "test" })).rejects.toThrow(/connection test/);
+  }
+  f.store.close();
+});
+it("cancels an active test outside the serialized mutation queue", async () => {
+  const f = fixture();
+  await f.settings.configure({ type: "save-key", key: "synthetic" });
+  f.complete.mockImplementation(async (...args: unknown[]) => {
+    const request = args[0] as { signal: AbortSignal };
+    return new Promise((_resolve, reject) => request.signal.addEventListener("abort", () => reject(new Error("cancelled")), { once: true }));
+  });
+  const work = f.settings.configure({ type: "test" });
+  const failure = expect(work).rejects.toThrow("cancelled");
+  await vi.waitFor(() => expect(f.complete).toHaveBeenCalled());
+  await f.settings.configure({ type: "cancel-test" });
+  await failure;
+  await f.settings.configure({ type: "select", provider: "ollama" });
+  f.store.close();
+});

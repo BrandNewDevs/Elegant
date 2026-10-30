@@ -43,7 +43,9 @@ export function AIProviderSettings({ ai }: { ai: AISettingsView }) {
         <Input id="gemini-model" value={model} maxLength={110} onChange={event => setModel(event.target.value)} />
         <Button type="button" variant="outline" disabled={busy || model === ai.geminiModel} onClick={() => void configure({ type: "model", model })}>Save model</Button>
       </div>
-      <Button type="button" variant="outline" disabled={busy || !ai.hasGeminiKey} onClick={() => void configure({ type: "test" })}>Test Gemini connection</Button>
+      <Button type="button" variant="outline" disabled={busy || !ai.hasGeminiKey || model !== ai.geminiModel} onClick={() => void configure({ type: "test" })}>Test Gemini connection</Button>
+      <p className="text-xs text-muted-foreground">Connection test uses saved model: {ai.geminiModel}. Save model changes before testing.</p>
+      {busy && <Button type="button" variant="outline" onClick={() => { void window.electron.setup.configureAI({ type: "cancel-test" }).catch(() => {}); }}>Cancel connection test</Button>}
       {ai.provider !== "gemini" && <>
         <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} />I agree to send Transcript evidence and questions to Google when using Gemini.</label>
         <Button type="button" disabled={busy || !consent || !ai.hasGeminiKey} onClick={() => void configure({ type: "select", provider: "gemini", consent: true })}>Use Gemini</Button>

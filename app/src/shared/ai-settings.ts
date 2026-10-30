@@ -12,4 +12,5 @@ export type AISettingsAction =
   | { type: "save-key"; key: string }
   | { type: "remove-key" }
   | { type: "model"; model: string }
-  | { type: "test" };
+  | { type: "test" }
+  | { type: "cancel-test" };

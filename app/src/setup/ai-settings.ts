@@ -39,6 +39,11 @@ export class AISettings {
   /** Serialize settings mutations so replacing/removing keys cannot race. */
   configure(value: unknown): Promise<string> {
     if (this.closed) return Promise.reject(new Error("AI settings are shutting down"));
+    if (value && typeof value === "object" && !Array.isArray(value)
+      && Object.keys(value).length === 1 && (value as { type?: unknown }).type === "cancel-test") {
+      this.testController?.abort();
+      return Promise.resolve("Connection test cancellation requested");
+    }
     const result = this.pending.then(() => this.apply(value));
     this.pending = result.catch(() => {});
     return result;
@@ -99,8 +104,14 @@ export class AISettings {
         if (this.closed) throw new Error("AI settings are shutting down");
         this.testController = new AbortController();
         try {
-          await this.testClient(apiKey, view.geminiModel).complete({ messages: [{ role: "user", content: "Connection test only. Return {\"ok\":true}." }],
-            schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] }, signal: this.testController.signal, timeoutMs: 30_000, maxOutputTokens: 256 });
+          const response = await this.testClient(apiKey, view.geminiModel).complete({ messages: [{ role: "user", content: "Connection test only. Return {\"ok\":true}." }],
+            schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] }, signal: this.testController.signal, timeoutMs: 60_000, maxOutputTokens: 2048, ...(view.geminiModel === "gemini-3.8-flash" ? { thinkingLevel: "low" as const } : {}) });
+        let result;
+          try { result = JSON.parse(response.text); } catch { throw new Error("Gemini connection test returned invalid JSON. Retry the test."); }
+          if (!result || result.ok !== true) throw new Error("Gemini connection test did not confirm success. Retry the test.");
+        } catch (error) {
+          if (error instanceof Error && error.name === "TimeoutError") throw new Error("Gemini connection test timed out after 60 seconds. Check network access and the saved model, then retry.");
+          throw error;
         } finally { this.testController = undefined; }
         message = "Gemini connection succeeded. No Meeting content was sent.";
         break;

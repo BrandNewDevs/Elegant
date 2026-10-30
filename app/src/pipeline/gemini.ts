@@ -44,7 +44,7 @@ export class GeminiClient implements TextModel {
         body: JSON.stringify({
           systemInstruction: { parts: request.messages.filter(m => m.role === "system").map(m => ({ text: m.content })) },
           contents: request.messages.filter(m => m.role !== "system").map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
-          generationConfig: { temperature: 0, maxOutputTokens, responseMimeType: "application/json", responseJsonSchema: request.schema },
+          generationConfig: { temperature: 0, maxOutputTokens, ...(request.thinkingLevel ? { thinkingConfig: { thinkingLevel: request.thinkingLevel } } : {}), responseMimeType: "application/json", responseJsonSchema: request.schema },
         }),
       });
       if (!response.ok) {
@@ -70,6 +70,7 @@ export class GeminiClient implements TextModel {
       try { body = JSON.parse(Buffer.concat(chunks).toString("utf8")); }
       catch { throw new GeminiError("Gemini returned an invalid response. Retry the request."); }
       const candidate = body?.candidates?.[0];
+      if (candidate?.finishReason === "MAX_TOKENS") throw new GeminiError("Gemini reached its output token limit before completing. No partial result was saved.");
       if (candidate?.finishReason !== "STOP") throw new GeminiError("Gemini did not complete its answer, or blocked the request. No partial result was saved.");
       const parts = candidate.content?.parts;
       if (!Array.isArray(parts)) throw new GeminiError("Gemini returned no answer text");
