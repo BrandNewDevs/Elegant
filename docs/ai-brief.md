@@ -88,7 +88,7 @@ Output: a Summary as JSON.
 
 ## Evidence-backed Summary implementation
 
-The app and evaluation command use `createReadableSummariser` with prompt version `readable-summary-v13`. The earlier `createGroundedSummariser` remains for historical comparison and its structural regression tests.
+The app and evaluation command use `createReadableSummariser` with prompt version `readable-summary-v14`. The earlier `createGroundedSummariser` remains for historical comparison and its structural regression tests.
 
 Working passages combine consecutive same-speaker segments separated by at most two seconds. Sentence and word boundaries bound evidence size; original stored Transcript content, speaker labels and ordinal references remain unchanged. Model evidence contains only IDs, speakers and text.
 
@@ -179,3 +179,7 @@ These are release gates, not verified claims. Fix and rerun failed gates and rep
 Test audio comes mostly from recordings made with people who have agreed to be recorded. You'll need to correct reference transcripts by hand for any recording used to measure accuracy.
 
 **Audio never goes into git.** The repository ignores common audio formats. Keep recordings outside the repo, and commit only a manifest that says what each recording is and how to get it. Do not commit recordings of anyone who has not agreed, and do not use real work meetings.
+
+### TL;DR priority refinement
+
+The overview reserves explicit affirmed final decisions, then explicit first-person commitments, before filling space with updates and unresolved status. Conditional, negated and quoted commitments are not automatically promoted. Earlier proposals have lower packing priority; they remain available in Participant points. Ranking uses narrow English cues and does not establish semantic supersession or guarantee every action fits the three-sentence/90-word limit. Source validation, cancellation and request budgets remain unchanged. Presentation removes a leading acknowledgement and lowercases selected sentence-internal pronouns after semicolons. No extra inference stage is added.

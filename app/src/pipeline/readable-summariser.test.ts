@@ -200,7 +200,7 @@ describe('TLDR recovery at the production Summary seam', () => {
     const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: points.slice(0, 3).map((point, id) => ({ text: point.text, covers: [id] })) })) })({
       segments: texts.map((text, id) => ({ start: id * 20, end: id * 20 + 10, speaker: id === 0 || id === 2 ? 'You' : 'Speaker 1', text })),
     });
-    expect(result.tldr).toMatch(/^Agreed[;. ]+Friday replaces Monday/u);
+    expect(result.tldr).toMatch(/^Friday replaces Monday/u);
     expect(result.tldr).toContain('Speaker 1: I will run the offline test again on Wednesday.');
     expect(result.tldr).not.toContain('initial proposal');
     expect(result.tldr).not.toContain('I propose');
@@ -215,6 +215,13 @@ describe('TLDR recovery at the production Summary seam', () => {
     });
     expect(result.tldr).toContain('The model runs locally.');
     expect(result.tldr).not.toContain('launch');
+  });
+  it('cleans sentence-internal capitalization without changing ownership or evidence', async () => {
+    const result = await createReadableSummariser({ model: scriptedModel(points => ({ sentences: [{ text: points[0].text, covers: [0] }] })) })({
+      segments: [{ start: 0, end: 10, speaker: 'Speaker 1', text: 'The tests are not finished. This call is one of the tests.' }],
+    });
+    expect(result.tldr).toBe('The tests are not finished; this call is one of the tests.');
+    expect(result.evidence!.tldr).toEqual([0]);
   });
   it('fills a status-only model response with supported main updates', async () => {
     const texts = ['The model runs locally.', 'It creates summaries.', 'The tests are not finished.'];

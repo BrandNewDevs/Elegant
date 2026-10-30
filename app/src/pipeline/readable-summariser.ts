@@ -212,7 +212,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       const render = (point: Claim, text: string) => {
         const firstPerson = /\b(?:I|my)\b|^(?:Will|Can|Must|Should)\b/iu.test(text);
         const attributed = firstPerson && !text.startsWith(point.speaker + ':') ? point.speaker + ': ' + text : text;
-        return attributed.replace(/[.!?]+$/u, '') + '.';
+        return attributed.replace(/^Agreed[.;]\s+/iu, '').replace(/;\s+(This|These|Those|One)\b/gu, (_, word: string) => '; ' + word.toLowerCase()).replace(/[.!?]+$/u, '') + '.';
       };
       const words = (text: string) => text.match(/\S+/gu)?.length ?? 0;
       const sentenceCount = (text: string) => [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(text)].length;
