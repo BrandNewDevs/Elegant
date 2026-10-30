@@ -41,3 +41,9 @@ Private cloud evaluation is refused before reading a manifest unless `AI_ALLOW_C
 - Test invalid/restricted keys, unavailable models, quota/rate limits, no network, cancellation and quit. Existing Summaries must survive failures and partial results must never publish.
 - Review the same synthetic and permissioned real Transcripts for coverage, every critical final decision, attribution, citation support, readability, follow-ups and absent-answer questions. Record failures and costs/usage instead of claiming success from valid JSON.
 - Verify citation navigation, rename, export, restart, regeneration and deletion with mixed legacy/local/Gemini results. Audio must never leave the Mac, and private/cloud processing must never activate silently.
+
+## Connection-check recovery
+
+Save model edits before testing; the test button uses the saved model and is disabled while edits are unsaved. The synthetic connection check has a 60-second deadline and 2,048-token response allowance. For exactly `gemini-3.8-flash`, it explicitly requests low thinking; other models retain their defaults to avoid unsupported options. Success requires valid JSON with `ok: true`.
+
+Cancel connection test aborts the active check without entering the serialized credential-mutation queue. It does not cancel Meeting processing. Token exhaustion is reported separately from blocked output. A setup timeout points to network/model checks rather than suggesting a narrower Meeting question. These changes do not establish the cause of a particular Mac network delay; verify with the signed Mac app and synthetic content before using real Meetings.
