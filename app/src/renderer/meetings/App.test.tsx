@@ -86,7 +86,7 @@ function showState(patch: Partial<MeetingsViewState>) {
 }
 
 function showSetup(view = nothingDone) {
-  window.electron.setup = { ready: vi.fn(), onState: (callback) => { callback(view); return () => {}; }, act: vi.fn(), setUserName: vi.fn(), configureAI: vi.fn(async () => "Saved") };
+  window.electron.setup = { ready: vi.fn(), onState: (callback) => { callback(view); return () => {}; }, act: vi.fn(), setUserName: vi.fn(), configureAI: vi.fn(async () => "Saved"), geminiModels: vi.fn(async () => []), findGeminiModels: vi.fn(async () => ""), stopFindingGeminiModels: vi.fn(async () => {}) };
 }
 
 it("shows Settings as a modal over the Meetings when it is open, and asks to close it from its close button", () => {

@@ -69,3 +69,44 @@ it("limits credential operations to attached windows and never pushes the saved 
   expect(send.mock.calls.at(-1)?.[1].ai).toMatchObject({ hasGeminiKey: true, provider: "ollama" });
   store.close();
 });
+
+it("lists Gemini models only for attached windows", async () => {
+  const store = openStore(":memory:");
+  const listModels = vi.fn(async () => [{ id: "gemini-test", label: "Gemini Test" }]);
+  const ai = new AISettings(store, {
+    isAsyncEncryptionAvailable: async () => true,
+    encryptStringAsync: async text => Buffer.from("protected:" + text),
+    decryptStringAsync: async () => ({ result: "private-key", shouldReEncrypt: false }),
+  }, undefined, listModels);
+  const setup = new Setup(new FakeEngine(), store, { speechModel: "tiny", modelsDirectory: "/models", checkOllama: async () => ({ status: "ready" }) });
+  const bridge = new SetupBridge(setup, { ai, done: () => {}, openSettings: () => {} });
+  const page = { once: () => {}, isDestroyed: () => false, send: vi.fn() } as unknown as WebContents;
+  bridge.attach(page);
+  const models = electron.handlers.get("setup:gemini-models")!;
+  expect(() => models({ sender: {} })).toThrow("cannot configure AI");
+  await electron.handlers.get("setup:configure-ai")!({ sender: page }, { type: "save-key", key: "private-key" });
+  expect(await models({ sender: page })).toEqual([{ id: "gemini-test", label: "Gemini Test" }]);
+  store.close();
+});
+
+it("starts and stops the search for usable Gemini models only for attached windows", async () => {
+  const store = openStore(":memory:");
+  const ai = new AISettings(store, {
+    isAsyncEncryptionAvailable: async () => true,
+    encryptStringAsync: async text => Buffer.from("protected:" + text),
+    decryptStringAsync: async () => ({ result: "private-key", shouldReEncrypt: false }),
+  }, undefined, async () => [{ id: "gemini-test", label: "Gemini Test" }], async () => "ok", { betweenMs: 0, busyMs: 0 });
+  const setup = new Setup(new FakeEngine(), store, { speechModel: "tiny", modelsDirectory: "/models", checkOllama: async () => ({ status: "ready" }) });
+  const bridge = new SetupBridge(setup, { ai, done: () => {}, openSettings: () => {} });
+  const page = { once: () => {}, isDestroyed: () => false, send: vi.fn() } as unknown as WebContents;
+  bridge.attach(page);
+  const find = electron.handlers.get("setup:gemini-find-models")!;
+  const stop = electron.handlers.get("setup:gemini-stop-finding")!;
+  expect(() => find({ sender: {} })).toThrow("cannot configure AI");
+  expect(() => stop({ sender: {} })).toThrow("cannot configure AI");
+  await electron.handlers.get("setup:configure-ai")!({ sender: page }, { type: "save-key", key: "private-key" });
+  expect(await find({ sender: page })).toBe("Found 1 model that works on your key.");
+  expect(ai.view.usableModels).toEqual(["gemini-test"]);
+  expect(() => stop({ sender: page })).not.toThrow();
+  store.close();
+});

@@ -1,6 +1,6 @@
 import type { Store } from "../store/store.js";
-import type { AISettingsAction, AISettingsView, AIProvider } from "../shared/ai-settings.js";
-import { DEFAULT_GEMINI_MODEL, GeminiClient, validGeminiModel } from "../pipeline/gemini.js";
+import type { AISettingsAction, AISettingsView, AIProvider, GeminiModelOption } from "../shared/ai-settings.js";
+import { DEFAULT_GEMINI_MODEL, GeminiClient, listGeminiModels, probeGeminiModel, validGeminiModel, type ModelProbe } from "../pipeline/gemini.js";
 import type { TextModel } from "../pipeline/language-model.js";
 
 export interface CredentialEncryption {
@@ -8,6 +8,9 @@ export interface CredentialEncryption {
   encryptStringAsync(text: string): Promise<Buffer>;
   decryptStringAsync(buffer: Buffer): Promise<{ result: string; shouldReEncrypt: boolean }>;
 }
+/** Thinking tokens count against the cap, so a thinking model needs room to reason before it can write even a tiny answer. */
+const TEST_OUTPUT_TOKENS = 2048;
+
 export type AISelection = { provider: "ollama" } | { provider: "gemini"; model: string; apiKey: string };
 
 /** Credentials are decrypted lazily: local-only launches never touch the OS keychain. */
@@ -17,13 +20,31 @@ export class AISettings {
   private closed = false;
   /** One per queued or running test, so cancellation also covers tests still waiting in the queue. */
   private readonly testControllers = new Set<AbortController>();
+  private listController: AbortController | undefined;
+  private finding: { controller: AbortController; done: number; total: number } | undefined;
   constructor(private readonly store: Pick<Store, "getSetting" | "setSetting">, private readonly encryption: CredentialEncryption,
-    private readonly testClient: (apiKey: string, model: string) => TextModel = (apiKey, model) => new GeminiClient({ apiKey, model })) {}
+    private readonly testClient: (apiKey: string, model: string) => TextModel = (apiKey, model) => new GeminiClient({ apiKey, model }),
+    private readonly listModels: (apiKey: string, signal: AbortSignal) => Promise<GeminiModelOption[]> = (apiKey, signal) => listGeminiModels({ apiKey, signal }),
+    private readonly probeModel: (apiKey: string, model: string, signal: AbortSignal) => Promise<ModelProbe> = (apiKey, model, signal) => probeGeminiModel({ apiKey, model, signal }),
+    /** How long to wait between two models, and before the one retry of a model that was rate-limited. */
+    private readonly pauses = { betweenMs: 300, busyMs: 2_000 }) {}
 
   get view(): AISettingsView {
     return { provider: this.store.getSetting("ai.provider") === "gemini" ? "gemini" : "ollama",
       geminiModel: this.store.getSetting("ai.gemini.model") || DEFAULT_GEMINI_MODEL,
-      hasGeminiKey: !!this.store.getSetting("ai.gemini.encryptedKey") };
+      hasGeminiKey: !!this.store.getSetting("ai.gemini.encryptedKey"),
+      ...(this.usable() ? { usableModels: this.usable() } : {}),
+      ...(this.finding ? { finding: { done: this.finding.done, total: this.finding.total } } : {}) };
+  }
+  /** The models that answered the last run for the saved key; undefined when no run was done for it. */
+  private usable(): string[] | undefined {
+    try {
+      const saved = JSON.parse(this.store.getSetting("ai.gemini.usable") || "null");
+      return Array.isArray(saved) && saved.every(m => typeof m === "string" && validGeminiModel(m)) ? saved : undefined;
+    } catch { return undefined; }
+  }
+  private changed(): void {
+    for (const listener of this.listeners) { try { listener(); } catch { /* Views cannot interrupt persistence. */ } }
   }
   onChange(listener: () => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
 
@@ -52,9 +73,103 @@ export class AISettings {
     return result;
   }
 
+  /**
+   * The Gemini text models the saved key can use, asked of Google. Only the key is sent, never Meeting content. It does not
+   * change any setting, so it is not serialised with the changes that do.
+   */
+  async geminiModels(): Promise<GeminiModelOption[]> {
+    if (this.closed) throw new Error("AI settings are shutting down");
+    const encrypted = this.store.getSetting("ai.gemini.encryptedKey");
+    if (!encrypted) throw new Error("Save a Gemini API key first");
+    const apiKey = await this.decrypt(encrypted);
+    if (this.closed) throw new Error("AI settings are shutting down");
+    this.listController?.abort();
+    const controller = (this.listController = new AbortController());
+    try {
+      return await this.listModels(apiKey, controller.signal);
+    } finally {
+      if (this.listController === controller) this.listController = undefined;
+    }
+  }
+
+  /** A new or removed key is a different account, so what the last key could use says nothing about it. */
+  private forgetUsable(): void {
+    this.finding?.controller.abort();
+    this.store.setSetting("ai.gemini.usable", "");
+  }
+
+  /**
+   * Tries each model the key can see with one tiny synthetic request, and remembers the ones that answer, so the picker can
+   * offer only models that work on this key (Gemini quotas are per model, so each try is independent). Meeting content is
+   * never sent. A model Google refuses for quota, or that is rate-limited, is left out. Stopping keeps what was found so far.
+   */
+  async findUsableModels(): Promise<string> {
+    if (this.closed) throw new Error("AI settings are shutting down");
+    if (this.finding) throw new Error("Already looking for models that work");
+    const encrypted = this.store.getSetting("ai.gemini.encryptedKey");
+    if (!encrypted) throw new Error("Save a Gemini API key first");
+    // Marked as running before anything is awaited, so a second press cannot start a second run.
+    const run = (this.finding = { controller: new AbortController(), done: 0, total: 0 });
+    this.changed();
+    const usable: string[] = [];
+    let stopped = false;
+    // A key that changed meanwhile cleared the results; the old key's must not be written back, nor must anything after shutdown.
+    const save = () => {
+      if (this.store.getSetting("ai.gemini.encryptedKey") === encrypted && !this.closed) this.store.setSetting("ai.gemini.usable", JSON.stringify([...usable].sort()));
+    };
+    try {
+      const apiKey = await this.decrypt(encrypted);
+      run.controller.signal.throwIfAborted();
+      const listed = (await this.listModels(apiKey, run.controller.signal)).map(m => m.id);
+      // Models likelier to be on a free plan first, so a stopped run has already tried the ones that matter most.
+      const rank = (id: string) => (/flash-lite/.test(id) ? 0 : /flash/.test(id) ? 1 : 2);
+      const candidates = [...listed].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+      run.total = candidates.length;
+      this.changed();
+      for (const [index, model] of candidates.entries()) {
+        run.controller.signal.throwIfAborted();
+        let result = await this.probeModel(apiKey, model, run.controller.signal);
+        if (result === "busy") { // rate-limited right now, not refused: one more try after a short pause
+          await this.pause(this.pauses.busyMs);
+          result = await this.probeModel(apiKey, model, run.controller.signal);
+        }
+        if (result === "ok") usable.push(model);
+        run.done = index + 1;
+        this.changed();
+        if (index < candidates.length - 1) await this.pause(this.pauses.betweenMs);
+      }
+      save();
+    } catch (error) {
+      if (!run.controller.signal.aborted) throw error; // a failure saves nothing, so the last good results stay
+      stopped = true;
+      save();
+    } finally {
+      this.finding = undefined;
+      this.changed();
+    }
+    const count = `${usable.length} model${usable.length === 1 ? "" : "s"}`;
+    return stopped ? `Stopped. ${count} answered so far.` : usable.length ? `Found ${count} that ${usable.length === 1 ? "works" : "work"} on your key.` : "None of the models answered on your key. Check its quota in Google AI Studio.";
+  }
+
+  /** Stops a run in progress, keeping the models found so far. */
+  stopFindingModels(): void {
+    this.finding?.controller.abort();
+  }
+
+  private pause(ms: number): Promise<void> {
+    const signal = this.finding?.controller.signal;
+    if (ms <= 0) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(resolve, ms);
+      signal?.addEventListener("abort", () => { clearTimeout(timer); reject(signal.reason); }, { once: true });
+    });
+  }
+
   async shutdown(): Promise<void> {
     this.closed = true;
     this.cancelTests();
+    this.listController?.abort();
+    this.finding?.controller.abort();
     await this.pending;
   }
 
@@ -91,12 +206,14 @@ export class AISettings {
           encrypted = await this.encryption.encryptStringAsync(action.key.trim());
         } catch { throw new Error("Secure credential storage is unavailable. Unlock your Mac keychain and retry."); }
         if (this.closed) throw new Error("AI settings are shutting down");
+        this.forgetUsable();
         this.store.setSetting("ai.gemini.encryptedKey", encrypted.toString("base64"));
         message = "Gemini key saved securely";
         break;
       }
       case "remove-key":
         // Do not automatically change providers or send queued work somewhere else.
+        this.forgetUsable();
         this.store.setSetting("ai.gemini.encryptedKey", "");
         message = "Gemini key removed. New Gemini requests need a key.";
         break;
@@ -112,7 +229,7 @@ export class AISettings {
         if (testSignal?.aborted) throw Object.assign(new Error("Gemini request was cancelled"), { name: "AbortError" });
         try {
           const response = await this.testClient(apiKey, view.geminiModel).complete({ messages: [{ role: "user", content: "Connection test only. Return {\"ok\":true}." }],
-            schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] }, signal: testSignal, timeoutMs: 60_000, maxOutputTokens: 2048,
+            schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] }, signal: testSignal, timeoutMs: 60_000, maxOutputTokens: TEST_OUTPUT_TOKENS,
             // Only the default model is known to accept thinkingLevel; others keep Gemini's defaults.
             ...(view.geminiModel === DEFAULT_GEMINI_MODEL ? { thinkingLevel: "low" as const } : {}) });
           let result;
@@ -126,7 +243,7 @@ export class AISettings {
         break;
       }
     }
-    for (const listener of this.listeners) { try { listener(); } catch { /* Views cannot interrupt persistence. */ } }
+    this.changed();
     return message;
   }
 }

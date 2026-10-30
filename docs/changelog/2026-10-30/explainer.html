@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elegant 0.1.3: what changed on 30 October 2026</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fafafa; --card: #ffffff; --fg: #18181b; --muted: #62626b; --line: #e4e4e7; --stage: #ececf0;
+    --new: #1d4ed8; --new-bg: #e0e9ff;
+    --improved: #0f766e; --improved-bg: #d5f3ee;
+    --fixed: #b45309; --fixed-bg: #fdecc8;
+    --ui: #7c3aed; --ui-bg: #ece3ff;
+    --before: #71717a; --after: #15803d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111113; --card: #1a1a1e; --fg: #f4f4f5; --muted: #a1a1aa; --line: #2c2c32; --stage: #232328;
+      --new: #8fb0ff; --new-bg: #1c2a52;
+      --improved: #5fd4c4; --improved-bg: #12332f;
+      --fixed: #f5b95b; --fixed-bg: #3b2a0c;
+      --ui: #c4a5ff; --ui-bg: #2d2150;
+      --before: #a1a1aa; --after: #6ee7a0;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1080px; margin: 0 auto; padding: 56px 24px 96px; }
+  h1 { font-size: clamp(1.9rem, 4vw, 2.6rem); line-height: 1.15; margin: 0 0 12px; letter-spacing: -0.02em; }
+  h2 { font-size: 1.45rem; margin: 64px 0 8px; letter-spacing: -0.01em; }
+  h3 { font-size: 1.05rem; margin: 0 0 4px; }
+  p { margin: 0 0 12px; }
+  a { color: var(--new); }
+  code { font: 0.88em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--stage); padding: 1px 6px; border-radius: 5px; }
+  .muted { color: var(--muted); }
+  .lede { font-size: 1.15rem; color: var(--muted); max-width: 46rem; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 20px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: 0.92rem; }
+  .meta b { color: var(--fg); font-weight: 600; }
+
+  .tag { display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 9px; border-radius: 999px; vertical-align: 2px; }
+  .tag.new { color: var(--new); background: var(--new-bg); }
+  .tag.improved { color: var(--improved); background: var(--improved-bg); }
+  .tag.fixed { color: var(--fixed); background: var(--fixed-bg); }
+  .tag.ui { color: var(--ui); background: var(--ui-bg); }
+
+  .glance { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-top: 36px; }
+  .glance > div { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+  .glance p { margin: 8px 0 0; font-size: 0.95rem; }
+
+  .group { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 8px 22px; margin-top: 16px; }
+  .group > header { padding: 14px 0 4px; }
+  .group ul { list-style: none; margin: 0; padding: 0; }
+  .group li { padding: 12px 0; border-top: 1px solid var(--line); }
+  .group li:first-child { border-top: 0; }
+  .group li p { margin: 0; color: var(--muted); font-size: 0.97rem; }
+  .group li strong { color: var(--fg); }
+  .pr { font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+
+  .compare { margin-top: 28px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px; }
+  .compare > p { margin-bottom: 18px; color: var(--muted); }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .pair.single { grid-template-columns: minmax(0, 1fr); max-width: 560px; margin: 0 auto; }
+  figure { margin: 0; min-width: 0; }
+  figure .label { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+  figure .label::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+  figure.before .label { color: var(--before); }
+  figure.after .label { color: var(--after); }
+  .stage { background: var(--stage); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+  .stage img { display: block; width: 100%; height: auto; border-radius: 10px; }
+  .stage.wide { padding: 18px 10px; }
+  .stage.wide img { border-radius: 0; }
+  figcaption { margin-top: 10px; font-size: 0.93rem; color: var(--muted); }
+  .na { display: flex; align-items: center; justify-content: center; min-height: 160px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 12px; padding: 16px; font-size: 0.93rem; }
+
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 16px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 22px; }
+  .panel ul { margin: 8px 0 0; padding-left: 1.1em; }
+  .panel li { margin: 0 0 8px; color: var(--muted); font-size: 0.96rem; }
+  .panel li strong { color: var(--fg); }
+  .ok { color: var(--after); font-weight: 600; }
+  footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
+
+  @media (max-width: 760px) {
+    .pair { grid-template-columns: minmax(0, 1fr); }
+    main { padding-top: 36px; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <p class="muted" style="margin:0 0 6px"><strong>Elegant</strong> · changelog</p>
+  <h1>30 October 2026: Gemini as an option, Settings as a modal, a Prompt that waits for you</h1>
+  <p class="lede">Seven pull requests merged into <code>main</code> today and shipped as <a href="https://github.com/BrandNewDevs/Elegant/releases/tag/v0.1.3">v0.1.3</a>, the first release with in-app updates. Ollama is still the default. Nothing here sends anything to the cloud unless you choose it in Settings.</p>
+  <ul class="meta">
+    <li><b>Date</b> 30 October 2026</li>
+    <li><b>Release</b> v0.1.3, published 12:36 IST</li>
+    <li><b>PRs</b> #65, #67, #68, #71, #72, #73, #74</li>
+    <li><b>Full notes</b> <a href="./README.md">README.md</a></li>
+  </ul>
+
+  <div class="glance">
+    <div><span class="tag new">New</span><p>Optional Gemini for Summaries and Meeting Chat, a Providers tab, an Appearance setting, model management.</p></div>
+    <div><span class="tag improved">Improved</span><p>The Prompt waits for an answer. TL;DRs lead with decisions and commitments. Clearer Gemini errors.</p></div>
+    <div><span class="tag fixed">Fixed</span><p>A TL;DR over 90 words is recovered, not rejected. The Dock no longer lists the window as "Meetings".</p></div>
+    <div><span class="tag ui">UI</span><p>Settings is a modal. A transparent title strip with a Beta label. A close button on the Prompt and on every toast.</p></div>
+  </div>
+</header>
+
+<h2>What changed</h2>
+<p class="muted">Each item below was checked against its commits or the docs they changed.</p>
+
+<section class="group" aria-label="New">
+  <header><span class="tag new">New</span></header>
+  <ul>
+    <li><h3>Optional Gemini processing <span class="pr">#71</span></h3>
+      <p>Summaries and Meeting Chat can run on Gemini with your own API key. The key is stored with Electron's OS-backed encryption and never reaches the renderer. You must accept a consent step, and there is no fallback between providers. Audio, transcription and speaker detection stay on your Mac. See <a href="../../adr/0003-optional-gemini-processing.md">ADR 0003</a>.</p></li>
+    <li><h3>Providers tab <span class="pr">#74</span></h3>
+      <p>One card per provider. Ollama (local) holds the Summary model picker and its readiness check. Gemini (cloud) holds the key, model, connection test and consent.</p></li>
+    <li><h3>Gemini model list and "Find usable models" <span class="pr">#74</span></h3>
+      <p>Once a key is saved, the model picker is filled from Google's models endpoint. Because Google lists models your plan cannot use, "Find usable models" sends each a tiny synthetic request, with progress and a Stop button, and keeps only the ones that answer. No Meeting content is ever sent for either.</p></li>
+    <li><h3>Appearance: System, Light or Dark <span class="pr">#72</span></h3>
+      <p>Applies to every window, the Prompt included.</p></li>
+    <li><h3>Summary model picker for Ollama <span class="pr">#72</span></h3>
+      <p>Lists the models you have pulled. <code>gemma3:4b</code> is the default and the only one that has passed the evaluation gates; any other is flagged as untested.</p></li>
+    <li><h3>Speech and speaker models, with Remove and Redownload <span class="pr">#72</span></h3>
+      <p>Each model shows its size on disk. Both actions ask first and are refused while a download, a Recording or AI work is running.</p></li>
+    <li><h3>Elegant logos and a Beta label <span class="pr">#72</span></h3>
+      <p>The app, Dock and menu bar use the Elegant logo. The menu-bar title still shows elapsed time while recording.</p></li>
+  </ul>
+</section>
+
+<section class="group" aria-label="Improved">
+  <header><span class="tag improved">Improved</span></header>
+  <ul>
+    <li><h3>The Prompt stays until you answer <span class="pr">#72</span></h3>
+      <p>No timeout, and clicking elsewhere does not dismiss it. Closing it discards the buffered audio, and Elegant will not ask about that app again until it releases the microphone.</p></li>
+    <li><h3>TL;DRs lead with what matters <span class="pr">#65 · #73</span></h3>
+      <p>The overview reserves space for explicit final decisions, then first-person commitments, then updates and open questions. Earlier proposals rank lower but stay in each Participant's points.</p></li>
+    <li><h3>Gemini quota errors say why <span class="pr">#74</span></h3>
+      <p>A 429 now names the quota, the model and the retry delay, and says when the limit is zero because the model is not on your plan.</p></li>
+    <li><h3>Gemini setup checked against Google's docs <span class="pr">#74</span></h3>
+      <p>The connection test allows 2,048 output tokens because thinking tokens count against the cap. The consent text now says that on the free tier Google may use what you send to improve its products.</p></li>
+    <li><h3>Tighter Settings copy and toast confirmations <span class="pr">#72 · #74</span></h3>
+      <p>Descriptions say what the setting does first. Saved keys and passed tests appear as toasts; a failed change stays as an alert until fixed.</p></li>
+  </ul>
+</section>
+
+<section class="group" aria-label="Fixed">
+  <header><span class="tag fixed">Fixed</span></header>
+  <ul>
+    <li><h3>A TL;DR over 90 words no longer fails <span class="pr">#65</span></h3>
+      <p>Three valid 57-word points produced a 171-word overview that the app rejected. It now packs whole supported sentences inside three sentences and 90 words, and keeps main updates and who said what.</p></li>
+    <li><h3>The Dock no longer lists the window as "Meetings" <span class="pr">#72</span></h3>
+      <p>The page's own title was replacing the window title. The Meetings and onboarding windows now keep the app's name.</p></li>
+  </ul>
+</section>
+
+<section class="group" aria-label="UI">
+  <header><span class="tag ui">UI</span></header>
+  <ul>
+    <li><h3>Settings is a modal</h3>
+      <p>It opens over the Meetings window, which blurs behind it. The close button, Esc or a click outside closes it, and your open Meeting stays put.</p></li>
+    <li><h3>A transparent title strip</h3>
+      <p>The traffic lights sit inside the window. The strip no longer shows the app's name; a Beta label sits at its right edge.</p></li>
+    <li><h3>Close buttons</h3>
+      <p>On the Prompt, as a badge on its corner, and on every toast.</p></li>
+    <li><h3>Settings sections</h3>
+      <p>General, Permissions, Models, Providers, Updates. The Summary model picker moved to Providers, and the default model is no longer labelled "(tested)".</p></li>
+  </ul>
+</section>
+
+<h2>Previous UI and Updated UI</h2>
+<p class="muted">"Previous UI" is <code>main</code> right after #67 and #68 merged at 10:41 IST. "Updated UI" is the same app with the day's work on top. Both use the same made-up Meeting data and were rendered from the built app windows, so no real people or Meetings appear.</p>
+
+<section class="compare" aria-labelledby="c1">
+  <h3 id="c1"><span class="tag ui">UI</span> The window's top edge</h3>
+  <p>The native title bar is replaced by a transparent strip you can drag. It no longer repeats the app's name, and it carries a Beta label. The window now reads as one surface, with the sidebar and the Meeting starting just below the strip.</p>
+  <div class="pair">
+    <figure class="before"><div class="label">Previous UI</div>
+      <div class="stage"><img src="./screenshots/meeting-previous.png" alt="Meetings window with a native title bar reading Elegant" loading="lazy"></div>
+      <figcaption>A native title bar that says "Elegant", with a rule under it.</figcaption></figure>
+    <figure class="after"><div class="label">Updated UI</div>
+      <div class="stage"><img src="./screenshots/meeting-updated.png" alt="Meetings window with a transparent top strip and a Beta label at the right edge" loading="lazy"></div>
+      <figcaption>The same window with no title bar. The traffic lights sit inside it and "Beta" sits at the right edge.</figcaption></figure>
+  </div>
+</section>
+
+<section class="compare" aria-labelledby="c2">
+  <h3 id="c2"><span class="tag ui">UI</span> <span class="tag new">New</span> Settings, General</h3>
+  <p>Settings stops replacing the Meeting and floats over it. You can look something up in Settings and land back on the Meeting you were reading. Appearance is new, and settings that explain themselves no longer carry a description.</p>
+  <div class="pair">
+    <figure class="before"><div class="label">Previous UI</div>
+      <div class="stage"><img src="./screenshots/settings-general-previous.png" alt="Settings as a page in the main area with General, Permissions, Models and Updates" loading="lazy"></div>
+      <figcaption>A page that takes over the main area, with a Meetings back link and four sections.</figcaption></figure>
+    <figure class="after"><div class="label">Updated UI</div>
+      <div class="stage"><img src="./screenshots/settings-general-updated.png" alt="Settings as a modal over a blurred Meetings window, showing an Appearance control" loading="lazy"></div>
+      <figcaption>A modal over the blurred Meetings, with a close button, five sections and the new System / Light / Dark control.</figcaption></figure>
+  </div>
+</section>
+
+<section class="compare" aria-labelledby="c3">
+  <h3 id="c3"><span class="tag ui">UI</span> <span class="tag new">New</span> Settings, Models</h3>
+  <p>Models now covers only what runs on your Mac for transcription. You can see how much space each model takes, and remove it or fetch it again without leaving the app.</p>
+  <div class="pair">
+    <figure class="before"><div class="label">Previous UI</div>
+      <div class="stage"><img src="./screenshots/settings-models-previous.png" alt="Models section with a combined speech and speaker status and a Summaries readiness check" loading="lazy"></div>
+      <figcaption>One combined "Downloaded" status, and Ollama's readiness check under Summaries.</figcaption></figure>
+    <figure class="after"><div class="label">Updated UI</div>
+      <div class="stage"><img src="./screenshots/settings-models-updated.png" alt="Models section listing the speech and speaker models with sizes, Redownload and Remove" loading="lazy"></div>
+      <figcaption>Speech and speaker models listed separately with their sizes, each with Redownload and Remove.</figcaption></figure>
+  </div>
+</section>
+
+<section class="compare" aria-labelledby="c4">
+  <h3 id="c4"><span class="tag improved">Improved</span> <span class="tag ui">UI</span> The Prompt</h3>
+  <p>The Prompt used to give up after a timeout and offered a Not now button. It now waits for you, and the close badge on its corner replaces Not now. Esc closes it too.</p>
+  <div class="pair">
+    <figure class="before"><div class="label">Previous UI</div>
+      <div class="stage wide"><img src="./screenshots/prompt-previous.png" alt="Prompt reading Zoom is using your microphone, with Record, Not now and Never for this app" loading="lazy"></div>
+      <figcaption>The heading names the app, and there are three buttons: Record, Not now, Never for this app.</figcaption></figure>
+    <figure class="after"><div class="label">Updated UI</div>
+      <div class="stage wide"><img src="./screenshots/prompt-updated.png" alt="Prompt reading Record this Meeting with Record, Never for this app and a close badge" loading="lazy"></div>
+      <figcaption>A plain "Record this Meeting?" heading, two buttons and a close badge on the top-right corner.</figcaption></figure>
+  </div>
+</section>
+
+<section class="compare" aria-labelledby="c5">
+  <h3 id="c5"><span class="tag new">New</span> Settings, Providers</h3>
+  <p>This tab is new, so there is no Previous UI. Ollama and Gemini each get a card. The one in use is marked, and the Gemini card (scrolled out of view here) holds the key, model, connection test and consent.</p>
+  <div class="pair single">
+    <figure class="before"><div class="label">Previous UI</div>
+      <div class="na">Not applicable: this tab did not exist.</div></figure>
+    <figure class="after"><div class="label">Updated UI</div>
+      <div class="stage"><img src="./screenshots/settings-providers-updated.png" alt="Providers section with an Ollama card marked In use and the top of a Gemini card" loading="lazy"></div>
+      <figcaption>The Ollama card, marked Local and In use, with the Summary model picker. The Gemini card, marked Cloud, starts below it.</figcaption></figure>
+  </div>
+</section>
+
+<h2>What it means for you</h2>
+<div class="cols">
+  <div class="panel"><h3>User impact</h3>
+    <ul>
+      <li><strong>Local use is unchanged.</strong> Ollama stays the default and a Summary you already have is not rewritten if you change provider.</li>
+      <li><strong>Gemini sends Transcript evidence and questions to Google.</strong> You opt in once, in Settings. Audio is never uploaded.</li>
+      <li><strong>The Prompt waits.</strong> You answer or close it; it will not time out while you are busy.</li>
+      <li><strong>Settings keeps your place.</strong> The Meeting you were reading is still there when you close it.</li>
+      <li><strong>0.1.3 is the first release with in-app updates.</strong> Getting to it is a manual download; after that the app updates itself.</li>
+    </ul></div>
+  <div class="panel"><h3>Checks completed</h3>
+    <ul>
+      <li><span class="ok">Passed</span> <code>pnpm run typecheck</code> on <code>main</code> at <code>4d07793</code>, the commit <code>v0.1.3</code> points to.</li>
+      <li><span class="ok">Passed</span> <code>pnpm exec vitest run</code>: 53 files, 791 tests. The four real-engine tests ran against an existing local engine build.</li>
+      <li><strong>Not run:</strong> the full <code>pnpm test</code>, so the Swift engine's own tests were skipped.</li>
+      <li>Screenshots were captured from the built renderer in Electron, not from the packaged app.</li>
+    </ul></div>
+  <div class="panel"><h3>Known issues</h3>
+    <ul>
+      <li><strong>Gemini has not been tried with a live key.</strong> Google's docs were read, not exercised. A passing "Test Gemini connection" is the real check. Quality and latency against Ollama are still unmeasured.</li>
+      <li><strong>Keychain behaviour is unverified on a signed Mac app</strong>: save, replace, remove, relaunch, and a locked keychain.</li>
+      <li>Google calls <code>generateContent</code> legacy but supported. Elegant stays on it for now.</li>
+      <li>"Find usable models" spends a little of each model's quota. <code>gemini-4-argon</code> is paid only.</li>
+      <li>TL;DR ranking uses narrow English cues. Three sentences can still leave out a detail; each Participant's points keep everything.</li>
+      <li>Only <code>gemma3:4b</code> has passed the evaluation gates.</li>
+    </ul></div>
+</div>
+
+<footer>
+  Elegant 0.1.3 · 30 October 2026 · Source notes in <a href="./README.md">README.md</a>, Gemini details in <a href="../../gemini.md">docs/gemini.md</a>. The comparison screenshots show stubbed data and omit toasts and the Dark appearance.
+</footer>
+
+</main>
+</body>
+</html>
