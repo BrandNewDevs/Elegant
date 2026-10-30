@@ -20,6 +20,9 @@ import { useSetup } from "@/lib/use-setup";
 import { cn } from "@/lib/utils";
 import { restartForUpdate } from "../meetings/update-actions";
 
+import { AIProviderSettings } from "./AIProviderSettings";
+import type { AISettingsView } from "../../shared/ai-settings";
+
 export const SECTIONS = ["General", "Permissions", "Models", "Updates"] as const;
 export type SettingsSection = (typeof SECTIONS)[number];
 
@@ -324,7 +327,7 @@ function DownloadedModels({ models, name }: { models: Step & { fraction: number 
   );
 }
 
-function Models({ models, ollama, summaryModel, name }: { models: Step & { fraction: number }; ollama: Step; summaryModel: string; name: string }) {
+function Models({ models, ollama, summaryModel, name, ai }: { models: Step & { fraction: number }; ollama: Step; summaryModel: string; name: string; ai?: AISettingsView }) {
   const percent = Math.round(models.fraction * 100);
   return (
     <div className="divide-y">
@@ -336,7 +339,8 @@ function Models({ models, ollama, summaryModel, name }: { models: Step & { fract
       >
         <SummaryModelPicker model={summaryModel} ollama={ollama.status} />
       </SettingRow>
-      <SettingRow
+      {ai && <AIProviderSettings ai={ai} />}
+      {ai?.provider !== "gemini" && <SettingRow
         title="Summaries"
         description="A model running in Ollama on your Mac writes each Summary. Start Ollama and pull the model first; you can record without it and summarise later."
         below={
@@ -354,7 +358,7 @@ function Models({ models, ollama, summaryModel, name }: { models: Step & { fract
         {ollama.status === "done" && <Status label="Ready" variant="success" />}
         {ollama.status === "working" && <Status label="Checking…" variant="warning" />}
         {ollama.status === "problem" && <Status label="Not ready" variant="destructive" />}
-      </SettingRow>
+      </SettingRow>}
     </div>
   );
 }
@@ -457,7 +461,7 @@ export function SettingsPage({
               <>
                 {section === "General" && <General appearance={appearance} showInDock={showInDock} keepAudio={keepAudio} userName={view.userName} />}
                 {section === "Permissions" && <Permissions state={view.state} name={view.name} />}
-                {section === "Models" && <Models models={view.state.models} ollama={view.state.ollama} summaryModel={summaryModel} name={view.name} />}
+                {section === "Models" && <Models models={view.state.models} ollama={view.state.ollama} summaryModel={summaryModel} name={view.name} ai={view.ai} />}
                 {section === "Updates" && <Updates checkForUpdates={checkForUpdates} update={update} appVersion={appVersion} name={view.name} />}
               </>
             )}

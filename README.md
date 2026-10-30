@@ -1,6 +1,6 @@
 # Elegant
 
-A personal macOS menu-bar app that notices when you are in an online call, offers to record it, and produces a transcript and summary entirely on your own machine. No audio, transcript or summary ever leaves the Mac ([ADR 0002](./docs/adr/0002-fully-local-processing.md)).
+A personal macOS menu-bar app that notices when you are in an online call, offers to record it, and produces a Transcript and Summary. Processing is local by default. Optional Gemini Summary and Chat processing sends Transcript evidence and questions to Google only after explicit selection in Settings; audio stays on the Mac ([ADR 0003](./docs/adr/0003-optional-gemini-processing.md)).
 
 ## What it does
 
@@ -9,18 +9,19 @@ A personal macOS menu-bar app that notices when you are in an online call, offer
 - **Transcribes locally.** After you stop, WhisperKit transcribes the whole recording (English only). Other voices are separated by speaker diarization and labelled "Speaker 1", "Speaker 2", and so on. You can rename any speaker per meeting.
 - **Summarises locally.** A local model served by Ollama (default `gemma3:4b`) writes a TL;DR and what each participant said. Every point links to the transcript passage that supports it, and clicking a timestamp jumps to and highlights that passage. Long meetings are handled in bounded chunks.
 - **Chat with a meeting.** Ask questions about one meeting in the Chat view. Answers cite transcript segments, history is saved per meeting, and you can cancel, retry or clear a chat.
+- **Optional Gemini.** Choose Gemini in Settings, save your own API key and acknowledge cloud processing. Gemini writes evidence-backed Summaries and synthesised Chat answers without requiring Ollama. Local remains the default, with no automatic cloud fallback. See [Gemini setup and verification](./docs/gemini.md).
 - **Meetings window.** Browse, full-text search, and open a meeting in its Summary, Transcript or Chat view. Regenerate a summary, export a meeting to Markdown (summary, transcript and supporting timestamps), or delete a meeting and all its data.
 - **Your name.** Set it once in Settings → General and it replaces "You" in transcripts, summaries and exports.
 - **Menu-bar controls.** Open the app, Settings (⌘,), keep audio after transcription (off by default; audio is otherwise deleted once transcription succeeds), show in Dock (on by default), ignored apps, and apps you chose "Never" for.
 - **Launches at login** when installed as the packaged app.
 - **AI work is queued.** Model preparation, transcription, summaries and chat run one at a time, shown as toasts. Detection and recording stay responsive.
 
-**Out of scope:** live captions, calendar integration, in-person meetings, languages other than English, any cloud processing, and cross-meeting chat. See [`docs/design.md`](./docs/design.md) for the full design.
+**Out of scope:** live captions, calendar integration, in-person meetings, languages other than English, cloud audio processing, and cross-meeting chat. See [`docs/design.md`](./docs/design.md) for the full design.
 
 ## Requirements
 
 - An Apple Silicon Mac running **macOS 14.2 or later** (system-audio capture needs it). The target machine is a 16 GB M4.
-- [Ollama](https://ollama.com) installed and running, with the summary model pulled:
+- For local Summary and Chat processing, [Ollama](https://ollama.com) installed and running, with the summary model pulled:
 
   ```sh
   ollama pull gemma3:4b

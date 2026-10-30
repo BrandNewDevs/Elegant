@@ -22,6 +22,7 @@ export interface GenerationMetadata {
   elapsedMs: number;
   promptTokens?: number;
   outputTokens?: number;
+  thinkingTokens?: number;
   loadDurationNs?: number;
 }
 

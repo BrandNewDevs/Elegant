@@ -1,6 +1,6 @@
 # Elegant
 
-A personal macOS app that notices when you are in an online call, offers to record it, and produces a transcript and summary entirely on your own machine.
+A personal macOS app that notices when you are in an online call, offers to record it, and produces a Transcript and Summary. Processing is local by default, with optional Gemini text processing as described in ADR 0003. Audio stays on the Mac.
 
 ## Language
 

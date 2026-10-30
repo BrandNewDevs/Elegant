@@ -32,6 +32,7 @@ export function pushSetupState(view: SetupViewState) {
       },
       act,
       setUserName,
+      configureAI: vi.fn(async () => "AI settings saved"),
     },
     meetings: createMeetingsApi({ setShowInDock, setAppearance, setSummaryModel, setKeepAudio, setCheckForUpdates }),
     prompt: {} as Window["electron"]["prompt"],

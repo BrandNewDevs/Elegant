@@ -3,6 +3,7 @@ import { DISPLAY_NAME } from "../config.js";
 import type { Setup } from "../setup/setup.js";
 import type { SetupAction } from "../shared/setup-actions.js";
 import type { SetupViewState } from "../shared/setup-view-state.js";
+import type { AISettings } from "../setup/ai-settings.js";
 
 const SETTINGS_PANE = {
   "settings-microphone": "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
@@ -10,6 +11,7 @@ const SETTINGS_PANE = {
 } as const;
 
 export interface SetupBridgeHandlers {
+  ai?: AISettings;
   /** The onboarding page is finished; close the window it is in. */
   done(sender: WebContents): void;
   /** The onboarding page asked to go to Settings, which is a page of the Meetings window. */
@@ -32,6 +34,15 @@ export class SetupBridge {
     setup.onChange(() => {
       for (const [contents, ready] of this.clients) if (ready) this.push(contents);
     });
+    if (handlers.ai) {
+      handlers.ai.onChange(() => {
+        for (const [contents, ready] of this.clients) if (ready) this.push(contents);
+      });
+      ipcMain.handle("setup:configure-ai", (event, action: unknown) => {
+        if (!this.clients.has(event.sender)) throw new Error("This window cannot configure AI");
+        return handlers.ai!.configure(action);
+      });
+    }
     ipcMain.on("setup:ready", (event) => {
       if (!this.clients.has(event.sender)) return;
       this.clients.set(event.sender, true);
@@ -79,6 +90,7 @@ export class SetupBridge {
       userName: this.setup.userName,
       permissionsGranted: this.setup.permissionsGranted,
       state: this.setup.state,
+      ...(this.handlers.ai ? { ai: this.handlers.ai.view } : {}),
     };
     contents.send("setup:state", payload);
   }

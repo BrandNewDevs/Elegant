@@ -21,6 +21,10 @@ import { OnboardingWindow } from "./onboarding-window.js";
 import { SetupBridge } from "./setup-bridge.js";
 import { STATUS_LABEL, trayTitle } from "./status-label.js";
 import { createUpdateDriver } from "./update-driver.js";
+import { AISettings } from "../setup/ai-settings.js";
+import { GeminiClient } from "../pipeline/gemini.js";
+import { createGeminiSummariser, createGeminiChat } from "../pipeline/gemini-pipeline.js";
+import { createProviderRouting } from "../pipeline/provider.js";
 
 const RECORDING_SYMBOL = "⏺";
 
@@ -126,15 +130,32 @@ app.whenReady().then(() => {
   const store = openStore(join(dataDir, "meetings.db"));
   const engine = new ProcessEngine({ command: process.env.MEETING_RECORDER_ENGINE ?? engineCommand });
   ignoredAppsPath = join(dataDir, "ignored-apps.json");
+  // The local model is read per request, so the Summary model picked in Settings applies to the next one.
   const textModel = new OllamaClient({ model: () => core?.summaryModel ?? DEFAULT_SUMMARY_MODEL });
+  const ai = new AISettings(store, {
+    isAsyncEncryptionAvailable: async () => (await import("electron")).safeStorage.isAsyncEncryptionAvailable(),
+    encryptStringAsync: async text => (await import("electron")).safeStorage.encryptStringAsync(text),
+    decryptStringAsync: async buffer => (await import("electron")).safeStorage.decryptStringAsync(buffer),
+  });
+  const providers = createProviderRouting({
+    snapshot: () => ai.snapshot(),
+    local: {
+      summarise: createReadableSummariser({ model: textModel }),
+      chat: createMeetingChat({ store, model: textModel, modelName: DEFAULT_SUMMARY_MODEL }),
+    },
+    gemini: selection => {
+      const model = new GeminiClient({ apiKey: selection.apiKey, model: selection.model });
+      return { summarise: createGeminiSummariser({ model }), chat: createGeminiChat({ store, model }) };
+    },
+  });
   core = new AppCore({
-    chat: createMeetingChat({ store, model: textModel, modelName: DEFAULT_SUMMARY_MODEL }),
+    chat: providers.chat,
     engine,
     store,
     extraIgnoredApps: ignoredAppsFile(ignoredAppsPath),
     pipeline: {
       transcribe: createEngineTranscriber(engine, { model: SPEECH_MODEL, modelsDirectory: join(dataDir, "models") }),
-      summarise: createReadableSummariser({ model: textModel }),
+      summarise: providers.summarise,
     },
   });
 
@@ -146,6 +167,7 @@ app.whenReady().then(() => {
     busyReason: () => (core?.recording ? "A Recording is in progress." : core?.jobs.snapshot.length ? "Meeting processing is running." : undefined),
   });
   const setupBridge = new SetupBridge(setup, {
+    ai,
     done: (sender) => BrowserWindow.fromWebContents(sender)?.close(),
     openSettings: () => meetingsWindow?.show({ settings: true }),
   });
@@ -241,7 +263,7 @@ app.whenReady().then(() => {
     if (quitting) return;
     event.preventDefault();
     quitting = true;
-    void core!.stop().finally(() => {
+    void Promise.allSettled([core!.stop(), ai.shutdown()]).then(() => {
       store.close();
       app.exit(0);
     });

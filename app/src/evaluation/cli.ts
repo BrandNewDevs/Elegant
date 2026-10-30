@@ -15,12 +15,19 @@ import { evaluateFixture, validateFixture } from "./runner.js";
 import { evaluationMetadata } from "./metadata.js";
 import { requestBytes } from "../pipeline/model-request.js";
 import { EVIDENCE_PROMPT_VERSION } from "../pipeline/meeting-evidence.js";
+import { GeminiClient, DEFAULT_GEMINI_MODEL } from "../pipeline/gemini.js";
+import { createGeminiSummariser, createGeminiChat, GEMINI_CHAT_VERSION } from "../pipeline/gemini-pipeline.js";
 
 const [mode, source, output] = process.argv.slice(2);
 if (!source || !output || !["baseline", "current", "chat", "summary", "private-baseline", "private-current", "private-chat", "private-summary"].includes(mode ?? "")) throw new Error("Usage: eval:ai <baseline|current|chat|summary|private-baseline|private-current|private-chat|private-summary> <fixtures-dir|private-manifest.json> <results.json>");
 const privateRun = mode!.startsWith("private-");
 const traceEnabled = process.env.AI_SYNTHETIC_TRACE === "1";
 if (traceEnabled && (privateRun || mode!.endsWith("baseline"))) throw new Error("Synthetic tracing is available only for current synthetic evaluation; private content is never traced");
+const provider = process.env.AI_PROVIDER ?? "ollama";
+if (provider !== "ollama" && provider !== "gemini") throw new Error("AI_PROVIDER must be ollama or gemini");
+if (provider === "gemini" && mode!.endsWith("baseline")) throw new Error("The frozen baseline is Ollama-only; use summary, chat or current for Gemini");
+if (provider === "gemini" && privateRun && process.env.AI_ALLOW_CLOUD_PRIVATE !== "1") throw new Error("Private Gemini evaluation sends Transcript content to Google. Explicitly set AI_ALLOW_CLOUD_PRIVATE=1 only with permission to share it.");
+if (provider === "gemini" && !process.env.GEMINI_API_KEY?.trim()) throw new Error("Set GEMINI_API_KEY for Gemini evaluation; the key is never written to reports");
 const root = await realpath(fileURLToPath(new URL("../../../", import.meta.url)));
 const outside = (path: string) => isOutside(root, path);
 let destination = resolve(output);
@@ -49,12 +56,12 @@ const summaryDeadlineMs = deadlineOverride === undefined ? 15 * 60_000 : Number(
 if (!Number.isSafeInteger(summaryDeadlineMs) || summaryDeadlineMs < 1 || summaryDeadlineMs > 60 * 60_000) {
   throw new Error("AI_SUMMARY_DEADLINE_MS must be an integer from 1 to 3600000; it changes evaluation only");
 }
-const modelName = process.env.AI_MODEL ?? DEFAULT_SUMMARY_MODEL;
-const metadata = { ...await evaluationMetadata(modelName, implementation), ...(implementation === "current" ? {
+const modelName = process.env.AI_MODEL ?? (provider === "gemini" ? DEFAULT_GEMINI_MODEL : DEFAULT_SUMMARY_MODEL);
+const metadata = { ...await evaluationMetadata(modelName, implementation, provider), ...(implementation === "current" ? {
   summaryDeadlineMs, evaluationDeadlineOverride: deadlineOverride !== undefined,
-  chatPromptVersion: CHAT_PROMPT_VERSION, evidencePromptVersion: EVIDENCE_PROMPT_VERSION,
+  chatPromptVersion: provider === "gemini" ? GEMINI_CHAT_VERSION : CHAT_PROMPT_VERSION, evidencePromptVersion: provider === "gemini" ? "gemini-original-evidence-v1" : EVIDENCE_PROMPT_VERSION,
 } : {}) };
-const client = new OllamaClient({ model: modelName });
+const client = provider === "gemini" ? new GeminiClient({ model: modelName, apiKey: process.env.GEMINI_API_KEY! }) : new OllamaClient({ model: modelName });
 const baseline = new BaselineOllamaClient({ model: modelName });
 let calls = 0;
 const requests: { call: number; bytes: number; promptTokens?: number; outputTokens?: number; elapsedMs?: number; failed?: boolean }[] = [];
@@ -64,7 +71,7 @@ const model: LanguageModel & TextModel = {
   complete: async request => {
     const observation: (typeof requests)[number] = { call: ++calls, bytes: requestBytes(request) };
     requests.push(observation);
-    console.log(`Local model request ${calls}`);
+    console.log(`${provider === "gemini" ? "Gemini" : "Local model"} request ${calls}`);
     try {
       const result = await client.complete(request);
       if (traceEnabled) traces.push({ call: observation.call, messages: request.messages, schema: request.schema, response: result.text });
@@ -73,10 +80,10 @@ const model: LanguageModel & TextModel = {
     } catch (error) { observation.failed = true; throw error; }
   },
 };
-const summarise = implementation === "baseline" ? createBaselineSummariser({ model }) : createReadableSummariser({ model, deadlineMs: summaryDeadlineMs });
+const summarise = implementation === "baseline" ? createBaselineSummariser({ model }) : provider === "gemini" ? createGeminiSummariser({ model, deadlineMs: summaryDeadlineMs }) : createReadableSummariser({ model, deadlineMs: summaryDeadlineMs });
 const store = openStore(":memory:");
 const meetingIds = new WeakMap<Transcript, number>();
-const chat = createMeetingChat({ store, model, modelName });
+const chat = provider === "gemini" ? createGeminiChat({ store, model }) : createMeetingChat({ store, model, modelName });
 const pipeline = { ...(mode!.endsWith("chat") ? {} : { summarise }), ...(implementation === "current" && !mode!.endsWith("summary") ? { answer: async (transcript: Transcript, question: string,
   history: { question: string; answer: { text: string } }[]) => {
   let meetingId = meetingIds.get(transcript);

@@ -54,7 +54,7 @@ export function ChatPanel({ meetingId, chat, transcript, onOpen, isCurrent }: {
     </div>
     {!available && <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">Chat becomes available when this Meeting's Transcript is ready.</p>}
     {!history.length && available && <div className="rounded-lg border border-dashed px-5 py-8 text-center">
-      <MessageSquare className="mx-auto mb-3 size-5 text-muted-foreground" aria-hidden /><p className="text-sm">What was decided? Who committed to what?</p><p className="mt-1 text-xs text-muted-foreground">Questions and answers stay on this machine.</p>
+      <MessageSquare className="mx-auto mb-3 size-5 text-muted-foreground" aria-hidden /><p className="text-sm">What was decided? Who committed to what?</p><p className="mt-1 text-xs text-muted-foreground">Your AI provider is selected in Settings. Gemini sends Transcript evidence and questions to Google.</p>
     </div>}
     <ol aria-label="Chat history" className="space-y-5">{history.map(record => <li key={record.id} className="space-y-3">
       <div className="ml-8 rounded-lg bg-muted px-4 py-3"><p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Your question</p><p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{record.question}</p></div>
@@ -64,6 +64,7 @@ export function ChatPanel({ meetingId, chat, transcript, onOpen, isCurrent }: {
           {ACTIVE.has(record.status) && <Button type="button" variant="ghost" size="sm" onClick={() => void cancel(record.id)} aria-label="Cancel answer"><Square aria-hidden />Cancel</Button>}
         </div>
         {record.status === "completed" && record.answer && <div>
+          {record.generation?.provider === "gemini" && <p className="mb-1 text-xs text-muted-foreground">Generated with Gemini · {record.generation.model}</p>}
           <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{record.answer.text}<Citations revision={record.revision} refs={record.answer.refs} transcript={transcript} onOpen={onOpen} /></p>
         </div>}
         {["failed", "cancelled", "interrupted"].includes(record.status) && <div className="space-y-2">

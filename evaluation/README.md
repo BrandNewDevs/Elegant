@@ -1,6 +1,6 @@
 # Local AI evaluation
 
-Production AI is TypeScript. Python is only for analysis; it is never bundled with the app. Use synthetic Transcripts in Git. Keep real Recordings, corrected Transcripts and generated reports containing their words outside this repository.
+Production AI is TypeScript. Python is only for analysis; it is never bundled with the app. Use synthetic Transcripts in Git. Keep real Recordings, corrected Transcripts and generated reports containing their words outside this repository. Commands below default to unchanged Ollama processing. [Optional Gemini evaluation](../docs/gemini.md) uses the same production interfaces with separate cloud prompts and explicit private-data consent.
 
 ## Reproduce the frozen baseline
 
