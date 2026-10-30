@@ -59,7 +59,6 @@ export function MeetingsApp() {
         toast(`Version ${update.version} is ready. Restart to update`, {
           id,
           duration: Infinity,
-          closeButton: true,
           action: {
             label: "Restart",
             onClick: (event) => {
@@ -73,7 +72,6 @@ export function MeetingsApp() {
           id,
           description: "You can still download it from the release page.",
           duration: Infinity,
-          closeButton: true,
           action: { label: "View release", onClick: () => window.electron.meetings.openRelease() },
         });
       }
