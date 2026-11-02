@@ -406,6 +406,7 @@ function GeminiModelPicker({ ai, busy, configure }: { ai: AISettingsView; busy: 
     let current = true;
     setLoading(true);
     setProblem("");
+    setModels(undefined);
     window.electron.setup
       .geminiModels()
       .then((found) => current && setModels(found))
@@ -414,7 +415,7 @@ function GeminiModelPicker({ ai, busy, configure }: { ai: AISettingsView; busy: 
     return () => {
       current = false;
     };
-  }, [ai.hasGeminiKey, reload]); // a saved or replaced key, or the Refresh button, asks Google again
+  }, [ai.hasGeminiKey, ai.geminiKeyRevision, reload]);
   const finding = ai.finding;
   const usable = ai.usableModels;
   const filtered = usable !== undefined && !showAll;

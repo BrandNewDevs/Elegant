@@ -393,6 +393,28 @@ it("keeps the key that was typed when saving it fails", async () => {
 
 const gemini = (extra = {}) => ({ ...nothingDone, ai: { provider: "ollama" as const, geminiModel: "gemini-2.5-flash", hasGeminiKey: true, ...extra } });
 
+it("reloads models after key replacement and ignores the old key's late response", async () => {
+  pushSetupState(gemini({ geminiKeyRevision: 1 }));
+  let update!: Parameters<Window["electron"]["setup"]["onState"]>[0];
+  window.electron.setup.onState = callback => {
+    update = callback;
+    callback(gemini({ geminiKeyRevision: 1 }));
+    return () => {};
+  };
+  let finishOld!: (models: { id: string; label: string }[]) => void;
+  vi.mocked(window.electron.setup.geminiModels)
+    .mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve; }))
+    .mockResolvedValueOnce([{ id: "gemini-new", label: "New" }]);
+  page("Providers");
+  await vi.waitFor(() => expect(window.electron.setup.geminiModels).toHaveBeenCalledTimes(1));
+  await act(async () => { update(gemini({ geminiKeyRevision: 2 })); });
+  await vi.waitFor(() => expect(window.electron.setup.geminiModels).toHaveBeenCalledTimes(2));
+  await act(async () => { finishOld([{ id: "gemini-old", label: "Old" }]); });
+  openPicker(screen.getByRole("combobox", { name: "Gemini text model" }));
+  expect(await screen.findByRole("option", { name: "gemini-new" })).toBeTruthy();
+  expect(screen.queryByRole("option", { name: "gemini-old" })).toBeNull();
+});
+
 it("loads the Gemini models from the API and picks one without saving a separate field", async () => {
   pushSetupState(gemini());
   vi.mocked(window.electron.setup.geminiModels).mockResolvedValue([{ id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" }, { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" }]);
