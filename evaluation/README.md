@@ -120,3 +120,7 @@ Omit `--nvidia` on the Mac. The wrapper discards command stdout/stderr and does 
 Pass `--label cold` or `--label warm` only after establishing that condition yourself. The label does not prepare it. To compare models, use identical fixture files, generation settings and production commit, unload the previous model, verify Ollama has no resident model before the cold run, then immediately repeat after verifying the selected model remains resident. Record the digest and quantization on each machine: matching tag names alone do not establish matching weights. Keep the baseline unless the candidate meets quality and target-M4 gates.
 
 The readable Summary regression also supports optional `tldrTopics` and `unwantedContent` review criteria. These are never sent to the model. See the [current comparison](comparison/readable-summaries.md) for measured results and limits.
+
+## Human-reviewed Summary benchmark
+
+For output-bound reviews, explicit factual and presentation rubrics, and Summary-only quality reports, use the [Summary benchmark workflow](summary-benchmark.md). This adds a versioned review format alongside the legacy combined Summary/chat report; historical reviews are not automatically upgraded or treated as new human judgments.
