@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 
 from report import combine_status, valid_summary
@@ -122,7 +123,7 @@ def main():
         parser.error('score requires --reviews')
     result = prepare(results, fixtures) if args.mode == 'prepare' else score(results, fixtures, read(args.reviews))
     # Never replace a human review or prior report. Private outputs are owner-only.
-    with args.output.open('x', opener=lambda path, flags: __import__('os').open(path, flags, 0o600)) as output:
+    with open(args.output, 'x', opener=lambda path, flags: os.open(path, flags, 0o600)) as output:
         json.dump(result, output, indent=2)
         output.write('\n')
 
