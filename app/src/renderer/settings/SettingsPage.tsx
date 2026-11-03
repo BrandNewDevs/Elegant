@@ -394,23 +394,20 @@ function OllamaCard({ ollama, summaryModel, active, busy, onUse }: { ollama: Ste
 function GeminiModelPicker({ ai, busy, configure }: { ai: AISettingsView; busy: boolean; configure: (action: AISettingsAction) => Promise<boolean> }) {
   const [models, setModels] = useState<GeminiModelOption[]>();
   const [loading, setLoading] = useState(false);
-  const [problem, setProblem] = useState("");
   const [reload, setReload] = useState(0);
   const [showAll, setShowAll] = useState(false);
   useEffect(() => {
     if (!ai.hasGeminiKey) {
       setModels(undefined);
-      setProblem("");
       return;
     }
     let current = true;
     setLoading(true);
-    setProblem("");
     setModels(undefined);
     window.electron.setup
       .geminiModels()
       .then((found) => current && setModels(found))
-      .catch((error: unknown) => current && setProblem(error instanceof Error ? error.message : "The model list could not be loaded"))
+      .catch((error: unknown) => current && toast.error("Gemini models could not be loaded", { id: "gemini-models-problem", duration: 12000, dismissible: true, description: error instanceof Error ? error.message : undefined }))
       .finally(() => current && setLoading(false));
     return () => {
       current = false;
@@ -426,7 +423,7 @@ function GeminiModelPicker({ ai, busy, configure }: { ai: AISettingsView; busy: 
     try {
       toast.success(await window.electron.setup.findGeminiModels());
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "The models could not be tried");
+      toast.error("Finding usable models failed", { id: "gemini-models-problem", duration: 12000, dismissible: true, description: error instanceof Error ? error.message : "The models could not be tried" });
     }
   };
   return (
@@ -455,8 +452,7 @@ function GeminiModelPicker({ ai, busy, configure }: { ai: AISettingsView; busy: 
           <RefreshCw className={loading ? "animate-spin" : undefined} aria-hidden />
         </Button>
       </div>
-      {problem && <p className="text-sm text-destructive">{problem}</p>}
-      {!problem && models && models.length === 0 && <p className="text-sm text-muted-foreground">This key has no Gemini text models available.</p>}
+      {models && models.length === 0 && <p className="text-sm text-muted-foreground">This key has no Gemini text models available.</p>}
       <div className="flex flex-wrap items-center gap-2">
         {finding ? (
           <>
@@ -540,19 +536,29 @@ function GeminiCard({ ai, busy, testing, configure }: { ai: AISettingsView; busy
 }
 
 /** The providers on offer: which one writes Summaries and answers questions, and each one's own settings. One choice covers new work. */
+/** The toast title for an AI settings change that was refused; its reason follows as the description. */
+const FAILED: Partial<Record<AISettingsAction["type"], string>> = {
+  test: "Gemini connection test failed",
+  "save-key": "Gemini key not saved",
+  "remove-key": "Gemini key not removed",
+  model: "Gemini model not changed",
+  select: "Provider not changed",
+};
+
 function Providers({ ollama, summaryModel, ai }: { ollama: Step; summaryModel: string; ai?: AISettingsView }) {
   const [running, setRunning] = useState<AISettingsAction["type"]>();
   const busy = running !== undefined;
-  const [error, setError] = useState("");
-  /** Runs the change; says whether it was made, with a toast when it was and an alert by the controls when it was not. */
+  /** Runs the change; says whether it was made, with a toast either way: the reason is the toast's description. */
   const configure = async (action: AISettingsAction): Promise<boolean> => {
     setRunning(action.type);
-    setError("");
     try {
       toast.success(await window.electron.setup.configureAI(action));
       return true;
     } catch (problem) {
-      setError(problem instanceof Error ? problem.message : "AI settings could not be saved");
+      toast.error(FAILED[action.type] ?? "AI settings could not be saved", {
+        id: "ai-settings-problem", duration: 12000, dismissible: true,
+        description: problem instanceof Error ? problem.message : undefined,
+      });
       return false;
     } finally {
       setRunning(undefined);
@@ -565,11 +571,6 @@ function Providers({ ollama, summaryModel, ai }: { ollama: Step; summaryModel: s
       <OllamaCard ollama={ollama} summaryModel={summaryModel} active={provider === "ollama"} busy={busy} onUse={ai ? () => void configure({ type: "select", provider: "ollama" }) : undefined} />
       {ai && <GeminiCard ai={ai} busy={busy} testing={running === "test"} configure={configure} />}
       {busy && <p role="status" className="text-sm">Updating AI settings…</p>}
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
     </div>
   );
 }

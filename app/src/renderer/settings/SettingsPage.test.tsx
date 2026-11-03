@@ -7,7 +7,7 @@ import { SettingsPage, type SettingsSection } from "./SettingsPage";
 
 /** Renders the page on one section; the section nav is covered on its own. */
 function page(section: SettingsSection, props: Partial<Parameters<typeof SettingsPage>[0]> = {}) {
-  return render(<SettingsPage section={section} onSectionChange={() => {}} onBack={() => {}} {...props} />);
+  return render(<><SettingsPage section={section} onSectionChange={() => {}} onBack={() => {}} {...props} /><Toaster /></>);
 }
 
 it("lists the sections, marks the open one, and asks to change section", () => {
@@ -341,7 +341,9 @@ it("does not require Ollama when Gemini is selected and can switch back explicit
   page("Providers");
   expect(screen.queryByRole("button", { name: "Check Ollama" })).toBeNull();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Test Gemini connection" })));
-  expect(screen.getByRole("alert").textContent).toContain("Gemini quota reached");
+  expect((await screen.findByText("Gemini quota reached")).closest("[data-sonner-toast]")).not.toBeNull();
+  expect(screen.getByText("Gemini connection test failed")).toBeTruthy();
+  expect(screen.queryByRole("alert")).toBeNull();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Use Ollama" })));
   expect(window.electron.setup.configureAI).toHaveBeenLastCalledWith({ type: "select", provider: "ollama" });
 });
@@ -387,7 +389,8 @@ it("keeps the key that was typed when saving it fails", async () => {
   const field = screen.getByLabelText("Gemini API key") as HTMLInputElement;
   fireEvent.change(field, { target: { value: "entered-key" } });
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save key" })));
-  expect(screen.getByRole("alert").textContent).toContain("The keychain is locked");
+  expect((await screen.findByText("The keychain is locked")).closest("[data-sonner-toast]")).not.toBeNull();
+  expect(screen.getByText("Gemini key not saved")).toBeTruthy();
   expect(field.value).toBe("entered-key");
 });
 
@@ -455,10 +458,11 @@ it("says why the model list could not be loaded and asks again on Refresh", asyn
   pushSetupState(gemini());
   vi.mocked(window.electron.setup.geminiModels).mockRejectedValueOnce(new Error("Gemini access was denied. Check your API key.")).mockResolvedValue([{ id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" }]);
   page("Providers");
-  expect(await screen.findByText("Gemini access was denied. Check your API key.")).toBeTruthy();
+  const toast = await screen.findByText("Gemini access was denied. Check your API key.");
+  expect(toast.closest("[data-sonner-toast]")).not.toBeNull();
+  expect(screen.getByText("Gemini models could not be loaded")).toBeTruthy();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Refresh models" })));
   expect(window.electron.setup.geminiModels).toHaveBeenCalledTimes(2);
-  expect(screen.queryByText("Gemini access was denied. Check your API key.")).toBeNull();
 });
 
 it("confirms a provider change with a toast, not with text in the page", async () => {
@@ -471,14 +475,16 @@ it("confirms a provider change with a toast, not with text in the page", async (
   expect(toast.closest("section[aria-label='Gemini']")).toBeNull();
 });
 
-it("shows a failed provider change as an alert beside the controls, with no toast", async () => {
+it("shows a failed provider change as a toast with its reason, not as an alert in the page", async () => {
   pushSetupState(gemini({ hasGeminiKey: false }));
   vi.mocked(window.electron.setup.configureAI).mockRejectedValue(new Error("The keychain is locked"));
   render(<><SettingsPage section="Providers" onSectionChange={() => {}} onBack={() => {}} /><Toaster /></>);
   fireEvent.change(screen.getByLabelText("Gemini API key"), { target: { value: "entered-key" } });
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save key" })));
-  expect(screen.getByRole("alert").textContent).toContain("The keychain is locked");
-  expect(document.querySelector("[data-sonner-toast]")).toBeNull();
+  const toast = await screen.findByText("The keychain is locked");
+  expect(toast.closest("[data-sonner-toast]")).not.toBeNull();
+  expect(toast.closest("section[aria-label='Gemini']")).toBeNull();
+  expect(screen.queryByRole("alert")).toBeNull();
 });
 
 const listed = [{ id: "gemini-flash", label: "Flash" }, { id: "gemini-argon", label: "Argon" }, { id: "gemini-pro", label: "Pro" }];
