@@ -24,7 +24,9 @@ export function showPrompt(app: string, handlers: { record(): void; close(): voi
     maximizable: false,
     fullscreenable: false,
     skipTaskbar: true,
-    alwaysOnTop: true,
+    alwaysOnTop: true,Oct 30, 6:00 PM IST
+
+
     // Without this the first click on an inactive window only activates it, and the buttons would need two.
     acceptFirstMouse: true,
     show: false,
