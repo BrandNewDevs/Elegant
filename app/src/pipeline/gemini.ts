@@ -2,7 +2,7 @@ import type { GeminiModelOption } from "../shared/ai-settings.js";
 import type { TextModel, TextRequest, TextResponse } from "./language-model.js";
 import { requestBytes } from "./model-request.js";
 
-export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
 /** Separate from Ollama's limits: never change the local pipeline's request budget. */
 export const GEMINI_INPUT_BYTES = 192_000;
 const MAX_REPLY_BYTES = 512 * 1024;
@@ -76,17 +76,21 @@ async function refusal(response: Response, model?: string): Promise<GeminiError>
   }
   if (response.status !== 429) {
     await response.body?.cancel();
-    return new GeminiError(failure(response.status), { status: response.status });
+    return new GeminiError(failure(response.status, model), { status: response.status });
   }
   const { message, limitZero, retryDelaySeconds } = parseQuota(await readSmall(response), model);
   return new GeminiError(message, { status: 429, limitZero, retryDelaySeconds });
 }
-const failure = (status: number): string => {
+const failure = (status: number, model?: string): string => {
   if (status === 400) return "Gemini rejected the request. Check the API key, model and supported settings.";
   if (status === 401 || status === 403) return "Gemini access was denied. Check your API key and project permissions in Settings.";
-  if (status === 404) return "The selected Gemini model is unavailable. Choose an available text model in Settings.";
+  if (status === 404) return `Gemini model ${model ?? "selected"} is not available to your key (404). Choose another model in Settings.`;
   if (status === 429) return "Gemini quota or rate limit reached. Check your Google account usage and retry later.";
-  return "Gemini is temporarily unavailable. Retry later or choose Ollama in Settings.";
+  const name = model ?? "The selected model";
+  if (status === 503) return `Gemini is temporarily unavailable (503): ${name} is overloaded at Google. Retry in a minute, choose another model in Settings, or use Ollama.`;
+  if (status === 504) return `Gemini is temporarily unavailable (504): Google timed out answering ${name}. Retry, choose another model in Settings, or use Ollama.`;
+  if (status === 500 || status === 502) return `Gemini is temporarily unavailable (${status}): Google had an internal error with ${name}. Retry, choose another model in Settings, or use Ollama.`;
+  return `Gemini is temporarily unavailable (HTTP ${status}). Retry later, choose another model in Settings, or use Ollama.`;
 };
 
 /** Only text goes to Google's fixed endpoint; credentials use a header, never a URL. */
@@ -151,7 +155,7 @@ export class GeminiClient implements TextModel {
         if (request.signal.reason?.name === "TimeoutError") throw Object.assign(new Error("Gemini processing exceeded its deadline. Retry or ask a narrower question."), { name: "TimeoutError" });
         throw Object.assign(new Error("Gemini request was cancelled"), { name: "AbortError" });
       }
-      if (timeout.aborted) throw Object.assign(new Error("Gemini request timed out. Retry or ask a narrower question."), { name: "TimeoutError" });
+      if (timeout.aborted) throw Object.assign(new Error(`Gemini did not answer within ${Math.round(timeoutMs / 1000)} seconds. ${model} may be overloaded: retry, or choose another model in Settings.`), { name: "TimeoutError" });
       if (error instanceof GeminiError) throw error;
       // Fetch/SDK/server errors may contain credentials or speech; never forward them.
       throw new Error("Could not reach Gemini. Check your connection and retry.");
@@ -220,7 +224,7 @@ export async function checkGeminiConnection(client: TextModel, model: string, si
     try { result = JSON.parse(response.text); } catch { throw new GeminiError("Gemini connection test returned invalid JSON. Retry the test."); }
     if (!result || result.ok !== true) throw new GeminiError("Gemini connection test did not confirm success. Retry the test.");
   } catch (error) {
-    if (error instanceof Error && error.name === "TimeoutError") throw Object.assign(new Error("Gemini connection test timed out after 60 seconds. Check network access and the saved model, then retry."), { name: "TimeoutError" });
+    if (error instanceof Error && error.name === "TimeoutError") throw Object.assign(new Error(`Gemini connection test timed out after 60 seconds. ${model} may be overloaded at Google, or the network is slow: retry, or choose another model.`), { name: "TimeoutError" });
     throw error;
   }
 }

@@ -55,7 +55,7 @@ export function useJobToasts(jobs: AIJobState[] | undefined, meetings: MeetingLi
       const meeting = meetings.find(m => m.id === meetingId);
       if (!meeting) { toast.dismiss(id); finished.current.delete(id); continue; }
       if (meeting.state === "done") toast.success(WORDING[job.kind]!.done, { id, duration: 4000, dismissible: true, description: meeting.app, action: undefined });
-      else if (meeting.state === "failed") toast.error(`${WORDING[job.kind]!.running} failed`, { id, duration: 8000, dismissible: true, description: meeting.app, action: undefined });
+      else if (meeting.state === "failed") toast.error(`${WORDING[job.kind]!.running} failed`, { id, duration: 12000, dismissible: true, description: meeting.failure ? `${meeting.failure} (${meeting.app})` : meeting.app, action: undefined });
       else continue;
       finished.current.delete(id);
     }

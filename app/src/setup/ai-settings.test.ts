@@ -165,7 +165,7 @@ it("explains a connection-test timeout as a setup problem", async () => {
   const f = fixture();
   await f.settings.configure({ type: "save-key", key: "synthetic" });
   f.complete.mockRejectedValue(Object.assign(new Error("Gemini request timed out. Retry or ask a narrower question."), { name: "TimeoutError" }));
-  await expect(f.settings.configure({ type: "test" })).rejects.toThrow("timed out after 60 seconds. Check network access and the saved model");
+  await expect(f.settings.configure({ type: "test" })).rejects.toThrow("timed out after 60 seconds. gemini-3.6-flash may be overloaded");
   f.store.close();
 });
 it("requests low thinking only for the default model", async () => {

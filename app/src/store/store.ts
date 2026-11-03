@@ -11,6 +11,8 @@ export interface MeetingListItem {
   app: string;
   startedAt: string;
   state: MeetingState;
+  /** Why a failed Meeting failed, so the window can say it without opening the Meeting. */
+  failure?: string;
 }
 
 export interface Participant {
@@ -356,9 +358,9 @@ export function openStore(path: string): Store {
 
     listMeetings() {
       const rows = db
-        .prepare("SELECT id, app, started_at, state FROM meetings ORDER BY started_at DESC, id DESC")
-        .all() as unknown as Pick<MeetingRow, "id" | "app" | "started_at" | "state">[];
-      return rows.map((r) => ({ id: r.id, app: r.app, startedAt: r.started_at, state: r.state }));
+        .prepare("SELECT id, app, started_at, state, error FROM meetings ORDER BY started_at DESC, id DESC")
+        .all() as unknown as Pick<MeetingRow, "id" | "app" | "started_at" | "state" | "error">[];
+      return rows.map((r) => ({ id: r.id, app: r.app, startedAt: r.started_at, state: r.state, ...(r.state === "failed" && r.error ? { failure: r.error } : {}) }));
     },
     searchMeetings(query) {
       const expression = searchExpression(query);
