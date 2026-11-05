@@ -157,6 +157,7 @@ export function createGeminiSummariser({ model, deadlineMs = 15 * 60_000, observ
         if (typeof p.speaker !== "string") return invalid();
         const covers = ids(p.covers, draft.map((_, id) => id));
         if (covers.some(id => draft[id]!.speaker !== p.speaker)) return invalid();
+        if (covers.some(id => superseded.has(id)) && !covers.every(id => superseded.has(id))) return invalid();
         covers.forEach(id => covered.add(id));
         const historical = covers.every(id => superseded.has(id));
         if (historical) historicalPoints.add(index);

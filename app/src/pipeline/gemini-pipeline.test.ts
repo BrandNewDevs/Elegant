@@ -165,3 +165,19 @@ it("records Gemini extraction and consolidation diagnostics without persisting t
   expect(output.tldr).toBe(final.tldr.text);
   expect(JSON.stringify(output.generation)).not.toContain('Friday');
 });
+
+it("keeps superseded Gemini points out of TLDR selection and retains correction evidence", async () => {
+  const input = { segments: [
+    { start: 0, end: 2, speaker: 'You', text: 'I propose Monday with PDF export.' },
+    { start: 4, end: 6, speaker: 'You', text: 'Friday replaces Monday, and Markdown replaces PDF.' },
+  ] };
+  const extraction = { points: input.segments.map((s, id) => ({ speaker: s.speaker, text: s.text, sourceIds: [`${id}:0`] })), omittedSourceIds: [] };
+  const points = input.segments.map((s, id) => ({ speaker: s.speaker, text: s.text, covers: [id] }));
+  const model = modelFor([extraction, { points, tldr: { text: input.segments[0]!.text, pointIds: [0] } },
+    { points, tldr: { text: input.segments[1]!.text, pointIds: [1] } }]);
+  const output = await createGeminiSummariser({ model })(input);
+  expect(model.complete).toHaveBeenCalledTimes(3);
+  expect(output.participants[0]!.said[0]).toMatch(/^Earlier position \(superseded\):/);
+  expect(output.evidence!.participants[0]!.said[0]).toEqual([0, 1]);
+  expect(output.tldr).not.toContain('I propose');
+});
