@@ -4,7 +4,7 @@
  */
 export function readableWording(text: string): string {
   const value = text.trim();
-  if (/\b(?:Utilize|Utilizes|Utilized)\b|["“”`]|\b(?:branch|file|path|variable|function|ticket|issue)\s+\S+/iu.test(value)) return value;
+  if (/\b(?:Utilize|Utilizes|Utilized)\b/u.test(value) || /["“”`]|\b(?:branch|file|path|variable|function|ticket|issue)\s+\S+/iu.test(value)) return value;
   const cleaned = value
     .replace(/^(?:(?:um|uh|okay|ok|well|so),\s*)+/iu, '')
     .replace(/^(?:as I mentioned earlier|to repeat|repeating my earlier commitment):?[,\s]+/iu, '')
