@@ -1,3 +1,4 @@
+import type { SummaryDiagnostic } from "../pipeline/summary-diagnostics.js";
 import { readFile, readdir, writeFile, realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import { isOutside, privateOutputPath } from "./private-path.js";
@@ -66,6 +67,9 @@ const baseline = new BaselineOllamaClient({ model: modelName });
 let calls = 0;
 const requests: { call: number; bytes: number; promptTokens?: number; outputTokens?: number; elapsedMs?: number; failed?: boolean }[] = [];
 const traces: object[] = [];
+let fixtureId = '';
+const summaryDiagnostics: (SummaryDiagnostic & { fixtureId: string })[] = [];
+const observe = traceEnabled ? (event: SummaryDiagnostic) => summaryDiagnostics.push({ ...event, fixtureId }) : undefined;
 const model: LanguageModel & TextModel = {
   generate: request => { calls++; return baseline.generate(request); },
   complete: async request => {
@@ -80,7 +84,7 @@ const model: LanguageModel & TextModel = {
     } catch (error) { observation.failed = true; throw error; }
   },
 };
-const summarise = implementation === "baseline" ? createBaselineSummariser({ model }) : provider === "gemini" ? createGeminiSummariser({ model, deadlineMs: summaryDeadlineMs }) : createReadableSummariser({ model, deadlineMs: summaryDeadlineMs });
+const summarise = implementation === "baseline" ? createBaselineSummariser({ model }) : provider === "gemini" ? createGeminiSummariser({ model, deadlineMs: summaryDeadlineMs, observe }) : createReadableSummariser({ model, deadlineMs: summaryDeadlineMs, observe });
 const store = openStore(":memory:");
 const meetingIds = new WeakMap<Transcript, number>();
 const chat = provider === "gemini" ? createGeminiChat({ store, model }) : createMeetingChat({ store, model, modelName });
@@ -100,10 +104,11 @@ const pipeline = { ...(mode!.endsWith("chat") ? {} : { summarise }), ...(impleme
 const runs = [];
 try {
 for (const fixture of selected) {
+  fixtureId = fixture.id;
   runs.push(await evaluateFixture(fixture, pipeline, () => calls));
   // Keep results even if a later fixture fails or the process is interrupted. Content stays at the selected local path.
   await writeFile(destination, JSON.stringify({ metadata, runs, requests,
-    ...(traceEnabled ? { traceScope: "Explicit synthetic-only debug trace; never enabled for private modes", traces } : {}) }, null, 2) + "\n");
+    ...(traceEnabled ? { traceScope: "Explicit synthetic-only debug trace; never enabled for private modes", traces, summaryDiagnostics } : {}) }, null, 2) + "\n");
   console.log(`${fixture.id}: ${runs.at(-1)?.error ? "failed" : "generated; human review pending"}`);
 }
 } finally { store.close(); }

@@ -291,3 +291,29 @@ describe('TLDR recovery at the production Summary seam', () => {
     }
   });
 });
+
+describe('opt-in Summary diagnostics', () => {
+  it('exposes stage checkpoints and fallback evidence without changing the Summary', async () => {
+    const events: import('./summary-diagnostics.js').SummaryDiagnostic[] = [];
+    const plain = await createReadableSummariser({ model: model() })(transcript);
+    const observed = await createReadableSummariser({ model: model(), observe: event => {
+      events.push(structuredClone(event));
+      event.data = null;
+    } })(transcript);
+    expect(observed.participants).toEqual(plain.participants);
+    expect(observed.tldr).toEqual(plain.tldr);
+    expect(observed.evidence).toEqual(plain.evidence);
+    expect(events.filter(e => e.event === 'checkpoint').map(e => e.stage)).toEqual([
+      'evidence', 'extraction', 'consolidation', 'selection', 'tldr',
+    ]);
+    expect(events.some(e => e.event === 'fallback' && e.reason && e.data)).toBe(true);
+    expect(JSON.stringify(observed.generation)).not.toContain('The model runs');
+  });
+  it('retains validation failures and does not let observers fail generation', async () => {
+    const events: import('./summary-diagnostics.js').SummaryDiagnostic[] = [];
+    await expect(createReadableSummariser({ attempts: 1, model: model(stage => stage === 'tldr' ? { sentences: [] } : undefined),
+      observe: event => events.push(event) })(transcript)).rejects.toThrow();
+    expect(events.some(e => e.event === 'rejected' && e.stage === 'tldr')).toBe(true);
+    await expect(createReadableSummariser({ model: model(), observe: () => { throw new Error('observer failed'); } })(transcript)).resolves.toHaveProperty('tldr');
+  });
+});
