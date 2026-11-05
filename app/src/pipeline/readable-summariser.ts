@@ -114,7 +114,7 @@ function proposal(point: Claim): boolean {
 /** Explicit scope agreements count as outcomes even without the word "final". */
 function outcomeIds(items: Claim[]): number[] {
   return [...new Set([...finalDecisionIds(items), ...items.flatMap((point, id) =>
-    /\bwe (?:agree|agreed|decided)\b/iu.test(point.text)
+    /\bwe (?:agree|agreed|decided)\b|\bis agreed\b|\bis (?:our|the) decision\b/iu.test(point.text)
       && !/\b(?:if|unless|provided|quoted|hypothetical|not|never|maybe|would)\b|["“”]/iu.test(point.text) ? [id] : [])])];
 }
 const claimData = (claim: Claim, id: number) => ({ id, speaker: claim.speaker, text: claim.text, sources: claim.sources, kind: claim.kind });
