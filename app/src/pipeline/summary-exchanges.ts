@@ -57,7 +57,7 @@ export function retainExchangeResponses(transcript: Transcript, summary: Summary
     }
     const source = transcript.segments[exchange.refs[0]!]!;
     const change = changes.find(c => c.earlier === exchange.refs[0]);
-    summary.participants[index]!.said.push(`${change ? 'Earlier response (superseded proposal): ' : ''}In response to ${source.speaker}'s proposal (${source.text.trim()}): ${reply.text.trim()}`);
+    summary.participants[index]!.said.push(`${change ? 'Earlier response (superseded proposal): ' : ''}In response to the proposal from ${source.speaker} (${source.text.trim()}): ${reply.text.trim()}`);
     summary.evidence.participants[index]!.said.push([...exchange.refs, ...(change ? [change.replacement] : [])]);
   }
   return summary;

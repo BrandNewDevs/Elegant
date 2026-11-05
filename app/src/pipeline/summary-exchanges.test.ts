@@ -24,7 +24,7 @@ it.each(['Agreed.', 'I disagree.', 'Agreed, provided the offline test passes.'])
 it('retains a bare agreement with original subject and both source references', async () => {
   const result = await createReadableSummariser({ model })(input('Agreed.'));
   const index = result.participants.findIndex(p => p.speaker === 'Speaker 2');
-  expect(result.participants[index]!.said[0]).toContain("Speaker 1's proposal (I propose Markdown for export.)");
+  expect(result.participants[index]!.said[0]).toContain("the proposal from Speaker 1 (I propose Markdown for export.)");
   expect(result.evidence!.participants[index]!.said[0]).toEqual([0, 1]);
 });
 it('does not join a reply across an intervening topic', async () => {
