@@ -39,7 +39,7 @@ it("creates readable points and TLDR with original ordinal evidence and provider
   const output = await createGeminiSummariser({ model })(transcript);
   expect(output.tldr).toBe(final.tldr.text);
   expect(output.evidence).toEqual({ revision: transcriptRevision(transcript), tldr: [1], participants: [{ speaker: "You", said: [[0]] }, { speaker: "Speaker 1", said: [[1]] }] });
-  expect(output.generation).toMatchObject({ provider: "gemini", promptVersion: "gemini-summary-v1", calls: 2 });
+  expect(output.generation).toMatchObject({ provider: "gemini", promptVersion: "gemini-summary-v2", calls: 2 });
   expect(model.requests.every(r => requestBytes(r) <= GEMINI_INPUT_BYTES)).toBe(true);
 });
 
@@ -160,7 +160,7 @@ it("aborts a Summary at its deadline without accepting a late model response", a
 it("records Gemini extraction and consolidation diagnostics without persisting their content", async () => {
   const events: import('./summary-diagnostics.js').SummaryDiagnostic[] = [];
   const output = await createGeminiSummariser({ model: modelFor([{}, extracted, final]), observe: e => events.push(e) })(transcript);
-  expect(events.filter(e => e.event === 'checkpoint').map(e => e.stage)).toEqual(['evidence', 'extraction', 'consolidation', 'tldr']);
+  expect(events.filter(e => e.event === 'checkpoint').map(e => e.stage)).toEqual(['evidence', 'extraction', 'decision-history', 'consolidation', 'tldr']);
   expect(events.some(e => e.event === 'rejected' && e.attempt === 1)).toBe(true);
   expect(output.tldr).toBe(final.tldr.text);
   expect(JSON.stringify(output.generation)).not.toContain('Friday');
