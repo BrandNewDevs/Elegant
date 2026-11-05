@@ -1,0 +1,35 @@
+{
+  "id": "readability-commitment",
+  "split": "tuning",
+  "synthetic": true,
+  "transcript": {
+    "segments": [
+      {
+        "start": 0,
+        "end": 5,
+        "speaker": "You",
+        "text": "Okay, I will write the guide in order to help reviewers by Thursday."
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "meaning",
+      "text": "Okay, I will write the guide in order to help reviewers by Thursday.",
+      "speaker": "You",
+      "refs": [
+        0
+      ],
+      "critical": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "owner",
+      "question": "Who owns implementation?",
+      "answer": null,
+      "refs": [],
+      "critical": true
+    }
+  ]
+}
