@@ -37,9 +37,9 @@ function meeting() {
 it("creates readable points and TLDR with original ordinal evidence and provider metadata", async () => {
   const model = modelFor([extracted, final]);
   const output = await createGeminiSummariser({ model })(transcript);
-  expect(output.tldr).toBe(final.tldr.text);
+  expect(output.tldr).toBe(transcript.segments[1]!.text);
   expect(output.evidence).toEqual({ revision: transcriptRevision(transcript), tldr: [1], participants: [{ speaker: "You", said: [[0]] }, { speaker: "Speaker 1", said: [[1]] }] });
-  expect(output.generation).toMatchObject({ provider: "gemini", promptVersion: "gemini-summary-v3", calls: 2 });
+  expect(output.generation).toMatchObject({ provider: "gemini", promptVersion: "gemini-summary-v4", calls: 2 });
   expect(model.requests.every(r => requestBytes(r) <= GEMINI_INPUT_BYTES)).toBe(true);
 });
 
@@ -162,7 +162,7 @@ it("records Gemini extraction and consolidation diagnostics without persisting t
   const output = await createGeminiSummariser({ model: modelFor([{}, extracted, final]), observe: e => events.push(e) })(transcript);
   expect(events.filter(e => e.event === 'checkpoint').map(e => e.stage)).toEqual(['evidence', 'extraction', 'decision-history', 'consolidation', 'tldr', 'exchanges']);
   expect(events.some(e => e.event === 'rejected' && e.attempt === 1)).toBe(true);
-  expect(output.tldr).toBe(final.tldr.text);
+  expect(output.tldr).toBe(transcript.segments[1]!.text);
   expect(JSON.stringify(output.generation)).not.toContain('Friday');
 });
 
@@ -196,4 +196,21 @@ it('restores a contextual Gemini agreement without assigning the proposal to the
   expect(output.evidence!.tldr).toEqual([0, 1]);
   expect(output.participants[1]!.said[0]).toContain("You's proposal");
   expect(output.participants[1]!.said[0]).not.toContain('will implement');
+});
+
+it.each([
+  ['Alice helped Bob.', 'Bob helped Alice.'],
+  ['I will write the guide if the tests pass.', 'I will write the guide.'],
+  ['We may ship on Friday.', 'We will ship on Friday.'],
+  ['The budget is 500 dollars.', 'The budget is 5000 dollars.'],
+])('falls back to original Gemini evidence when valid IDs accompany changed meaning: %s', async (source, rewrite) => {
+  const input = { segments: [{ start: 0, end: 2, speaker: 'You', text: source }] };
+  const model = modelFor([
+    { points: [{ speaker: 'You', text: rewrite, sourceIds: ['0:0'] }], omittedSourceIds: [] },
+    { points: [{ speaker: 'You', text: rewrite, covers: [0] }], tldr: { text: rewrite, pointIds: [0] } },
+  ]);
+  const output = await createGeminiSummariser({ model })(input);
+  expect(output.participants[0]!.said).toEqual([source]);
+  expect(output.tldr).toContain(source);
+  expect(output.generation!.fallbacks).toBeGreaterThanOrEqual(2);
 });

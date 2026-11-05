@@ -1,0 +1,35 @@
+{
+  "id": "semantic-actors",
+  "split": "tuning",
+  "synthetic": true,
+  "transcript": {
+    "segments": [
+      {
+        "start": 0,
+        "end": 5,
+        "speaker": "You",
+        "text": "Alice helped Bob. Bob did not help Alice."
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "meaning",
+      "text": "Alice helped Bob. Bob did not help Alice.",
+      "speaker": "You",
+      "refs": [
+        0
+      ],
+      "critical": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "owner",
+      "question": "Who owns implementation?",
+      "answer": null,
+      "refs": [],
+      "critical": true
+    }
+  ]
+}

@@ -212,3 +212,16 @@ This establishes a response relationship, not unanimous consensus or task owners
 Quoted dialogue, overlapping speech, distant replies, intervening topics and
 multi-sentence proposals are not linked automatically. These remain evaluation cases
 for broader semantic discourse handling.
+
+### Semantic safeguards
+
+Ollama v18 validates actor/argument order for all complete claims, including updates,
+not only model-classified critical claims. Overview compression also preserves
+explicit actors and past-state markers. Dependent non-approval qualifiers stay with
+the proposals they qualify. Gemini v4 applies the same source-statement grounding
+to extraction and consolidation, and validates overview compression against original
+evidence. Unsupported Gemini rewrites retain original wording with fallback diagnostics;
+an oversized grounded overview fails bounded validation rather than publishing an
+unsupported shortened claim. This is conservative validation, not a semantic proof:
+valid paraphrases can fall back, and evidence selection/recognition errors still need
+human evaluation. Provider prompts and consent/routing remain separate.
