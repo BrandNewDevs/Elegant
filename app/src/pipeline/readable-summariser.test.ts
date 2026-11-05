@@ -317,3 +317,18 @@ describe('opt-in Summary diagnostics', () => {
     await expect(createReadableSummariser({ model: model(), observe: () => { throw new Error('observer failed'); } })(transcript)).resolves.toHaveProperty('tldr');
   });
 });
+
+it('reserves an explicit agreed outcome when the model overview selects only background', async () => {
+  const fake: TextModel = { async complete(request) {
+    const { data } = JSON.parse(request.messages[1]!.content);
+    return { text: JSON.stringify(data.points ? { sentences: [{ text: data.points[0].text, covers: [0] }] }
+      : data.claims ? { points: data.claims.map((c: any, id: number) => ({ ...c, covers: [id] })) }
+      : { points: [] }), metadata: { model: 'synthetic', elapsedMs: 0 } };
+  } };
+  const result = await createReadableSummariser({ model: fake })({ segments: [
+    { start: 0, end: 2, speaker: 'You', text: 'We will revisit email later, without making a commitment.' },
+    { start: 4, end: 6, speaker: 'You', text: 'Markdown is agreed for this release.' },
+  ] });
+  expect(result.tldr).toContain('Markdown is agreed for this release');
+  expect(result.tldr.indexOf('Markdown')).toBeLessThan(result.tldr.indexOf('revisit'));
+});

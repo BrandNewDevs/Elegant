@@ -225,3 +225,15 @@ an oversized grounded overview fails bounded validation rather than publishing a
 unsupported shortened claim. This is conservative validation, not a semantic proof:
 valid paraphrases can fall back, and evidence selection/recognition errors still need
 human evaluation. Provider prompts and consent/routing remain separate.
+
+### Constrained readable wording
+
+Ollama v19 and Gemini v5 share a small explicit set of wording equivalences for
+validation and rendering: conversational prefixes, `in order to` → `to`, `due to
+the fact that` → `because`, current-time/frequency phrases and supported `utilize`
+verb forms. Original Transcript text and ordinal references stay unchanged. Source
+statements retain their original context alongside their normalized text, so fallback
+wording benefits too. Conditions, intent, uncertainty, actors, negation and values
+are not removed; quoted/code/identifier passages stay literal. This improves common
+verbose phrasing, not arbitrary abstractive rewriting or semantic deduplication.
+No model calls are added. Broader paraphrases still need source verification.
