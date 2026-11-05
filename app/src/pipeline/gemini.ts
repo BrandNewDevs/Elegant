@@ -3,6 +3,8 @@ import type { TextModel, TextRequest, TextResponse } from "./language-model.js";
 import { requestBytes } from "./model-request.js";
 
 export const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
+/** Connection-check capabilities stay stable when the fresh-setup default changes. */
+const LOW_THINKING_MODELS = new Set(["gemini-3.6-flash", "gemini-3.8-flash"]);
 /** Separate from Ollama's limits: never change the local pipeline's request budget. */
 export const GEMINI_INPUT_BYTES = 192_000;
 const MAX_REPLY_BYTES = 512 * 1024;
@@ -217,7 +219,7 @@ export async function checkGeminiConnection(client: TextModel, model: string, si
       schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] },
       signal, timeoutMs: 60_000, maxOutputTokens: 2048,
       // Other models retain their defaults rather than receiving an unsupported setting.
-      ...(model === DEFAULT_GEMINI_MODEL ? { thinkingLevel: "low" as const } : {}),
+      ...(LOW_THINKING_MODELS.has(model) ? { thinkingLevel: "low" as const } : {}),
     });
     signal?.throwIfAborted();
     let result;
