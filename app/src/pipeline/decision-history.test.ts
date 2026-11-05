@@ -41,3 +41,11 @@ it('keeps unrelated commitments and ambiguous same-value proposals', async () =>
   ] });
   expect(result.participants.flatMap(p => p.said).join(' ')).not.toContain('superseded');
 });
+it('follows successive explicit corrections instead of treating the first replacement as final forever', async () => {
+  const result = await createReadableSummariser({ model: sourceModel() })({ segments: [
+    segment('I propose Monday.', 0), segment('Friday replaces Monday.', 1), segment('Sunday replaces Friday. This is the final decision.', 2),
+  ] });
+  expect(result.participants[0]!.said.filter(p => p.startsWith('Earlier position'))).toHaveLength(2);
+  expect(result.tldr).toContain('Sunday replaces Friday');
+  expect(result.tldr).not.toContain('Friday replaces Monday');
+});

@@ -2,7 +2,7 @@
 export interface DecisionPoint { speaker: string; text: string; refs: number[] }
 export interface DecisionChange { earlier: number; replacement: number }
 const guarded = /\b(?:no|not|never|if|unless|provided|maybe|might|could|would|quoted|hypothetical|propose\w*|suggest\w*)\b|n['’]t\b|["“”]/iu;
-const historical = /\b(?:propos\w*|suggest\w*|provisional|initial|agree\w*|decid\w*|plan\w*|choice)\b/iu;
+const historical = /\b(?:propos\w*|suggest\w*|provisional|initial|agree\w*|decid\w*|decision\w*|replaces?|plan\w*|choice)\b/iu;
 const commitment = /\b(?:I|we) (?:will|shall)\b/iu;
 const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}_-]+/gu) ?? [];
 const contains = (text: string, phrase: string) => (' ' + words(text).join(' ') + ' ').includes(' ' + words(phrase).join(' ') + ' ');
