@@ -27,6 +27,21 @@ it.each([400, 401, 403, 404, 429, 500])("sanitizes HTTP %s without retrying or e
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
 
+it.each([
+  [503, "(503): gemini-test is overloaded at Google"],
+  [504, "(504): Google timed out answering gemini-test"],
+  [500, "(500): Google had an internal error with gemini-test"],
+  [404, "gemini-test is not available to your key (404)"],
+  [599, "(HTTP 599)"],
+])("names the status and the model, and what to do, for HTTP %s without echoing server speech", async (status, wording) => {
+  const client = new GeminiClient({ apiKey: "private-key", model: "gemini-test", fetch: async () => new Response("private-key Synthetic evidence", { status }) });
+  const error = (await client.complete(request).catch(e => e)) as Error;
+  expect(error.message).toContain(wording);
+  expect(error.message).toContain("Settings");
+  expect(error.message).not.toContain("private-key");
+  expect(error.message).not.toContain("Synthetic evidence");
+});
+
 it("sends thinkingConfig only when a thinking level is requested", async () => {
   const fetcher = vi.fn<typeof fetch>(async () => reply());
   const client = new GeminiClient({ apiKey: "private-key", fetch: fetcher });
