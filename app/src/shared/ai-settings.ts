@@ -5,6 +5,8 @@ export interface AISettingsView {
   provider: AIProvider;
   geminiModel: string;
   hasGeminiKey: boolean;
+  /** Changes when credentials are saved or removed; an in-memory counter, never a key fingerprint. */
+  geminiKeyRevision?: number;
   /** The models that answered the last "find usable models" run, if one was done for this key. Absent in older fixtures. */
   usableModels?: string[];
   /** Set while that run is going on: how many models have been tried of how many. */
