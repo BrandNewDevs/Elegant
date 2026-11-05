@@ -304,7 +304,7 @@ describe('opt-in Summary diagnostics', () => {
     expect(observed.tldr).toEqual(plain.tldr);
     expect(observed.evidence).toEqual(plain.evidence);
     expect(events.filter(e => e.event === 'checkpoint').map(e => e.stage)).toEqual([
-      'evidence', 'extraction', 'consolidation', 'selection', 'tldr',
+      'evidence', 'extraction', 'consolidation', 'decision-history', 'selection', 'tldr',
     ]);
     expect(events.some(e => e.event === 'fallback' && e.reason && e.data)).toBe(true);
     expect(JSON.stringify(observed.generation)).not.toContain('The model runs');

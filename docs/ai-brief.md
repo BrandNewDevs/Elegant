@@ -187,3 +187,14 @@ The overview reserves explicit affirmed final decisions, then explicit first-per
 ### Balanced overview coverage
 
 The TL;DR gives explicit outcomes (including direct scope agreements), one next-step commitment and unresolved status a turn before filling remaining space. Narrow cues recognize unassigned work, undecided dates and explicitly unset deadlines. Redundant inability/revision background and proposals rank below substantive updates. This is bounded selection, not semantic supersession: no source claim is deleted from Participant points, and three sentences may still omit important details. Participant presentation removes standalone acknowledgements after consolidation, adds terminal punctuation and cleans sentence-internal capitalization while keeping evidence aligned. No extra model call is introduced.
+
+### Explicit decision history
+
+Ollama v16 and Gemini v2 recognize affirmative `X replaces Y` corrections against
+chronologically earlier proposal/agreement points. Matched earlier positions remain
+visible as `Earlier position (superseded)` with original and correction evidence,
+but are excluded from overview selection. Conditional, negated, quoted and proposed
+replacements do not establish finality. Single-value corrections with multiple
+distinct candidate positions abstain; multi-value corrections require all old values
+to match. This is conservative explicit-link handling, not general semantic topic
+resolution. Unrecognized or ambiguous changes retain their original wording.

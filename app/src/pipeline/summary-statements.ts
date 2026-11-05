@@ -13,7 +13,7 @@ export function sourceStatements(evidence: SummaryPassage[]): SourceStatement[] 
   }
   return runs.flatMap(run => {
     let text = '';
-    const spans = run.map(p => { const start = text.length; text += (text ? ' ' : '') + p.text; return { id: p.id, start, end: text.length, text: p.text }; });
+    const spans = run.map(p => { if (text) text += ' '; const start = text.length; text += p.text; return { id: p.id, start, end: text.length, text: p.text }; });
     const boundaries = new Set([0, text.length]);
     for (const sentence of new Intl.Segmenter('en', { granularity: 'sentence' }).segment(text)) boundaries.add(sentence.index);
     for (const transition of text.matchAll(/\b(?:actually\s+)?I(?:['’]m| am) interested in\b/giu)) boundaries.add(transition.index!);
@@ -28,7 +28,7 @@ export function sourceStatements(evidence: SummaryPassage[]): SourceStatement[] 
     for (const statement of statements) {
       const dependent = /^(?:(?:this|that|these|those|it) (?:is|are|was|were) (?:the )?(?:final|a suggestion|test outcomes|synthetic|quoted|not)|this call is one of|one of the tests|(?:do not|don't|don’t) infer (?:either|this|that)|(?:the )?(?:provisional|earlier|previous) plan is withdrawn)/iu.test(statement.text);
       const previous = joined.at(-1);
-      const revision = previous && /\breplaces?\b/iu.test(statement.text)
+      const revision = previous && previous.sources.some(id => statement.sources.includes(id)) && /\breplaces?\b/iu.test(statement.text)
         && tokens(statement.text, statement.speaker).filter(word => tokens(previous.text, previous.speaker).includes(word)).length >= 2;
       if ((dependent || revision) && previous) {
         const related = [joined.pop()!];

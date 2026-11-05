@@ -1,3 +1,4 @@
+import { decisionChanges } from './decision-history.js';
 import { summaryDiagnostics, type SummaryObserver } from './summary-diagnostics.js';
 import type { TextModel, TextRequest } from './language-model.js';
 import type { PipelineContext, Summary, Transcript } from './pipeline.js';
@@ -7,7 +8,7 @@ import { summaryPassages, type SummaryPassage } from './summary-passages.js';
 import { sourceStatements, matchStatements, assertSupportedCompression, statementKey, UnsupportedSummaryRewrite, type SourceStatement } from './summary-statements.js';
 import { InvalidSummaryError } from './validate-summary.js';
 
-export const SUMMARY_PROMPT_VERSION = 'readable-summary-v15';
+export const SUMMARY_PROMPT_VERSION = 'readable-summary-v16';
 interface Claim { speaker: string; text: string; sources: number[]; kind: string; atoms: SourceStatement[] }
 const kinds = ['update', 'decision', 'commitment', 'proposal', 'disagreement', 'unresolved'];
 const integers = { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'integer' } };
@@ -206,7 +207,12 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       if (!changed || round >= 1) break;
     }
     emit({ stage: 'consolidation', event: 'checkpoint', data: claims });
-    let shortlist = claims.filter(claim => !/^(?:yes|yeah|sure|okay|ok|absolutely|agreed)[.!\s]*$/iu.test(claim.text));
+    const changes = decisionChanges(claims.map(c => ({ speaker: c.speaker,
+      text: c.atoms.map(a => a.text).join(' '), refs: c.sources.flatMap(id => passages[id]!.refs) })));
+    const superseded = new Map(changes.map(change => [change.earlier, change.replacement]));
+    const currentClaims = claims.filter((_, id) => !superseded.has(id));
+    emit({ stage: 'decision-history', event: 'checkpoint', data: changes });
+    let shortlist = currentClaims.filter(claim => !/^(?:yes|yeah|sure|okay|ok|absolutely|agreed)[.!\s]*$/iu.test(claim.text));
     if (!shortlist.length) throw new Error('No substantive point is available for a TL;DR');
     for (let round = 0; !fits('tldr', overview(shortlist)) && round < 8; round++) {
       const next: Claim[] = [];
@@ -227,10 +233,10 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
         shortlist = next.slice(0, Math.max(1, next.length - 1));
       } else shortlist = next;
     }
-    const priorities = [...outcomeIds(claims), ...attention(claims), ...commitmentIds(claims)];
+    const priorities = [...outcomeIds(currentClaims), ...attention(currentClaims), ...commitmentIds(currentClaims)];
     // Reserve priority claims before filling the remaining request budget.
     const retained: Claim[] = [];
-    for (const point of [...priorities.map(id => claims[id]!), ...shortlist]) {
+    for (const point of [...priorities.map(id => currentClaims[id]!), ...shortlist]) {
       if (!retained.includes(point) && fits('tldr', overview([...retained, point]))) retained.push(point);
     }
     shortlist = retained;
@@ -316,8 +322,8 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
     emit({ stage: 'tldr', event: 'checkpoint', data: sentences });
     const refs = (sources: number[]) => [...new Set(sources.flatMap(id => passages[id]!.refs))].sort((a, b) => a - b);
     const speakers = [...new Set(claims.map(c => c.speaker))];
-    return { tldr: sentences.map(s => s.text).join(' '), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => cleanPoint(c.text)) })),
-      evidence: { revision: transcriptRevision(transcript), tldr: refs(sentences.flatMap(s => s.sources)), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => refs(c.sources)) })) },
+    return { tldr: sentences.map(s => s.text).join(' '), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => cleanPoint((superseded.has(claims.indexOf(c)) ? 'Earlier position (superseded): ' : '') + c.text)) })),
+      evidence: { revision: transcriptRevision(transcript), tldr: refs(sentences.flatMap(s => s.sources)), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => refs([...c.sources, ...(superseded.has(claims.indexOf(c)) ? claims[superseded.get(claims.indexOf(c))!]!.sources : [])])) })) },
       generation: { promptVersion: SUMMARY_PROMPT_VERSION, model: modelName, elapsedMs: performance.now() - started, calls, promptTokens, outputTokens, fallbacks, requests: observations } };
   };
 }
