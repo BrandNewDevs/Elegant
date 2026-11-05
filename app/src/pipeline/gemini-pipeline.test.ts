@@ -39,7 +39,7 @@ it("creates readable points and TLDR with original ordinal evidence and provider
   const output = await createGeminiSummariser({ model })(transcript);
   expect(output.tldr).toBe(final.tldr.text);
   expect(output.evidence).toEqual({ revision: transcriptRevision(transcript), tldr: [1], participants: [{ speaker: "You", said: [[0]] }, { speaker: "Speaker 1", said: [[1]] }] });
-  expect(output.generation).toMatchObject({ provider: "gemini", promptVersion: "gemini-summary-v2", calls: 2 });
+  expect(output.generation).toMatchObject({ provider: "gemini", promptVersion: "gemini-summary-v3", calls: 2 });
   expect(model.requests.every(r => requestBytes(r) <= GEMINI_INPUT_BYTES)).toBe(true);
 });
 
@@ -160,7 +160,7 @@ it("aborts a Summary at its deadline without accepting a late model response", a
 it("records Gemini extraction and consolidation diagnostics without persisting their content", async () => {
   const events: import('./summary-diagnostics.js').SummaryDiagnostic[] = [];
   const output = await createGeminiSummariser({ model: modelFor([{}, extracted, final]), observe: e => events.push(e) })(transcript);
-  expect(events.filter(e => e.event === 'checkpoint').map(e => e.stage)).toEqual(['evidence', 'extraction', 'decision-history', 'consolidation', 'tldr']);
+  expect(events.filter(e => e.event === 'checkpoint').map(e => e.stage)).toEqual(['evidence', 'extraction', 'decision-history', 'consolidation', 'tldr', 'exchanges']);
   expect(events.some(e => e.event === 'rejected' && e.attempt === 1)).toBe(true);
   expect(output.tldr).toBe(final.tldr.text);
   expect(JSON.stringify(output.generation)).not.toContain('Friday');
@@ -180,4 +180,20 @@ it("keeps superseded Gemini points out of TLDR selection and retains correction 
   expect(output.participants[0]!.said[0]).toMatch(/^Earlier position \(superseded\):/);
   expect(output.evidence!.participants[0]!.said[0]).toEqual([0, 1]);
   expect(output.tldr).not.toContain('I propose');
+});
+
+it('restores a contextual Gemini agreement without assigning the proposal to the responder', async () => {
+  const input = { segments: [
+    { start: 0, end: 2, speaker: 'You', text: 'I propose Markdown for export.' },
+    { start: 3, end: 5, speaker: 'Speaker 1', text: 'Agreed.' },
+  ] };
+  const model = modelFor([
+    { points: [{ speaker: 'You', text: input.segments[0]!.text, sourceIds: ['0:0'] }], omittedSourceIds: ['1:0'] },
+    { points: [{ speaker: 'You', text: input.segments[0]!.text, covers: [0] }], tldr: { text: input.segments[0]!.text, pointIds: [0] } },
+  ]);
+  const output = await createGeminiSummariser({ model })(input);
+  expect(output.tldr).toContain('Speaker 1 responded: Agreed.');
+  expect(output.evidence!.tldr).toEqual([0, 1]);
+  expect(output.participants[1]!.said[0]).toContain("You's proposal");
+  expect(output.participants[1]!.said[0]).not.toContain('will implement');
 });
