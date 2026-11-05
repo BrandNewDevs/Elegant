@@ -156,3 +156,12 @@ it("aborts a Summary at its deadline without accepting a late model response", a
   }) };
   await expect(createGeminiSummariser({ model, deadlineMs: 10 })(transcript)).rejects.toThrow();
 });
+
+it("records Gemini extraction and consolidation diagnostics without persisting their content", async () => {
+  const events: import('./summary-diagnostics.js').SummaryDiagnostic[] = [];
+  const output = await createGeminiSummariser({ model: modelFor([{}, extracted, final]), observe: e => events.push(e) })(transcript);
+  expect(events.filter(e => e.event === 'checkpoint').map(e => e.stage)).toEqual(['evidence', 'extraction', 'consolidation', 'tldr']);
+  expect(events.some(e => e.event === 'rejected' && e.attempt === 1)).toBe(true);
+  expect(output.tldr).toBe(final.tldr.text);
+  expect(JSON.stringify(output.generation)).not.toContain('Friday');
+});

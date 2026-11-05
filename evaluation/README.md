@@ -124,3 +124,27 @@ The readable Summary regression also supports optional `tldrTopics` and `unwante
 ## Human-reviewed Summary benchmark
 
 For output-bound reviews, explicit factual and presentation rubrics, and Summary-only quality reports, use the [Summary benchmark workflow](summary-benchmark.md). This adds a versioned review format alongside the legacy combined Summary/chat report; historical reviews are not automatically upgraded or treated as new human judgments.
+
+### Diagnose Summary regressions
+
+With `AI_SYNTHETIC_TRACE=1`, current synthetic evaluation also saves `summaryDiagnostics`.
+Each event identifies its fixture, stage and event kind. Ollama checkpoints expose
+original evidence passages (including segment ordinals), accepted extraction claims,
+consolidated claims, the TL;DR shortlist and packed sentences. Claim `sources` refer
+to the checkpoint's passage IDs, whose `refs` resolve to original Transcript ordinals.
+Gemini checkpoints expose source fragments, extracted points, consolidated points
+and the final overview; fragment `ref` values are original segment ordinals.
+Accepted/rejected model attempts identify local Summary call and attempt numbers.
+Fallback events record the validation reason and retained source wording.
+
+Locate a missing expected fact in this order: original evidence → extraction →
+consolidation → selection → final TL;DR. Compare repeated wording at successive
+checkpoints to find where duplication survived or appeared. Inspect fallback events
+when wording remains conversational. Checkpoints show actual pipeline behavior;
+they do not establish semantic correctness or replace human review. Gemini performs
+consolidation and overview generation together and has no separate shortlist stage.
+
+Diagnostics are content-bearing, opt-in, synthetic-only and excluded from persisted
+Summary metadata. Private tracing is rejected before reading the private manifest.
+A failed fixture retains events emitted before failure in the evaluation result.
+Normal runs collect no diagnostic content. Observer failures cannot alter generation.
