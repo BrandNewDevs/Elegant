@@ -24,7 +24,7 @@ The default `gemma3:4b` tag was not installed. The explicitly selected installed
 
 ## Evaluation examples
 
-`fixtures/` contains ten entirely synthetic Transcripts with expected important points, source references and questions: straightforward discussion, proposal versus decision, changed decision, ambiguous ownership, disagreement, repetition, spoken misleading instructions, a long discussion, fragmented status updates with a noisy ending, and a long unpunctuated passage. The long fixture contains over 50,000 characters and constructed timestamps covering 60 minutes. It is not an audio Recording or evidence that a real 60-minute workflow passes.
+`fixtures/` contains fourteen entirely synthetic Transcripts with expected important points, source references and questions: straightforward discussion, proposal versus decision, changed decision, ambiguous ownership, disagreement, repetition, spoken misleading instructions, a long discussion, fragmented status updates with a noisy ending, a long unpunctuated passage, and four cross-Participant exchanges (agreement, rejection, conditional acceptance and refusal of ownership). The long fixture contains over 50,000 characters and constructed timestamps covering 60 minutes. It is not an audio Recording or evidence that a real 60-minute workflow passes.
 
 Fixtures use this shared shape:
 
