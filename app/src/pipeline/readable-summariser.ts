@@ -1,3 +1,4 @@
+import { contextualOverview, retainExchangeResponses } from './summary-exchanges.js';
 import { decisionChanges } from './decision-history.js';
 import { summaryDiagnostics, type SummaryObserver } from './summary-diagnostics.js';
 import type { TextModel, TextRequest } from './language-model.js';
@@ -8,7 +9,7 @@ import { summaryPassages, type SummaryPassage } from './summary-passages.js';
 import { sourceStatements, matchStatements, assertSupportedCompression, statementKey, UnsupportedSummaryRewrite, type SourceStatement } from './summary-statements.js';
 import { InvalidSummaryError } from './validate-summary.js';
 
-export const SUMMARY_PROMPT_VERSION = 'readable-summary-v16';
+export const SUMMARY_PROMPT_VERSION = 'readable-summary-v17';
 interface Claim { speaker: string; text: string; sources: number[]; kind: string; atoms: SourceStatement[] }
 const kinds = ['update', 'decision', 'commitment', 'proposal', 'disagreement', 'unresolved'];
 const integers = { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'integer' } };
@@ -322,8 +323,10 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
     emit({ stage: 'tldr', event: 'checkpoint', data: sentences });
     const refs = (sources: number[]) => [...new Set(sources.flatMap(id => passages[id]!.refs))].sort((a, b) => a - b);
     const speakers = [...new Set(claims.map(c => c.speaker))];
-    return { tldr: sentences.map(s => s.text).join(' '), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => cleanPoint((superseded.has(claims.indexOf(c)) ? 'Earlier position (superseded): ' : '') + c.text)) })),
-      evidence: { revision: transcriptRevision(transcript), tldr: refs(sentences.flatMap(s => s.sources)), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => refs([...c.sources, ...(superseded.has(claims.indexOf(c)) ? claims[superseded.get(claims.indexOf(c))!]!.sources : [])])) })) },
-      generation: { promptVersion: SUMMARY_PROMPT_VERSION, model: modelName, elapsedMs: performance.now() - started, calls, promptTokens, outputTokens, fallbacks, requests: observations } };
+    const overviewSentences = contextualOverview(transcript, sentences.map(s => ({ text: s.text, refs: refs(s.sources) })));
+    emit({ stage: 'exchanges', event: 'checkpoint', data: overviewSentences });
+    return retainExchangeResponses(transcript, { tldr: overviewSentences.map(s => s.text).join(' '), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => cleanPoint((superseded.has(claims.indexOf(c)) ? 'Earlier position (superseded): ' : '') + c.text)) })),
+      evidence: { revision: transcriptRevision(transcript), tldr: [...new Set(overviewSentences.flatMap(s => s.refs))].sort((a, b) => a - b), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => refs([...c.sources, ...(superseded.has(claims.indexOf(c)) ? claims[superseded.get(claims.indexOf(c))!]!.sources : [])])) })) },
+      generation: { promptVersion: SUMMARY_PROMPT_VERSION, model: modelName, elapsedMs: performance.now() - started, calls, promptTokens, outputTokens, fallbacks, requests: observations } });
   };
 }

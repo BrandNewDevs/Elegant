@@ -198,3 +198,17 @@ replacements do not establish finality. Single-value corrections with multiple
 distinct candidate positions abstain; multi-value corrections require all old values
 to match. This is conservative explicit-link handling, not general semantic topic
 resolution. Unrecognized or ambiguous changes retain their original wording.
+
+### Cross-Participant exchanges
+
+Ollama v17 and Gemini v3 can contextualize a selected proposal with the immediately
+following explicit agreement, objection or qualification by another Participant.
+Overview replacements preserve verbatim speech, individual labels and both ordinal
+references, retain unrelated selected points and respect the existing 90-word /
+three-sentence limit. If the exchange cannot fit, selection remains unchanged.
+Short explicit replies normally omitted by extraction are retained as contextual
+Participant quotations. Superseded proposals mark these replies historical too.
+This establishes a response relationship, not unanimous consensus or task ownership.
+Quoted dialogue, overlapping speech, distant replies, intervening topics and
+multi-sentence proposals are not linked automatically. These remain evaluation cases
+for broader semantic discourse handling.
