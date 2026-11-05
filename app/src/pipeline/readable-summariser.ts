@@ -1,3 +1,4 @@
+import { readableWording } from './readable-wording.js';
 import { contextualOverview, retainExchangeResponses } from './summary-exchanges.js';
 import { decisionChanges } from './decision-history.js';
 import { summaryDiagnostics, type SummaryObserver } from './summary-diagnostics.js';
@@ -9,7 +10,7 @@ import { summaryPassages, type SummaryPassage } from './summary-passages.js';
 import { sourceStatements, matchStatements, assertSupportedCompression, statementKey, UnsupportedSummaryRewrite, type SourceStatement } from './summary-statements.js';
 import { InvalidSummaryError } from './validate-summary.js';
 
-export const SUMMARY_PROMPT_VERSION = 'readable-summary-v18';
+export const SUMMARY_PROMPT_VERSION = 'readable-summary-v19';
 interface Claim { speaker: string; text: string; sources: number[]; kind: string; atoms: SourceStatement[] }
 const kinds = ['update', 'decision', 'commitment', 'proposal', 'disagreement', 'unresolved'];
 const integers = { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'integer' } };
@@ -87,7 +88,7 @@ function parsePoints(text: string, evidence: SummaryPassage[], draft?: Claim[], 
 function originalClaim(atom: SourceStatement): Claim { const cleaned = atom.text.replace(/\.(?=\s+[A-Z])/gu, ';').replace(/^(?:(?:yeah|okay|so|in fact|actually|and)[,\s]+)+/iu, ''); return { speaker: atom.speaker, text: cleaned.charAt(0).toUpperCase() + cleaned.slice(1), sources: atom.sources, kind: 'update', atoms: [atom] }; }
 const acknowledgement = /^(?:yes|yeah|sure|okay|ok|absolutely|agreed|understood|all good(?:,? all good)?)[.!\s]*$/iu;
 function cleanPoint(text: string): string {
-  return text.replace(/;\s+(This|That|These|Those|One)\b/gu, (_, word: string) => '; ' + word.toLowerCase()).replace(/[.!?]*$/u, '.');
+  return readableWording(text).replace(/;\s+(This|That|These|Those|One)\b/gu, (_, word: string) => '; ' + word.toLowerCase()).replace(/[.!?]*$/u, '.');
 }
 function distinctClaims(claims: Claim[]): Claim[] {
   const unique = new Map<string, Claim>();
@@ -249,6 +250,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       if (v.sentences.some(s => !s || typeof s !== 'object')) return fail('Return structured sentences');
       let unsupported = '';
       const render = (point: Claim, text: string) => {
+        text = readableWording(text);
         const firstPerson = /\b(?:I|my)\b|^(?:Will|Can|Must|Should)\b/iu.test(text);
         const attributed = firstPerson && !text.startsWith(point.speaker + ':') ? point.speaker + ': ' + text : text;
         return attributed.replace(/^Agreed[.;]\s+/iu, '').replace(/;\s+(This|These|Those|One)\b/gu, (_, word: string) => '; ' + word.toLowerCase()).replace(/[.!?]+$/u, '') + '.';

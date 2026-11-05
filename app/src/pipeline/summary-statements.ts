@@ -1,3 +1,4 @@
+import { readableWording } from './readable-wording.js';
 import { isSummaryHousekeeping, type SummaryPassage } from './summary-passages.js';
 
 export interface SourceStatement { speaker: string; text: string; sources: number[]; context?: string }
@@ -22,7 +23,7 @@ export function sourceStatements(evidence: SummaryPassage[]): SourceStatement[] 
       const value = clause.text.trim();
       if (!value || isSummaryHousekeeping(value) || bareAcknowledgement.test(value)) return [];
       const supporting = spans.filter(s => s.start < start + clause.end && s.end > start + clause.start);
-      return [{ speaker: run[0]!.speaker, text: value, sources: supporting.map(s => s.id), context: supporting.map(s => s.text).join(' ') }];
+      return [{ speaker: run[0]!.speaker, text: readableWording(value), sources: supporting.map(s => s.id), context: supporting.map(s => s.text).join(' ') }];
     }));
     const joined: SourceStatement[] = [];
     for (const statement of statements) {
@@ -44,6 +45,7 @@ export function sourceStatements(evidence: SummaryPassage[]): SourceStatement[] 
 const grammatical = new Set('a an the i we you he she they it my our your his her their this that these those am is are was were be been being have has had do does did of on in at to for from by with as and or but so yeah okay ok very well good actually basically also team system app application'.split(' '));
 const aliases: Record<string, string> = { initiated: 'start', initiate: 'start', commenced: 'start', commence: 'start', began: 'start', begun: 'start', begin: 'start', utilizes: 'use', utilize: 'use', utilized: 'use', utilises: 'use', using: 'use', running: 'run', references: 'links', reference: 'link', participants: 'speakers', participant: 'speaker', locally: 'local', done: 'complete' };
 function tokens(text: string, speaker: string, normalizeInflection = true, preserveRoles = false): string[] {
+  text = readableWording(text);
   const escaped = speaker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const value = (preserveRoles ? text : text.replace(new RegExp(`\\b${escaped}\\b`, 'g'), 'I')).toLowerCase()
     .replace(/tl;dr/gu, 'tldr').replace(/\b(i|we|you|they)['’]ll\b/gu, '$1 will').replace(/can['’]t/gu, 'can not').replace(/won['’]t/gu, 'will not').replace(/n['’]t/gu, ' not')
