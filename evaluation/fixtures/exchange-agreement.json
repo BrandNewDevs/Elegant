@@ -1,0 +1,50 @@
+{
+  "id": "exchange-agreement",
+  "split": "tuning",
+  "synthetic": true,
+  "transcript": {
+    "segments": [
+      {
+        "start": 0,
+        "end": 2,
+        "speaker": "You",
+        "text": "I propose Markdown for export."
+      },
+      {
+        "start": 3,
+        "end": 6,
+        "speaker": "Speaker 1",
+        "text": "Agreed."
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "proposal",
+      "text": "You proposed Markdown export.",
+      "speaker": "You",
+      "refs": [
+        0
+      ],
+      "critical": true
+    },
+    {
+      "id": "response",
+      "text": "Agreed.",
+      "speaker": "Speaker 1",
+      "refs": [
+        1
+      ],
+      "critical": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "owner",
+      "question": "Who will implement export?",
+      "answer": null,
+      "refs": [],
+      "critical": true
+    }
+  ]
+}

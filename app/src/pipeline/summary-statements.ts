@@ -1,3 +1,4 @@
+import { readableWording } from './readable-wording.js';
 import { isSummaryHousekeeping, type SummaryPassage } from './summary-passages.js';
 
 export interface SourceStatement { speaker: string; text: string; sources: number[]; context?: string }
@@ -13,7 +14,7 @@ export function sourceStatements(evidence: SummaryPassage[]): SourceStatement[] 
   }
   return runs.flatMap(run => {
     let text = '';
-    const spans = run.map(p => { const start = text.length; text += (text ? ' ' : '') + p.text; return { id: p.id, start, end: text.length, text: p.text }; });
+    const spans = run.map(p => { if (text) text += ' '; const start = text.length; text += p.text; return { id: p.id, start, end: text.length, text: p.text }; });
     const boundaries = new Set([0, text.length]);
     for (const sentence of new Intl.Segmenter('en', { granularity: 'sentence' }).segment(text)) boundaries.add(sentence.index);
     for (const transition of text.matchAll(/\b(?:actually\s+)?I(?:['’]m| am) interested in\b/giu)) boundaries.add(transition.index!);
@@ -22,13 +23,13 @@ export function sourceStatements(evidence: SummaryPassage[]): SourceStatement[] 
       const value = clause.text.trim();
       if (!value || isSummaryHousekeeping(value) || bareAcknowledgement.test(value)) return [];
       const supporting = spans.filter(s => s.start < start + clause.end && s.end > start + clause.start);
-      return [{ speaker: run[0]!.speaker, text: value, sources: supporting.map(s => s.id), context: supporting.map(s => s.text).join(' ') }];
+      return [{ speaker: run[0]!.speaker, text: readableWording(value), sources: supporting.map(s => s.id), context: supporting.map(s => s.text).join(' ') }];
     }));
     const joined: SourceStatement[] = [];
     for (const statement of statements) {
-      const dependent = /^(?:(?:this|that|these|those|it) (?:is|are|was|were) (?:the )?(?:final|a suggestion|test outcomes|synthetic|quoted|not)|this call is one of|one of the tests|(?:do not|don't|don’t) infer (?:either|this|that)|(?:the )?(?:provisional|earlier|previous) plan is withdrawn)/iu.test(statement.text);
+      const dependent = /^(?:(?:this|that|these|those|it) (?:is|are|was|were) (?:the )?(?:final|a suggestion|only an? idea|only a proposal|test outcomes|synthetic|quoted|not)|this call is one of|one of the tests|(?:do not|don't|don’t) infer (?:either|this|that)|(?:the )?(?:provisional|earlier|previous) plan is withdrawn)/iu.test(statement.text);
       const previous = joined.at(-1);
-      const revision = previous && /\breplaces?\b/iu.test(statement.text)
+      const revision = previous && previous.sources.some(id => statement.sources.includes(id)) && /\breplaces?\b/iu.test(statement.text)
         && tokens(statement.text, statement.speaker).filter(word => tokens(previous.text, previous.speaker).includes(word)).length >= 2;
       if ((dependent || revision) && previous) {
         const related = [joined.pop()!];
@@ -43,13 +44,14 @@ export function sourceStatements(evidence: SummaryPassage[]): SourceStatement[] 
 }
 const grammatical = new Set('a an the i we you he she they it my our your his her their this that these those am is are was were be been being have has had do does did of on in at to for from by with as and or but so yeah okay ok very well good actually basically also team system app application'.split(' '));
 const aliases: Record<string, string> = { initiated: 'start', initiate: 'start', commenced: 'start', commence: 'start', began: 'start', begun: 'start', begin: 'start', utilizes: 'use', utilize: 'use', utilized: 'use', utilises: 'use', using: 'use', running: 'run', references: 'links', reference: 'link', participants: 'speakers', participant: 'speaker', locally: 'local', done: 'complete' };
-function tokens(text: string, speaker: string, normalizeInflection = true): string[] {
+function tokens(text: string, speaker: string, normalizeInflection = true, preserveRoles = false): string[] {
+  text = readableWording(text);
   const escaped = speaker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const value = text.replace(new RegExp(`\\b${escaped}\\b`, 'g'), 'I').toLowerCase()
+  const value = (preserveRoles ? text : text.replace(new RegExp(`\\b${escaped}\\b`, 'g'), 'I')).toLowerCase()
     .replace(/tl;dr/gu, 'tldr').replace(/\b(i|we|you|they)['’]ll\b/gu, '$1 will').replace(/can['’]t/gu, 'can not').replace(/won['’]t/gu, 'will not').replace(/n['’]t/gu, ' not')
     .replace(/\b(?:i['’]m|we['’]re|it['’]s)\b/gu, ' ')
     .replace(/\blocal(?:ly)? on (?:the |this )?computer\b/gu, 'local');
-  return (value.match(/[\p{L}\p{N}_]+/gu) ?? []).filter(word => !grammatical.has(word)).map(word => {
+  return (value.match(/[\p{L}\p{N}_]+/gu) ?? []).filter(word => !grammatical.has(word) || preserveRoles && /^(?:i|me|my|we|us|our|you|your|he|him|his|she|her|they|them|their|it|its|from|to|by|before|after|was|were)$/u.test(word)).map(word => {
     if (!normalizeInflection) return word;
     word = aliases[word] ?? word;
     if (word.endsWith('ies')) word = word.slice(0, -3) + 'y';
@@ -71,6 +73,9 @@ export function matchStatements(text: string, speaker: string, available: Source
     const counts = new Map<string, number>();
     words.forEach(word => counts.set(word, (counts.get(word) ?? 0) + 1));
     if (![...counts].every(([word, count]) => (remaining.get(word) ?? 0) >= count)) continue;
+    const roleWords = tokens(statement.text, speaker, true, true);
+    const roleOutput = tokens(text, speaker, true, true);
+    if (!roleOutput.some((_, start) => roleWords.every((word, offset) => roleOutput[start + offset] === word))) continue;
     const critical = kind !== 'update' || /\d/u.test(statement.text) || words.some(word => ['no', 'not', 'never', 'if', 'unless', 'will', 'should', 'must', 'may', 'might', 'could', 'would', 'pending', 'provisional'].includes(word));
     if (critical && !output.some((_, start) => words.every((word, offset) => output[start + offset] === word))) continue;
     if (critical && /\bwe\b/iu.test(statement.text) && !/\b(?:we|team|group)\b/iu.test(text)) continue;
@@ -114,6 +119,16 @@ export function assertSupportedCompression(text: string, speaker: string, atoms:
     lastMatched = position++;
   }
   if (!output.length) throw new UnsupportedSummaryRewrite('Keep a substantive supported fact');
+  const roles = tokens(source, speaker, false, true), rewritten = tokens(text, speaker, false, true);
+  let cursor = 0;
+  for (const word of rewritten) {
+    while (cursor < roles.length && roles[cursor] !== word) cursor++;
+    if (cursor === roles.length) throw new UnsupportedSummaryRewrite('Preserve actors and the direction of their actions');
+    cursor++;
+  }
+  const actors = /^(?:i|me|my|we|us|our|you|your|he|him|his|she|her|they|them|their|was|were)$/u;
+  if (JSON.stringify(roles.filter(w => actors.test(w))) !== JSON.stringify(rewritten.filter(w => actors.test(w))))
+    throw new UnsupportedSummaryRewrite('Preserve all explicit actors');
   // A condition's meaning depends on its full antecedent, not just the word "if".
   if (hasProtectedScope(source)) matchStatements(text, speaker, atoms, 'commitment');
   const hard = new Set(tokens('no not never yet only without can will would should must may might could cannot pending unassigned undecided provisional initial trying maybe likely possible potential uncertain', speaker));

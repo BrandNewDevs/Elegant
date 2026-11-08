@@ -59,3 +59,20 @@ it('preserves a commitment sharing a segment with a request for updates', async 
   expect(result.participants[0]!.said).toEqual(['I will write the permission guide by Thursday.']);
   expect(result.evidence!.participants[0]!.said).toEqual([[0]]);
 });
+
+it.each([
+  ['Alice helped Bob.', 'Bob helped Alice.'],
+  ['I helped you.', 'You helped me.'],
+  ['She gave the report to him.', 'He gave the report to her.'],
+  ['Alice received the report from Bob.', 'Alice gave the report to Bob.'],
+])('preserves actor/action order even when a rewrite is classified as an update: %s', async (source, rewrite) => {
+  const result = await summarise([source], rewrite, 'update');
+  expect(result.participants[0]!.said).toEqual([source]);
+});
+it('keeps a proposal and its dependent non-approval qualifier together', async () => {
+  const result = await summarise(['I suggest email digests. This is only an idea; we have not approved it.'], 'This is only an idea; we have not approved it.', 'update');
+  expect(result.participants[0]!.said).toHaveLength(1);
+  expect(result.participants[0]!.said[0]).toContain('I suggest email digests');
+  expect(result.participants[0]!.said[0]).toContain('not approved');
+  expect(result.tldr).toContain('email digests');
+});

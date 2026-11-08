@@ -1,3 +1,7 @@
+import { readableWording } from './readable-wording.js';
+import { contextualOverview, retainExchangeResponses } from './summary-exchanges.js';
+import { decisionChanges } from './decision-history.js';
+import { summaryDiagnostics, type SummaryObserver } from './summary-diagnostics.js';
 import type { TextModel, TextRequest } from './language-model.js';
 import type { PipelineContext, Summary, Transcript } from './pipeline.js';
 import { AI_SETTINGS, assertRequestBudget, requestBytes } from './model-request.js';
@@ -6,7 +10,7 @@ import { summaryPassages, type SummaryPassage } from './summary-passages.js';
 import { sourceStatements, matchStatements, assertSupportedCompression, statementKey, UnsupportedSummaryRewrite, type SourceStatement } from './summary-statements.js';
 import { InvalidSummaryError } from './validate-summary.js';
 
-export const SUMMARY_PROMPT_VERSION = 'readable-summary-v15';
+export const SUMMARY_PROMPT_VERSION = 'readable-summary-v19';
 interface Claim { speaker: string; text: string; sources: number[]; kind: string; atoms: SourceStatement[] }
 const kinds = ['update', 'decision', 'commitment', 'proposal', 'disagreement', 'unresolved'];
 const integers = { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'integer' } };
@@ -84,7 +88,7 @@ function parsePoints(text: string, evidence: SummaryPassage[], draft?: Claim[], 
 function originalClaim(atom: SourceStatement): Claim { const cleaned = atom.text.replace(/\.(?=\s+[A-Z])/gu, ';').replace(/^(?:(?:yeah|okay|so|in fact|actually|and)[,\s]+)+/iu, ''); return { speaker: atom.speaker, text: cleaned.charAt(0).toUpperCase() + cleaned.slice(1), sources: atom.sources, kind: 'update', atoms: [atom] }; }
 const acknowledgement = /^(?:yes|yeah|sure|okay|ok|absolutely|agreed|understood|all good(?:,? all good)?)[.!\s]*$/iu;
 function cleanPoint(text: string): string {
-  return text.replace(/;\s+(This|That|These|Those|One)\b/gu, (_, word: string) => '; ' + word.toLowerCase()).replace(/[.!?]*$/u, '.');
+  return readableWording(text).replace(/;\s+(This|That|These|Those|One)\b/gu, (_, word: string) => '; ' + word.toLowerCase()).replace(/[.!?]*$/u, '.');
 }
 function distinctClaims(claims: Claim[]): Claim[] {
   const unique = new Map<string, Claim>();
@@ -110,14 +114,15 @@ function proposal(point: Claim): boolean {
 /** Explicit scope agreements count as outcomes even without the word "final". */
 function outcomeIds(items: Claim[]): number[] {
   return [...new Set([...finalDecisionIds(items), ...items.flatMap((point, id) =>
-    /\bwe (?:agree|agreed|decided)\b/iu.test(point.text)
+    /\bwe (?:agree|agreed|decided)\b|\bis agreed\b|\bis (?:our|the) decision\b/iu.test(point.text)
       && !/\b(?:if|unless|provided|quoted|hypothetical|not|never|maybe|would)\b|["“”]/iu.test(point.text) ? [id] : [])])];
 }
 const claimData = (claim: Claim, id: number) => ({ id, speaker: claim.speaker, text: claim.text, sources: claim.sources, kind: claim.kind });
-export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, deadlineMs = 900000 }: { model: TextModel; attempts?: number; maxCalls?: number; deadlineMs?: number }) {
+export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, deadlineMs = 900000, observe }: { observe?: SummaryObserver; model: TextModel; attempts?: number; maxCalls?: number; deadlineMs?: number }) {
   for (const [name, value] of Object.entries({ attempts, maxCalls, deadlineMs })) if (!Number.isInteger(value) || value < 1) throw new Error(`${name} must be a positive integer`);
   return async (transcript: Transcript, context: PipelineContext = {}): Promise<Summary> => {
     if (!transcript.segments.length) throw new Error('The Transcript is empty');
+    const emit = summaryDiagnostics(observe);
     const started = performance.now(), deadline = AbortSignal.timeout(deadlineMs);
     const signal = context.signal ? AbortSignal.any([context.signal, deadline]) : deadline;
     const observations: { stage: string; bytes: number; attempt: number; elapsedMs: number }[] = [];
@@ -131,14 +136,31 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
         check(); const req = request(stage, data, feedback); assertRequestBudget(req); calls++;
         const observation = { stage, bytes: requestBytes(req), attempt: attempt + 1, elapsedMs: 0 }; observations.push(observation);
         const callStarted = performance.now();
-        const result = await model.complete({ ...req, signal, timeoutMs: Math.max(1, Math.min(AI_SETTINGS.timeoutMs, Math.floor(deadlineMs - (performance.now() - started)))), maxOutputTokens: stage === 'tldr' ? 512 : stage === 'select' ? 256 : AI_SETTINGS.maxOutputTokens });
+        const result = await model.complete({ ...req, signal, timeoutMs: Math.max(1, Math.min(AI_SETTINGS.timeoutMs, Math.floor(deadlineMs - (performance.now() - started)))), maxOutputTokens: stage === 'tldr' ? 512 : stage === 'select' ? 256 : AI_SETTINGS.maxOutputTokens }).catch(error => {
+          emit({ stage, event: 'transport-error', call: calls, attempt: attempt + 1, reason: 'Model request failed or was cancelled' });
+          throw error;
+        });
         observation.elapsedMs = performance.now() - callStarted;
         signal.throwIfAborted(); modelName = result.metadata.model; promptTokens += result.metadata.promptTokens ?? 0; outputTokens += result.metadata.outputTokens ?? 0;
-        try { return parse(result.text, attempt); } catch (error) { if (error instanceof UnsupportedSummaryRewrite && fallback) { fallbacks++; return fallback(); } if (!(error instanceof InvalidSummaryError)) throw error; feedback = ' Validation: ' + error.message.slice(0, 160); }
+        try {
+          const accepted = parse(result.text, attempt);
+          emit({ stage, event: 'accepted', call: calls, attempt: attempt + 1, data: accepted });
+          return accepted;
+        } catch (error) {
+          if (error instanceof UnsupportedSummaryRewrite && fallback) {
+            fallbacks++; const retained = fallback();
+            emit({ stage, event: 'fallback', call: calls, attempt: attempt + 1, reason: error.message, data: retained });
+            return retained;
+          }
+          if (!(error instanceof InvalidSummaryError)) throw error;
+          emit({ stage, event: 'rejected', call: calls, attempt: attempt + 1, reason: error.message });
+          feedback = ' Validation: ' + error.message.slice(0, 160);
+        }
       }
       throw new InvalidSummaryError('Summary incomplete after bounded validation retries' + feedback);
     }
     const passages = summaryPassages(transcript);
+    emit({ stage: 'evidence', event: 'checkpoint', data: passages });
     const wire = (e: SummaryPassage[]) => e.map(({ id, speaker, text }) => ({ id, speaker, text }));
     const evidenceFor = (claims: Claim[]) => passages.filter(e => claims.some(c => c.sources.includes(e.id)));
     const openingTopic = transcript.segments.slice(0, 3).filter(s => Buffer.byteLength(s.text, 'utf8') <= 250).map(s => s.text);
@@ -162,6 +184,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       }
     }
     claims = distinctClaims(claims);
+    emit({ stage: 'extraction', event: 'checkpoint', data: claims });
     if (!claims.length) throw new Error('No meaningful speech was found to summarise');
     // Bound every reduction with original evidence; never silently discard a claim.
     for (let round = 0; round < 6; round++) {
@@ -185,7 +208,13 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       if (fits('tldr', overview(claims))) break;
       if (!changed || round >= 1) break;
     }
-    let shortlist = claims.filter(claim => !/^(?:yes|yeah|sure|okay|ok|absolutely|agreed)[.!\s]*$/iu.test(claim.text));
+    emit({ stage: 'consolidation', event: 'checkpoint', data: claims });
+    const changes = decisionChanges(claims.map(c => ({ speaker: c.speaker,
+      text: c.atoms.map(a => a.text).join(' '), refs: c.sources.flatMap(id => passages[id]!.refs) })));
+    const superseded = new Map(changes.map(change => [change.earlier, change.replacement]));
+    const currentClaims = claims.filter((_, id) => !superseded.has(id));
+    emit({ stage: 'decision-history', event: 'checkpoint', data: changes });
+    let shortlist = currentClaims.filter(claim => !/^(?:yes|yeah|sure|okay|ok|absolutely|agreed)[.!\s]*$/iu.test(claim.text));
     if (!shortlist.length) throw new Error('No substantive point is available for a TL;DR');
     for (let round = 0; !fits('tldr', overview(shortlist)) && round < 8; round++) {
       const next: Claim[] = [];
@@ -206,13 +235,14 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
         shortlist = next.slice(0, Math.max(1, next.length - 1));
       } else shortlist = next;
     }
-    const priorities = [...outcomeIds(claims), ...attention(claims), ...commitmentIds(claims)];
+    const priorities = [...outcomeIds(currentClaims), ...attention(currentClaims), ...commitmentIds(currentClaims)];
     // Reserve priority claims before filling the remaining request budget.
     const retained: Claim[] = [];
-    for (const point of [...priorities.map(id => claims[id]!), ...shortlist]) {
+    for (const point of [...priorities.map(id => currentClaims[id]!), ...shortlist]) {
       if (!retained.includes(point) && fits('tldr', overview([...retained, point]))) retained.push(point);
     }
     shortlist = retained;
+    emit({ stage: 'selection', event: 'checkpoint', data: shortlist });
     const evidence = evidenceFor(shortlist), payload = overview(shortlist);
     if (!fits('tldr', payload)) throw new Error('Summary incomplete: final evidence exceeds the TL;DR budget');
     const sentences = await ask('tldr', payload, text => {
@@ -220,6 +250,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       if (v.sentences.some(s => !s || typeof s !== 'object')) return fail('Return structured sentences');
       let unsupported = '';
       const render = (point: Claim, text: string) => {
+        text = readableWording(text);
         const firstPerson = /\b(?:I|my)\b|^(?:Will|Can|Must|Should)\b/iu.test(text);
         const attributed = firstPerson && !text.startsWith(point.speaker + ':') ? point.speaker + ': ' + text : text;
         return attributed.replace(/^Agreed[.;]\s+/iu, '').replace(/;\s+(This|These|Those|One)\b/gu, (_, word: string) => '; ' + word.toLowerCase()).replace(/[.!?]+$/u, '') + '.';
@@ -236,6 +267,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
         catch (error) {
           if (!(error instanceof UnsupportedSummaryRewrite)) throw error;
           fallbacks++; unsupported = error.message; text = point.text;
+          emit({ stage: 'tldr', event: 'fallback', call: calls, reason: error.message, data: { rejected: s.text, retained: point.text, sources: point.sources } });
         }
         const rendered = render(point, text);
         if (words(rendered) > 90 || sentenceCount(rendered) > 3) return [];
@@ -290,10 +322,13 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
         return displayRank(a.id) - displayRank(b.id);
       });
     });
+    emit({ stage: 'tldr', event: 'checkpoint', data: sentences });
     const refs = (sources: number[]) => [...new Set(sources.flatMap(id => passages[id]!.refs))].sort((a, b) => a - b);
     const speakers = [...new Set(claims.map(c => c.speaker))];
-    return { tldr: sentences.map(s => s.text).join(' '), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => cleanPoint(c.text)) })),
-      evidence: { revision: transcriptRevision(transcript), tldr: refs(sentences.flatMap(s => s.sources)), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => refs(c.sources)) })) },
-      generation: { promptVersion: SUMMARY_PROMPT_VERSION, model: modelName, elapsedMs: performance.now() - started, calls, promptTokens, outputTokens, fallbacks, requests: observations } };
+    const overviewSentences = contextualOverview(transcript, sentences.map(s => ({ text: s.text, refs: refs(s.sources) })));
+    emit({ stage: 'exchanges', event: 'checkpoint', data: overviewSentences });
+    return retainExchangeResponses(transcript, { tldr: overviewSentences.map(s => s.text).join(' '), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => cleanPoint((superseded.has(claims.indexOf(c)) ? 'Earlier position (superseded): ' : '') + c.text)) })),
+      evidence: { revision: transcriptRevision(transcript), tldr: [...new Set(overviewSentences.flatMap(s => s.refs))].sort((a, b) => a - b), participants: speakers.map(speaker => ({ speaker, said: claims.filter(c => c.speaker === speaker).map(c => refs([...c.sources, ...(superseded.has(claims.indexOf(c)) ? claims[superseded.get(claims.indexOf(c))!]!.sources : [])])) })) },
+      generation: { promptVersion: SUMMARY_PROMPT_VERSION, model: modelName, elapsedMs: performance.now() - started, calls, promptTokens, outputTokens, fallbacks, requests: observations } });
   };
 }
