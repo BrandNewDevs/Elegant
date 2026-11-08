@@ -66,7 +66,7 @@ it("runs synthetic setup, Summary persistence and Chat through provider routing 
     expect(settings.view.provider).toBe("ollama");
     await settings.configure({ type: "select", provider: "gemini", consent: true });
     await new PipelineRunner({ transcribe: async () => transcript, summarise: routing.summarise }, f.store).resummarise(f.id, transcript);
-    expect(f.store.getMeeting(f.id)?.summary?.tldr).toBe(final.tldr.text);
+    expect(f.store.getMeeting(f.id)?.summary?.tldr).toBe(transcript.segments[1]!.text); // the paraphrase is unsupported, so the source statement is kept
     expect(f.store.getMeeting(f.id)?.summary?.generation).toMatchObject({ provider: "gemini", calls: 2, model: "gemini-3.6-flash" });
     const answer = await routing.chat(f.input);
     expect(answer.answer).toEqual({ text: "Friday was selected.", refs: [1], sufficient: true });
