@@ -40,14 +40,14 @@ it("runs synthetic setup, Summary persistence and Chat through provider routing 
   const f = meeting();
   const answers = [{ ok: true }, extracted, final, { status: "answered", claims: [{ text: "Friday was selected.", sourceIds: ["1:0"] }] }];
   const fetcher = vi.fn<typeof fetch>(async (url, init) => {
-    expect(String(url)).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent");
+    expect(String(url)).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent");
     expect(init?.headers).toMatchObject({ "x-goog-api-key": "synthetic-key" });
     expect(init?.redirect).toBe("error");
     const body = JSON.parse(String(init?.body));
     expect(body.contents[0].role).toBe("user");
     expect(body.generationConfig.responseMimeType).toBe("application/json");
     expect(body.generationConfig.responseJsonSchema.type).toBe("object");
-    return new Response(JSON.stringify({ candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify(answers.shift()) }] } }], modelVersion: "gemini-3.8-flash", usageMetadata: { promptTokenCount: 30, candidatesTokenCount: 10 } }));
+    return new Response(JSON.stringify({ candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify(answers.shift()) }] } }], modelVersion: "gemini-3.6-flash", usageMetadata: { promptTokenCount: 30, candidatesTokenCount: 10 } }));
   });
   const client = (apiKey: string, model: string) => new GeminiClient({ apiKey, model, fetch: fetcher });
   const settings = new AISettings(f.store, {
@@ -67,7 +67,7 @@ it("runs synthetic setup, Summary persistence and Chat through provider routing 
     await settings.configure({ type: "select", provider: "gemini", consent: true });
     await new PipelineRunner({ transcribe: async () => transcript, summarise: routing.summarise }, f.store).resummarise(f.id, transcript);
     expect(f.store.getMeeting(f.id)?.summary?.tldr).toBe(final.tldr.text);
-    expect(f.store.getMeeting(f.id)?.summary?.generation).toMatchObject({ provider: "gemini", calls: 2, model: "gemini-3.8-flash" });
+    expect(f.store.getMeeting(f.id)?.summary?.generation).toMatchObject({ provider: "gemini", calls: 2, model: "gemini-3.6-flash" });
     const answer = await routing.chat(f.input);
     expect(answer.answer).toEqual({ text: "Friday was selected.", refs: [1], sufficient: true });
     expect(answer.generation).toMatchObject({ provider: "gemini", calls: 1 });

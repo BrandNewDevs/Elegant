@@ -105,7 +105,8 @@ export class AISettings {
   /**
    * Tries each model the key can see with one tiny synthetic request, and remembers the ones that answer, so the picker can
    * offer only models that work on this key (Gemini quotas are per model, so each try is independent). Meeting content is
-   * never sent. A model Google refuses for quota, or that is rate-limited, is left out. Stopping keeps what was found so far.
+   * never sent. A model Google refuses for quota, or that stays rate-limited or overloaded, is left out and the scan goes on.
+   * Stopping keeps what was found so far.
    */
   async findUsableModels(): Promise<string> {
     if (this.closed) throw new Error("AI settings are shutting down");
@@ -117,6 +118,7 @@ export class AISettings {
     const run = (this.finding = { controller: new AbortController(), done: 0, total: 0 });
     this.changed();
     const usable: string[] = [];
+    let skipped = 0;
     let stopped = false;
     // A key that changed meanwhile cleared the results; the old key's must not be written back, nor must anything after shutdown.
     const save = () => {
@@ -136,17 +138,21 @@ export class AISettings {
         let result = await this.probeModel(apiKey, model, run.controller.signal);
         if (result.status === "busy") {
           const wait = Math.max(this.pauses.busyMs, (result.retryDelaySeconds ?? 0) * 1000);
-          // Do not retry earlier than Google permits or leave a setup scan waiting for minutes.
-          if (wait > 60_000) throw new Error("Gemini rate limit reached. Retry discovery later; previous usable models were kept.");
-          await this.pause(wait, run.controller.signal);
-          result = await this.probeModel(apiKey, model, run.controller.signal);
+          // Do not retry earlier than Google permits, nor leave a setup scan waiting for minutes: a long wait skips the model.
+          if (wait <= 60_000) {
+            await this.pause(wait, run.controller.signal);
+            result = await this.probeModel(apiKey, model, run.controller.signal);
+          }
         }
-        if (result.status === "busy") throw new Error("Gemini rate limit reached. Retry discovery later; previous usable models were kept.");
+        // One busy or overloaded model says nothing about the others, so the scan goes on without it.
+        if (result.status === "busy" || result.status === "overloaded") skipped++;
         if (result.status === "ok") usable.push(model);
         run.done = index + 1;
         this.changed();
         if (index < candidates.length - 1) await this.pause(this.pauses.betweenMs, run.controller.signal);
       }
+      // Every model busy is an outage, not an answer: an empty list would hide every model, so the last results stay.
+      if (!usable.length && skipped) throw new Error("Gemini was busy or overloaded for every model it could try. Retry discovery later; previous usable models were kept.");
       save();
     } catch (error) {
       if (!run.controller.signal.aborted) throw error; // a failure saves nothing, so the last good results stay
@@ -157,7 +163,8 @@ export class AISettings {
       this.changed();
     }
     const count = `${usable.length} model${usable.length === 1 ? "" : "s"}`;
-    return stopped ? `Stopped. ${count} answered so far.` : usable.length ? `Found ${count} that ${usable.length === 1 ? "works" : "work"} on your key.` : "None of the models answered the connection check. Test the selected model for details, or check quota in Google AI Studio.";
+    const busy = skipped ? ` Skipped ${skipped} that ${skipped === 1 ? "was" : "were"} busy; find again later to check ${skipped === 1 ? "it" : "them"}.` : "";
+    return stopped ? `Stopped. ${count} answered so far.` : usable.length ? `Found ${count} that ${usable.length === 1 ? "works" : "work"} on your key.${busy}` : "None of the models answered the connection check. Test the selected model for details, or check quota in Google AI Studio.";
   }
 
   /** Stops a run in progress, keeping the models found so far. */
