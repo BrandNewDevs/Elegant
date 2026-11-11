@@ -11,6 +11,8 @@ export interface MeetingListItem {
   app: string;
   startedAt: string;
   state: MeetingState;
+  /** Why a failed Meeting failed, so the window can say it without opening the Meeting. */
+  failure?: string;
 }
 
 export interface Participant {
@@ -356,21 +358,21 @@ export function openStore(path: string): Store {
 
     listMeetings() {
       const rows = db
-        .prepare("SELECT id, app, started_at, state FROM meetings ORDER BY started_at DESC, id DESC")
-        .all() as unknown as Pick<MeetingRow, "id" | "app" | "started_at" | "state">[];
-      return rows.map((r) => ({ id: r.id, app: r.app, startedAt: r.started_at, state: r.state }));
+        .prepare("SELECT id, app, started_at, state, error FROM meetings ORDER BY started_at DESC, id DESC")
+        .all() as unknown as Pick<MeetingRow, "id" | "app" | "started_at" | "state" | "error">[];
+      return rows.map((r) => ({ id: r.id, app: r.app, startedAt: r.started_at, state: r.state, ...(r.state === "failed" && r.error ? { failure: r.error } : {}) }));
     },
     searchMeetings(query) {
       const expression = searchExpression(query);
       if (!expression) return [];
       const rows = db
         .prepare(
-          `SELECT m.id, m.app, m.started_at, m.state FROM search_index
+          `SELECT m.id, m.app, m.started_at, m.state, m.error FROM search_index
            JOIN meetings m ON m.id = search_index.meeting_id
            WHERE search_index MATCH ? ORDER BY m.started_at DESC, m.id DESC`,
         )
-        .all(expression) as unknown as Pick<MeetingRow, "id" | "app" | "started_at" | "state">[];
-      return rows.map((r) => ({ id: r.id, app: r.app, startedAt: r.started_at, state: r.state }));
+        .all(expression) as unknown as Pick<MeetingRow, "id" | "app" | "started_at" | "state" | "error">[];
+      return rows.map((r) => ({ id: r.id, app: r.app, startedAt: r.started_at, state: r.state, ...(r.state === "failed" && r.error ? { failure: r.error } : {}) }));
     },
 
     listPassages(meetingId, revision) {

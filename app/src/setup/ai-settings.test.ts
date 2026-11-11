@@ -165,18 +165,21 @@ it("explains a connection-test timeout as a setup problem", async () => {
   const f = fixture();
   await f.settings.configure({ type: "save-key", key: "synthetic" });
   f.complete.mockRejectedValue(Object.assign(new Error("Gemini request timed out. Retry or ask a narrower question."), { name: "TimeoutError" }));
-  await expect(f.settings.configure({ type: "test" })).rejects.toThrow("timed out after 60 seconds. Check network access and the saved model");
+  await expect(f.settings.configure({ type: "test" })).rejects.toThrow("timed out after 60 seconds. gemini-3.6-flash may be overloaded");
   f.store.close();
 });
-it("requests low thinking only for the default model", async () => {
+it("keeps low thinking for both supported Flash models, including an existing saved selection", async () => {
   const f = fixture();
   await f.settings.configure({ type: "save-key", key: "synthetic" });
+  await f.settings.configure({ type: "test" });
+  await f.settings.configure({ type: "model", model: "gemini-3.8-flash" });
   await f.settings.configure({ type: "test" });
   await f.settings.configure({ type: "model", model: "gemini-other" });
   await f.settings.configure({ type: "test" });
   const requests = f.complete.mock.calls.map(call => (call as unknown[])[0]);
   expect(requests[0]).toMatchObject({ thinkingLevel: "low" });
-  expect(requests[1]).not.toHaveProperty("thinkingLevel");
+  expect(requests[1]).toMatchObject({ thinkingLevel: "low", maxOutputTokens: 2048 });
+  expect(requests[2]).not.toHaveProperty("thinkingLevel");
   f.store.close();
 });
 

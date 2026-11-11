@@ -82,3 +82,18 @@ it("remembers a setting, and overwrites it", () => {
   expect(reopened.getSetting("keepAudio")).toBe("false");
   reopened.close();
 });
+
+it("includes failure reasons in both Meeting lists and search results, only for failed Meetings", () => {
+  const store = openStore(":memory:");
+  const failed = store.createMeeting({ app: "Zoom", startedAt: "2026-11-03T10:00:00.000Z" });
+  store.setMeetingState(failed, "failed", "Gemini is temporarily unavailable (503)");
+  const done = store.createMeeting({ app: "Meet", startedAt: "2026-11-03T11:00:00.000Z" });
+  store.setMeetingState(done, "done");
+  for (const id of [failed, done]) store.saveTranscript(id, { segments: [{ start: 0, end: 1, speaker: "You", text: "Release planning." }] });
+  for (const list of [store.listMeetings(), store.searchMeetings("release")]) {
+    expect(list.find(m => m.id === failed)).toMatchObject({ state: "failed", failure: "Gemini is temporarily unavailable (503)" });
+    expect(list.find(m => m.id === done)).toBeDefined();
+    expect(list.find(m => m.id === done)).not.toHaveProperty("failure");
+  }
+  store.close();
+});
