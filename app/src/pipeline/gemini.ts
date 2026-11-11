@@ -2,7 +2,7 @@ import type { GeminiModelOption } from "../shared/ai-settings.js";
 import type { TextModel, TextRequest, TextResponse } from "./language-model.js";
 import { requestBytes } from "./model-request.js";
 
-export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
 /** Separate from Ollama's limits: never change the local pipeline's request budget. */
 export const GEMINI_INPUT_BYTES = 192_000;
 const MAX_REPLY_BYTES = 512 * 1024;
@@ -17,7 +17,7 @@ export class GeminiError extends Error {
   constructor(message: string, readonly detail: GeminiErrorDetail = {}) { super(message); }
 }
 
-/** The reply's first bytes only: a quota error is small, and nothing else is read. */
+/** Read only a bounded error body; no server prose is exposed to the caller. */
 async function readSmall(response: Response, limit = 16 * 1024): Promise<string> {
   if (!response.body) return "";
   const reader = response.body.getReader();
@@ -63,8 +63,17 @@ export function parseQuota(body: string, requestedModel?: string): { message: st
 
 export const quotaMessage = (body: string, requestedModel?: string): string => parseQuota(body, requestedModel).message;
 
-/** The message for a refused request. Only a 429 is read, for the quota it names; every other reply is dropped unread. */
+/** Only allowlisted structured error reasons and quota tokens affect diagnostics; server prose is never forwarded. */
 async function refusal(response: Response, model?: string): Promise<GeminiError> {
+  if (response.status === 400 || response.status === 401 || response.status === 403) {
+    let invalidKey = false;
+    try {
+      const body = JSON.parse(await readSmall(response));
+      invalidKey = Array.isArray(body?.error?.details) && body.error.details.some((detail: { reason?: unknown } | null) =>
+        detail?.reason === "API_KEY_INVALID" || detail?.reason === "API_KEY_EXPIRED");
+    } catch { /* An unreadable body keeps the general, sanitized diagnostic. */ }
+    return new GeminiError(invalidKey ? "Gemini API key is invalid or expired. Replace the key in Settings." : failure(response.status), { status: response.status });
+  }
   if (response.status !== 429) {
     await response.body?.cancel();
     return new GeminiError(failure(response.status), { status: response.status });
@@ -103,7 +112,7 @@ export class GeminiClient implements TextModel {
         method: "POST", redirect: "error", signal,
         headers: { "content-type": "application/json", "x-goog-api-key": this.options.apiKey },
         body: JSON.stringify({
-          systemInstruction: { parts: request.messages.filter(m => m.role === "system").map(m => ({ text: m.content })) },
+          ...(request.messages.some(m => m.role === "system") ? { systemInstruction: { parts: request.messages.filter(m => m.role === "system").map(m => ({ text: m.content })) } } : {}),
           contents: request.messages.filter(m => m.role !== "system").map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
           generationConfig: { temperature: 0, maxOutputTokens, ...(request.thinkingLevel ? { thinkingConfig: { thinkingLevel: request.thinkingLevel } } : {}), responseMimeType: "application/json", responseJsonSchema: request.schema },
         }),
@@ -196,25 +205,48 @@ export async function listGeminiModels({ apiKey, signal, fetch: fetcher = fetch 
   return [...found].map(([id, label]) => ({ id, label })).sort((a, b) => a.id.localeCompare(b.id));
 }
 
-/** How one model answered a tiny test request: it did, Google has no quota for it on this plan, it is rate-limited right now, or it is unavailable. */
-export type ModelProbe = "ok" | "no-quota" | "busy" | "unavailable";
+/** Shared synthetic check for Settings and discovery. Saving credentials never invokes this or selects a provider. */
+export async function checkGeminiConnection(client: TextModel, model: string, signal?: AbortSignal): Promise<void> {
+  try {
+    const response = await client.complete({
+      messages: [{ role: "user", content: 'Connection test only. Return {"ok":true}.' }],
+      schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] },
+      signal, timeoutMs: 60_000, maxOutputTokens: 2048,
+      // Other models retain their defaults rather than receiving an unsupported setting.
+      ...(model === DEFAULT_GEMINI_MODEL ? { thinkingLevel: "low" as const } : {}),
+    });
+    signal?.throwIfAborted();
+    let result;
+    try { result = JSON.parse(response.text); } catch { throw new GeminiError("Gemini connection test returned invalid JSON. Retry the test."); }
+    if (!result || result.ok !== true) throw new GeminiError("Gemini connection test did not confirm success. Retry the test.");
+  } catch (error) {
+    if (error instanceof Error && error.name === "TimeoutError") throw Object.assign(new Error("Gemini connection test timed out after 60 seconds. Check network access and the saved model, then retry."), { name: "TimeoutError" });
+    throw error;
+  }
+}
+
+export type ModelProbe =
+  | { status: "ok" | "no-quota" | "unavailable" | "invalid-output" | "overloaded" }
+  | { status: "busy"; retryDelaySeconds?: number };
 
 /**
- * Sends one synthetic request (never Meeting content) to see whether this key can use the model. A model that answers, even
- * with an unfinished reply, is usable; a 429 with a limit of zero means it is not on the plan. Anything that is not about the
- * model itself, such as no network, is thrown so the caller stops instead of calling every model unavailable.
+ * Requires the same completed confirmation as Settings. Account, request and network failures stop discovery; a server
+ * error or a timeout is reported as overloaded, since Google overloads one model while others answer. A refused or
+ * malformed answer never establishes usability.
  */
 export async function probeGeminiModel({ apiKey, model, signal, fetch: fetcher }: { apiKey: string; model: string; signal?: AbortSignal; fetch?: typeof fetch }): Promise<ModelProbe> {
   try {
-    await new GeminiClient({ apiKey, model, fetch: fetcher }).complete({
-      messages: [{ role: "user", content: 'Connection test only. Return {"ok":true}.' }],
-      schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] }, signal, timeoutMs: 30_000, maxOutputTokens: 2048 });
-    return "ok";
+    await checkGeminiConnection(new GeminiClient({ apiKey, model, fetch: fetcher }), model, signal);
+    return { status: "ok" };
   } catch (error) {
-    if (signal?.aborted || !(error instanceof GeminiError)) throw error;
-    const { status, limitZero } = error.detail;
-    if (status === undefined) return "ok"; // a 200 that was not a finished answer: the model is there
-    if (status === 429) return limitZero ? "no-quota" : "busy";
-    return "unavailable";
+    if (signal?.aborted) throw error;
+    if (error instanceof Error && error.name === "TimeoutError") return { status: "overloaded" };
+    if (!(error instanceof GeminiError)) throw error;
+    const { status, limitZero, retryDelaySeconds } = error.detail;
+    if (status === undefined) return { status: "invalid-output" };
+    if (status === 429) return limitZero ? { status: "no-quota" } : { status: "busy", retryDelaySeconds };
+    if (status === 404) return { status: "unavailable" };
+    if (status >= 500) return { status: "overloaded" };
+    throw error;
   }
 }

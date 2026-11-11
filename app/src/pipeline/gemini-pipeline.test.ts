@@ -4,7 +4,9 @@ import { openStore } from "../store/store.js";
 import { transcriptRevision } from "./evidence.js";
 import type { TextModel, TextRequest } from "./language-model.js";
 import { PipelineRunner } from "./runner.js";
-import { GEMINI_INPUT_BYTES } from "./gemini.js";
+import { GEMINI_INPUT_BYTES, GeminiClient } from "./gemini.js";
+import { AISettings } from "../setup/ai-settings.js";
+import { createProviderRouting } from "./provider.js";
 import { requestBytes } from "./model-request.js";
 
 const transcript = { segments: [
@@ -33,6 +35,48 @@ function meeting() {
   store.saveTranscript(id, transcript); store.setMeetingState(id, "done");
   return { store, id, input: { meetingId: id, question: "What was the final release plan?", history: [], expectedRevision: transcriptRevision(transcript) } };
 }
+
+it("runs synthetic setup, Summary persistence and Chat through provider routing and the real Gemini transport", async () => {
+  const f = meeting();
+  const answers = [{ ok: true }, extracted, final, { status: "answered", claims: [{ text: "Friday was selected.", sourceIds: ["1:0"] }] }];
+  const fetcher = vi.fn<typeof fetch>(async (url, init) => {
+    expect(String(url)).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent");
+    expect(init?.headers).toMatchObject({ "x-goog-api-key": "synthetic-key" });
+    expect(init?.redirect).toBe("error");
+    const body = JSON.parse(String(init?.body));
+    expect(body.contents[0].role).toBe("user");
+    expect(body.generationConfig.responseMimeType).toBe("application/json");
+    expect(body.generationConfig.responseJsonSchema.type).toBe("object");
+    return new Response(JSON.stringify({ candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify(answers.shift()) }] } }], modelVersion: "gemini-3.6-flash", usageMetadata: { promptTokenCount: 30, candidatesTokenCount: 10 } }));
+  });
+  const client = (apiKey: string, model: string) => new GeminiClient({ apiKey, model, fetch: fetcher });
+  const settings = new AISettings(f.store, {
+    isAsyncEncryptionAvailable: async () => true,
+    encryptStringAsync: async text => Buffer.from(text),
+    decryptStringAsync: async buffer => ({ result: buffer.toString(), shouldReEncrypt: false }),
+  }, client);
+  const local = { summarise: vi.fn(), chat: vi.fn() };
+  const routing = createProviderRouting({ snapshot: () => settings.snapshot(), local, gemini: selection => {
+    const model = client(selection.apiKey, selection.model);
+    return { summarise: createGeminiSummariser({ model }), chat: createGeminiChat({ store: f.store, model }) };
+  } });
+  try {
+    await settings.configure({ type: "save-key", key: "synthetic-key" });
+    await settings.configure({ type: "test" });
+    expect(settings.view.provider).toBe("ollama");
+    await settings.configure({ type: "select", provider: "gemini", consent: true });
+    await new PipelineRunner({ transcribe: async () => transcript, summarise: routing.summarise }, f.store).resummarise(f.id, transcript);
+    expect(f.store.getMeeting(f.id)?.summary?.tldr).toBe(transcript.segments[1]!.text); // the paraphrase is unsupported, so the source statement is kept
+    expect(f.store.getMeeting(f.id)?.summary?.generation).toMatchObject({ provider: "gemini", calls: 2, model: "gemini-3.6-flash" });
+    const answer = await routing.chat(f.input);
+    expect(answer.answer).toEqual({ text: "Friday was selected.", refs: [1], sufficient: true });
+    expect(answer.generation).toMatchObject({ provider: "gemini", calls: 1 });
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(answers).toEqual([]);
+    expect(local.summarise).not.toHaveBeenCalled();
+    expect(local.chat).not.toHaveBeenCalled();
+  } finally { await settings.shutdown(); f.store.close(); }
+});
 
 it("creates readable points and TLDR with original ordinal evidence and provider metadata", async () => {
   const model = modelFor([extracted, final]);

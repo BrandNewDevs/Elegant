@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../store/store.js";
-import type { ModelProbe } from "../pipeline/gemini.js";
+import { probeGeminiModel, type ModelProbe } from "../pipeline/gemini.js";
 import { AISettings, type CredentialEncryption } from "./ai-settings.js";
 
 function fixture() {
@@ -212,18 +212,18 @@ function finder(ids: string[], outcomes: Record<string, ModelProbe | ModelProbe[
   const f = fixture();
   const tried: string[] = [];
   const listModels = vi.fn(async () => ids.map(id => ({ id, label: id })));
-  const probeModel = vi.fn(async (_key: string, model: string, signal: AbortSignal) => {
+  const probeModel = vi.fn(async (_key: string, model: string, signal: AbortSignal): Promise<ModelProbe> => {
     signal.throwIfAborted();
     tried.push(model);
-    const outcome = outcomes[model] ?? "ok";
-    return Array.isArray(outcome) ? (outcome.shift() ?? "ok") : outcome;
+    const outcome = outcomes[model] ?? { status: "ok" };
+    return Array.isArray(outcome) ? (outcome.shift() ?? { status: "ok" }) : outcome;
   });
   const settings = new AISettings(f.store, f.encryption, f.createClient, listModels, probeModel, { betweenMs: 0, busyMs: 0 });
   return { ...f, settings, tried, probeModel, listModels };
 }
 
 it("keeps the models that answered, flash-lite and flash first, and offers them as the usable ones", async () => {
-  const f = finder(["gemini-pro", "gemini-flash", "gemini-flash-lite", "gemini-argon"], { "gemini-argon": "no-quota", "gemini-pro": "busy" });
+  const f = finder(["gemini-pro", "gemini-flash", "gemini-flash-lite", "gemini-argon"], { "gemini-argon": { status: "no-quota" }, "gemini-pro": { status: "invalid-output" } });
   await f.settings.configure({ type: "save-key", key: "secret-test-key" });
   expect(f.settings.view.usableModels).toBeUndefined();
   expect(await f.settings.findUsableModels()).toBe("Found 2 models that work on your key.");
@@ -236,7 +236,7 @@ it("keeps the models that answered, flash-lite and flash first, and offers them 
 });
 
 it("retries a rate-limited model once, and counts it usable when the retry answers", async () => {
-  const f = finder(["gemini-flash"], { "gemini-flash": ["busy", "ok"] });
+  const f = finder(["gemini-flash"], { "gemini-flash": [{ status: "busy" }, { status: "ok" }] });
   await f.settings.configure({ type: "save-key", key: "secret-test-key" });
   await f.settings.findUsableModels();
   expect(f.probeModel).toHaveBeenCalledTimes(2);
@@ -258,7 +258,7 @@ it("reports progress through the settings view while it runs", async () => {
 });
 
 it("says so when no model answers, and refuses to start twice or without a key", async () => {
-  const f = finder(["gemini-a"], { "gemini-a": "no-quota" });
+  const f = finder(["gemini-a"], { "gemini-a": { status: "no-quota" } });
   await expect(f.settings.findUsableModels()).rejects.toThrow("Save a Gemini API key first");
   await f.settings.configure({ type: "save-key", key: "secret-test-key" });
   const first = f.settings.findUsableModels();
@@ -271,7 +271,7 @@ it("says so when no model answers, and refuses to start twice or without a key",
 it("keeps what was found so far when stopped", async () => {
   const f = finder(["gemini-flash-lite", "gemini-flash", "gemini-pro"]);
   await f.settings.configure({ type: "save-key", key: "secret-test-key" });
-  f.probeModel.mockImplementation(async (_key, model, signal) => { if (model === "gemini-flash") f.settings.stopFindingModels(); signal.throwIfAborted(); return "ok"; });
+  f.probeModel.mockImplementation(async (_key, model, signal) => { if (model === "gemini-flash") f.settings.stopFindingModels(); signal.throwIfAborted(); return { status: "ok" }; });
   expect(await f.settings.findUsableModels()).toBe("Stopped. 1 model answered so far.");
   expect(f.settings.view.usableModels).toEqual(["gemini-flash-lite"]);
   f.store.close();
@@ -285,7 +285,7 @@ it("forgets the results when the key changes, even while a run is going on, and 
   await f.settings.configure({ type: "save-key", key: "another-key" });
   expect(f.settings.view.usableModels).toBeUndefined();
 
-  f.probeModel.mockImplementation(async (_key, model, signal) => { if (model === "gemini-a") await f.settings.configure({ type: "remove-key" }); signal.throwIfAborted(); return "ok"; });
+  f.probeModel.mockImplementation(async (_key, model, signal) => { if (model === "gemini-a") await f.settings.configure({ type: "remove-key" }); signal.throwIfAborted(); return { status: "ok" }; });
   await f.settings.findUsableModels();
   expect(f.settings.view.usableModels).toBeUndefined();
   f.store.close();
@@ -307,5 +307,147 @@ it("gives the connection test room to think, since thinking tokens count against
   await f.settings.configure({ type: "save-key", key: "secret-test-key" });
   await f.settings.configure({ type: "test" });
   expect(f.complete).toHaveBeenCalledWith(expect.objectContaining({ maxOutputTokens: 2048, timeoutMs: 60_000 }));
+  f.store.close();
+});
+
+it("preserves discovered models when Google is overloaded for every model", async () => {
+  const f = fixture();
+  const fetcher = vi.fn<typeof fetch>(async () => new Response("private server details", { status: 503 }));
+  const settings = new AISettings(f.store, f.encryption, f.createClient,
+    async () => ["gemini-a", "gemini-b"].map(id => ({ id, label: id })),
+    (apiKey, model, signal) => probeGeminiModel({ apiKey, model, signal, fetch: fetcher }), { betweenMs: 0, busyMs: 0 });
+  await settings.configure({ type: "save-key", key: "synthetic" });
+  f.store.setSetting("ai.gemini.usable", '["gemini-previous"]');
+  await expect(settings.findUsableModels()).rejects.toThrow("busy or overloaded for every model");
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(settings.view.usableModels).toEqual(["gemini-previous"]);
+  expect(settings.view.finding).toBeUndefined();
+  f.store.close();
+});
+
+it("skips an overloaded model and keeps the ones that answered after it", async () => {
+  const f = finder(["gemini-flash-lite", "gemini-flash", "gemini-pro"], { "gemini-flash-lite": { status: "overloaded" } });
+  await f.settings.configure({ type: "save-key", key: "synthetic" });
+  expect(await f.settings.findUsableModels()).toBe("Found 2 models that work on your key. Skipped 1 that was busy; find again later to check it.");
+  expect(f.probeModel).toHaveBeenCalledTimes(3); // an overloaded model is not retried
+  expect(f.settings.view.usableModels).toEqual(["gemini-flash", "gemini-pro"]);
+  f.store.close();
+});
+
+it("respects Google's retry delay and makes the waiting retry cancellable", async () => {
+  vi.useFakeTimers();
+  const f = finder(["gemini-a"], { "gemini-a": [{ status: "busy", retryDelaySeconds: 28 }, { status: "ok" }] });
+  try {
+    await f.settings.configure({ type: "save-key", key: "synthetic" });
+    const work = f.settings.findUsableModels();
+    await vi.advanceTimersByTimeAsync(27_999);
+    expect(f.probeModel).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await work;
+    expect(f.probeModel).toHaveBeenCalledTimes(2);
+    f.probeModel.mockResolvedValue({ status: "busy", retryDelaySeconds: 28 });
+    const stopped = f.settings.findUsableModels();
+    await vi.advanceTimersByTimeAsync(0);
+    f.settings.stopFindingModels();
+    await expect(stopped).resolves.toContain("Stopped");
+    expect(f.probeModel).toHaveBeenCalledTimes(3);
+  } finally { vi.useRealTimers(); f.store.close(); }
+});
+
+it.each([2, 120])("skips a model whose rate limit persists or needs a long wait (%s seconds), and keeps the rest", async delay => {
+  const f = finder(["gemini-a", "gemini-b"], { "gemini-a": { status: "busy", retryDelaySeconds: delay } });
+  vi.useFakeTimers();
+  try {
+    await f.settings.configure({ type: "save-key", key: "synthetic" });
+    const found = f.settings.findUsableModels();
+    await vi.runAllTimersAsync();
+    expect(await found).toContain("Skipped 1 that was busy");
+    expect(f.probeModel).toHaveBeenCalledTimes(delay > 60 ? 2 : 3);
+    expect(f.settings.view.usableModels).toEqual(["gemini-b"]);
+  } finally { vi.useRealTimers(); f.store.close(); }
+});
+
+it("keeps previous discoveries when every model stays rate-limited", async () => {
+  const f = finder(["gemini-a"], { "gemini-a": { status: "busy", retryDelaySeconds: 2 } });
+  vi.useFakeTimers();
+  try {
+    await f.settings.configure({ type: "save-key", key: "synthetic" });
+    f.store.setSetting("ai.gemini.usable", '["gemini-previous"]');
+    const failed = expect(f.settings.findUsableModels()).rejects.toThrow("busy or overloaded for every model");
+    await vi.runAllTimersAsync();
+    await failed;
+    expect(f.settings.view.usableModels).toEqual(["gemini-previous"]);
+  } finally { vi.useRealTimers(); f.store.close(); }
+});
+
+it("invalidates pending model lists and advances a non-secret revision on key replacement", async () => {
+  const f = fixture();
+  let finish!: (models: { id: string; label: string }[]) => void;
+  let signal!: AbortSignal;
+  const settings = new AISettings(f.store, f.encryption, f.createClient, async (_key, s) => {
+    signal = s;
+    return new Promise(resolve => { finish = resolve; });
+  });
+  await settings.configure({ type: "save-key", key: "synthetic-old" });
+  const revision = settings.view.geminiKeyRevision;
+  const pending = settings.geminiModels();
+  await vi.waitFor(() => expect(signal).toBeDefined());
+  await settings.configure({ type: "save-key", key: "synthetic-new" });
+  expect(signal.aborted).toBe(true);
+  expect(settings.view.geminiKeyRevision).not.toBe(revision);
+  finish([{ id: "gemini-old", label: "Old" }]);
+  await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  expect(JSON.stringify(settings.view)).not.toContain("synthetic");
+  f.store.close();
+});
+
+it("does not send the old key if replacement happens while the keychain is unlocking", async () => {
+  const f = fixture();
+  const list = vi.fn(async () => [{ id: "gemini-new", label: "New" }]);
+  const settings = new AISettings(f.store, f.encryption, f.createClient, list);
+  await settings.configure({ type: "save-key", key: "old" });
+  let unlock!: () => void;
+  vi.mocked(f.encryption.decryptStringAsync).mockImplementationOnce(() => new Promise(resolve => {
+    unlock = () => resolve({ result: "old", shouldReEncrypt: false });
+  }));
+  const old = settings.geminiModels();
+  const cancelled = expect(old).rejects.toMatchObject({ name: "AbortError" });
+  await vi.waitFor(() => expect(unlock).toBeDefined());
+  await settings.configure({ type: "save-key", key: "new" });
+  expect(await settings.geminiModels()).toEqual([{ id: "gemini-new", label: "New" }]);
+  unlock();
+  await cancelled;
+  expect(list).toHaveBeenCalledTimes(1);
+  expect(list).toHaveBeenCalledWith("new", expect.any(AbortSignal));
+  f.store.close();
+});
+
+it("does not read closed storage when a cancelled discovery finishes after shutdown", async () => {
+  const f = finder(["gemini-a"]);
+  await f.settings.configure({ type: "save-key", key: "synthetic" });
+  let finish!: () => void;
+  f.probeModel.mockImplementation(async (_key, _model, signal) => {
+    await new Promise<void>(resolve => { finish = resolve; });
+    signal.throwIfAborted();
+    return { status: "ok" };
+  });
+  const running = f.settings.findUsableModels();
+  await vi.waitFor(() => expect(finish).toBeDefined());
+  await f.settings.shutdown();
+  f.store.close();
+  finish();
+  await expect(running).resolves.toContain("Stopped");
+});
+
+it("does not restore a cancelled discovery when the same key is saved again", async () => {
+  const f = finder(["gemini-a", "gemini-b"]);
+  await f.settings.configure({ type: "save-key", key: "synthetic" });
+  f.probeModel.mockImplementation(async (_key, model, signal) => {
+    if (model === "gemini-b") await f.settings.configure({ type: "save-key", key: "synthetic" });
+    signal.throwIfAborted();
+    return { status: "ok" };
+  });
+  await expect(f.settings.findUsableModels()).resolves.toContain("Stopped");
+  expect(f.settings.view.usableModels).toBeUndefined();
   f.store.close();
 });

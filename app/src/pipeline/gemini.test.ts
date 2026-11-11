@@ -179,15 +179,41 @@ it("reads the retry delay as seconds and whether the limit is zero", () => {
 
 const probe = (fetcher: typeof fetch, signal?: AbortSignal) => probeGeminiModel({ apiKey: "private-key", model: "gemini-test", fetch: fetcher, signal });
 
-it("finds a model usable when it answers, even with an unfinished answer, since the model is there", async () => {
-  expect(await probe(async () => reply())).toBe("ok");
-  expect(await probe(async () => new Response(JSON.stringify({ candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [{ text: "{" }] } }] })))).toBe("ok");
+it("requires a completed, validated confirmation before calling a model usable", async () => {
+  expect(await probe(async () => reply())).toEqual({ status: "ok" });
+  for (const response of [
+    reply({ candidates: [{ finishReason: "MAX_TOKENS" }] }),
+    reply({ candidates: [], promptFeedback: { blockReason: "SAFETY" } }),
+    reply({ candidates: [{ finishReason: "STOP", content: { parts: [{ text: '{"ok":false}' }] } }] }),
+    new Response("{"),
+  ]) expect(await probe(async () => response)).toEqual({ status: "invalid-output" });
 });
 
 it("sorts a refusal into no quota on the plan, rate-limited right now, or unavailable", async () => {
-  expect(await probe(async () => new Response(quotaBody({ limit: 0 }), { status: 429 }))).toBe("no-quota");
-  expect(await probe(async () => new Response(quotaBody({ limit: 20 }), { status: 429 }))).toBe("busy");
-  for (const status of [400, 401, 403, 404, 500]) expect(await probe(async () => new Response("x", { status }))).toBe("unavailable");
+  expect(await probe(async () => new Response(quotaBody({ limit: 0 }), { status: 429 }))).toEqual({ status: "no-quota" });
+  expect(await probe(async () => new Response(quotaBody({ limit: 20 }), { status: 429 }))).toEqual({ status: "busy", retryDelaySeconds: 28 });
+  expect(await probe(async () => new Response("x", { status: 404 }))).toEqual({ status: "unavailable" });
+});
+
+it.each([500, 502, 503, 504])("reports HTTP %s as an overloaded model, which discovery skips", async status => {
+  expect(await probe(async () => new Response("synthetic-private-detail", { status }))).toEqual({ status: "overloaded" });
+});
+
+it.each([400, 401, 403])("preserves HTTP %s as a discovery failure rather than blaming the model", async status => {
+  await expect(probe(async () => new Response("synthetic-private-detail", { status }))).rejects.toThrow(/Gemini/);
+});
+
+it("omits systemInstruction when the connection request has no system messages", async () => {
+  const fetcher = vi.fn<typeof fetch>(async () => reply());
+  await probe(fetcher);
+  expect(JSON.parse(String(fetcher.mock.calls[0]![1]?.body))).not.toHaveProperty("systemInstruction");
+});
+
+it("identifies an invalid key from structured error reasons without forwarding server text", async () => {
+  const client = new GeminiClient({ apiKey: "private-key", fetch: async () => new Response(JSON.stringify({ error: {
+    message: "private-key Synthetic evidence", details: [{ reason: "API_KEY_INVALID" }],
+  } }), { status: 400 }) });
+  await expect(client.complete(request)).rejects.toThrow("API key is invalid");
 });
 
 it("sends only a synthetic request when probing, and stops on no network or on cancel instead of calling the model unavailable", async () => {

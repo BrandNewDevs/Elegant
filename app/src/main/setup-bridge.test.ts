@@ -95,7 +95,7 @@ it("starts and stops the search for usable Gemini models only for attached windo
     isAsyncEncryptionAvailable: async () => true,
     encryptStringAsync: async text => Buffer.from("protected:" + text),
     decryptStringAsync: async () => ({ result: "private-key", shouldReEncrypt: false }),
-  }, undefined, async () => [{ id: "gemini-test", label: "Gemini Test" }], async () => "ok", { betweenMs: 0, busyMs: 0 });
+  }, undefined, async () => [{ id: "gemini-test", label: "Gemini Test" }], async () => ({ status: "ok" }), { betweenMs: 0, busyMs: 0 });
   const setup = new Setup(new FakeEngine(), store, { speechModel: "tiny", modelsDirectory: "/models", checkOllama: async () => ({ status: "ready" }) });
   const bridge = new SetupBridge(setup, { ai, done: () => {}, openSettings: () => {} });
   const page = { once: () => {}, isDestroyed: () => false, send: vi.fn() } as unknown as WebContents;
