@@ -1,0 +1,35 @@
+{
+  "id": "readability-review",
+  "split": "tuning",
+  "synthetic": true,
+  "transcript": {
+    "segments": [
+      {
+        "start": 0,
+        "end": 5,
+        "speaker": "You",
+        "text": "Repeating my earlier commitment: I will review the report on a weekly basis."
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "meaning",
+      "text": "Repeating my earlier commitment: I will review the report on a weekly basis.",
+      "speaker": "You",
+      "refs": [
+        0
+      ],
+      "critical": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "owner",
+      "question": "Who owns implementation?",
+      "answer": null,
+      "refs": [],
+      "critical": true
+    }
+  ]
+}

@@ -24,7 +24,7 @@ The default `gemma3:4b` tag was not installed. The explicitly selected installed
 
 ## Evaluation examples
 
-`fixtures/` contains ten entirely synthetic Transcripts with expected important points, source references and questions: straightforward discussion, proposal versus decision, changed decision, ambiguous ownership, disagreement, repetition, spoken misleading instructions, a long discussion, fragmented status updates with a noisy ending, and a long unpunctuated passage. The long fixture contains over 50,000 characters and constructed timestamps covering 60 minutes. It is not an audio Recording or evidence that a real 60-minute workflow passes.
+`fixtures/` contains twenty-two entirely synthetic Transcripts with expected important points, source references and questions: straightforward discussion, proposal versus decision, changed decision, ambiguous ownership, disagreement, repetition, spoken misleading instructions, a long discussion, fragmented status updates with a noisy ending, a long unpunctuated passage, and four cross-Participant exchanges (agreement, rejection, conditional acceptance and refusal of ownership), plus four semantic-guard cases (actors, conditions, non-approved proposals and values), and four constrained-readability cases. The long fixture contains over 50,000 characters and constructed timestamps covering 60 minutes. It is not an audio Recording or evidence that a real 60-minute workflow passes.
 
 Fixtures use this shared shape:
 
@@ -120,3 +120,31 @@ Omit `--nvidia` on the Mac. The wrapper discards command stdout/stderr and does 
 Pass `--label cold` or `--label warm` only after establishing that condition yourself. The label does not prepare it. To compare models, use identical fixture files, generation settings and production commit, unload the previous model, verify Ollama has no resident model before the cold run, then immediately repeat after verifying the selected model remains resident. Record the digest and quantization on each machine: matching tag names alone do not establish matching weights. Keep the baseline unless the candidate meets quality and target-M4 gates.
 
 The readable Summary regression also supports optional `tldrTopics` and `unwantedContent` review criteria. These are never sent to the model. See the [current comparison](comparison/readable-summaries.md) for measured results and limits.
+
+## Human-reviewed Summary benchmark
+
+For output-bound reviews, explicit factual and presentation rubrics, and Summary-only quality reports, use the [Summary benchmark workflow](summary-benchmark.md). This adds a versioned review format alongside the legacy combined Summary/chat report; historical reviews are not automatically upgraded or treated as new human judgments.
+
+### Diagnose Summary regressions
+
+With `AI_SYNTHETIC_TRACE=1`, current synthetic evaluation also saves `summaryDiagnostics`.
+Each event identifies its fixture, stage and event kind. Ollama checkpoints expose
+original evidence passages (including segment ordinals), accepted extraction claims,
+consolidated claims, the TL;DR shortlist and packed sentences. Claim `sources` refer
+to the checkpoint's passage IDs, whose `refs` resolve to original Transcript ordinals.
+Gemini checkpoints expose source fragments, extracted points, consolidated points
+and the final overview; fragment `ref` values are original segment ordinals.
+Accepted/rejected model attempts identify local Summary call and attempt numbers.
+Fallback events record the validation reason and retained source wording.
+
+Locate a missing expected fact in this order: original evidence → extraction →
+consolidation → selection → final TL;DR. Compare repeated wording at successive
+checkpoints to find where duplication survived or appeared. Inspect fallback events
+when wording remains conversational. Checkpoints show actual pipeline behavior;
+they do not establish semantic correctness or replace human review. Gemini performs
+consolidation and overview generation together and has no separate shortlist stage.
+
+Diagnostics are content-bearing, opt-in, synthetic-only and excluded from persisted
+Summary metadata. Private tracing is rejected before reading the private manifest.
+A failed fixture retains events emitted before failure in the evaluation result.
+Normal runs collect no diagnostic content. Observer failures cannot alter generation.

@@ -187,3 +187,53 @@ The overview reserves explicit affirmed final decisions, then explicit first-per
 ### Balanced overview coverage
 
 The TL;DR gives explicit outcomes (including direct scope agreements), one next-step commitment and unresolved status a turn before filling remaining space. Narrow cues recognize unassigned work, undecided dates and explicitly unset deadlines. Redundant inability/revision background and proposals rank below substantive updates. This is bounded selection, not semantic supersession: no source claim is deleted from Participant points, and three sentences may still omit important details. Participant presentation removes standalone acknowledgements after consolidation, adds terminal punctuation and cleans sentence-internal capitalization while keeping evidence aligned. No extra model call is introduced.
+
+### Explicit decision history
+
+Ollama v16 and Gemini v2 recognize affirmative `X replaces Y` corrections against
+chronologically earlier proposal/agreement points. Matched earlier positions remain
+visible as `Earlier position (superseded)` with original and correction evidence,
+but are excluded from overview selection. Conditional, negated, quoted and proposed
+replacements do not establish finality. Single-value corrections with multiple
+distinct candidate positions abstain; multi-value corrections require all old values
+to match. This is conservative explicit-link handling, not general semantic topic
+resolution. Unrecognized or ambiguous changes retain their original wording.
+
+### Cross-Participant exchanges
+
+Ollama v17 and Gemini v3 can contextualize a selected proposal with the immediately
+following explicit agreement, objection or qualification by another Participant.
+Overview replacements preserve verbatim speech, individual labels and both ordinal
+references, retain unrelated selected points and respect the existing 90-word /
+three-sentence limit. If the exchange cannot fit, selection remains unchanged.
+Short explicit replies normally omitted by extraction are retained as contextual
+Participant quotations. Superseded proposals mark these replies historical too.
+This establishes a response relationship, not unanimous consensus or task ownership.
+Quoted dialogue, overlapping speech, distant replies, intervening topics and
+multi-sentence proposals are not linked automatically. These remain evaluation cases
+for broader semantic discourse handling.
+
+### Semantic safeguards
+
+Ollama v18 validates actor/argument order for all complete claims, including updates,
+not only model-classified critical claims. Overview compression also preserves
+explicit actors and past-state markers. Dependent non-approval qualifiers stay with
+the proposals they qualify. Gemini v4 applies the same source-statement grounding
+to extraction and consolidation, and validates overview compression against original
+evidence. Unsupported Gemini rewrites retain original wording with fallback diagnostics;
+an oversized grounded overview fails bounded validation rather than publishing an
+unsupported shortened claim. This is conservative validation, not a semantic proof:
+valid paraphrases can fall back, and evidence selection/recognition errors still need
+human evaluation. Provider prompts and consent/routing remain separate.
+
+### Constrained readable wording
+
+Ollama v19 and Gemini v5 share a small explicit set of wording equivalences for
+validation and rendering: conversational prefixes, `in order to` → `to`, `due to
+the fact that` → `because`, current-time/frequency phrases and supported `utilize`
+verb forms. Original Transcript text and ordinal references stay unchanged. Source
+statements retain their original context alongside their normalized text, so fallback
+wording benefits too. Conditions, intent, uncertainty, actors, negation and values
+are not removed; quoted/code/identifier passages stay literal. This improves common
+verbose phrasing, not arbitrary abstractive rewriting or semantic deduplication.
+No model calls are added. Broader paraphrases still need source verification.

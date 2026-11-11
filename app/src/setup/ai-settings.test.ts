@@ -313,18 +313,27 @@ it("gives the connection test room to think, since thinking tokens count against
   f.store.close();
 });
 
-it("preserves discovered models and reports a Google outage without continuing the scan", async () => {
+it("preserves discovered models when Google is overloaded for every model", async () => {
   const f = fixture();
   const fetcher = vi.fn<typeof fetch>(async () => new Response("private server details", { status: 503 }));
   const settings = new AISettings(f.store, f.encryption, f.createClient,
     async () => ["gemini-a", "gemini-b"].map(id => ({ id, label: id })),
-    (apiKey, model, signal) => probeGeminiModel({ apiKey, model, signal, fetch: fetcher }));
+    (apiKey, model, signal) => probeGeminiModel({ apiKey, model, signal, fetch: fetcher }), { betweenMs: 0, busyMs: 0 });
   await settings.configure({ type: "save-key", key: "synthetic" });
   f.store.setSetting("ai.gemini.usable", '["gemini-previous"]');
-  await expect(settings.findUsableModels()).rejects.toThrow("temporarily unavailable");
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  await expect(settings.findUsableModels()).rejects.toThrow("busy or overloaded for every model");
+  expect(fetcher).toHaveBeenCalledTimes(2);
   expect(settings.view.usableModels).toEqual(["gemini-previous"]);
   expect(settings.view.finding).toBeUndefined();
+  f.store.close();
+});
+
+it("skips an overloaded model and keeps the ones that answered after it", async () => {
+  const f = finder(["gemini-flash-lite", "gemini-flash", "gemini-pro"], { "gemini-flash-lite": { status: "overloaded" } });
+  await f.settings.configure({ type: "save-key", key: "synthetic" });
+  expect(await f.settings.findUsableModels()).toBe("Found 2 models that work on your key. Skipped 1 that was busy; find again later to check it.");
+  expect(f.probeModel).toHaveBeenCalledTimes(3); // an overloaded model is not retried
+  expect(f.settings.view.usableModels).toEqual(["gemini-flash", "gemini-pro"]);
   f.store.close();
 });
 
@@ -348,16 +357,28 @@ it("respects Google's retry delay and makes the waiting retry cancellable", asyn
   } finally { vi.useRealTimers(); f.store.close(); }
 });
 
-it.each([2, 120])("keeps previous discoveries when a rate limit persists or needs a long wait (%s seconds)", async delay => {
-  const f = finder(["gemini-a"], { "gemini-a": { status: "busy", retryDelaySeconds: delay } });
+it.each([2, 120])("skips a model whose rate limit persists or needs a long wait (%s seconds), and keeps the rest", async delay => {
+  const f = finder(["gemini-a", "gemini-b"], { "gemini-a": { status: "busy", retryDelaySeconds: delay } });
+  vi.useFakeTimers();
+  try {
+    await f.settings.configure({ type: "save-key", key: "synthetic" });
+    const found = f.settings.findUsableModels();
+    await vi.runAllTimersAsync();
+    expect(await found).toContain("Skipped 1 that was busy");
+    expect(f.probeModel).toHaveBeenCalledTimes(delay > 60 ? 2 : 3);
+    expect(f.settings.view.usableModels).toEqual(["gemini-b"]);
+  } finally { vi.useRealTimers(); f.store.close(); }
+});
+
+it("keeps previous discoveries when every model stays rate-limited", async () => {
+  const f = finder(["gemini-a"], { "gemini-a": { status: "busy", retryDelaySeconds: 2 } });
   vi.useFakeTimers();
   try {
     await f.settings.configure({ type: "save-key", key: "synthetic" });
     f.store.setSetting("ai.gemini.usable", '["gemini-previous"]');
-    const failed = expect(f.settings.findUsableModels()).rejects.toThrow(/rate limit/);
+    const failed = expect(f.settings.findUsableModels()).rejects.toThrow("busy or overloaded for every model");
     await vi.runAllTimersAsync();
     await failed;
-    expect(f.probeModel).toHaveBeenCalledTimes(delay > 60 ? 1 : 2);
     expect(f.settings.view.usableModels).toEqual(["gemini-previous"]);
   } finally { vi.useRealTimers(); f.store.close(); }
 });

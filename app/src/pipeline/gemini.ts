@@ -232,23 +232,27 @@ export async function checkGeminiConnection(client: TextModel, model: string, si
 }
 
 export type ModelProbe =
-  | { status: "ok" | "no-quota" | "unavailable" | "invalid-output" }
+  | { status: "ok" | "no-quota" | "unavailable" | "invalid-output" | "overloaded" }
   | { status: "busy"; retryDelaySeconds?: number };
 
 /**
- * Requires the same completed confirmation as Settings. Account, request, network and service failures stop discovery;
- * only model-specific failures can exclude a model. A refused or malformed answer never establishes usability.
+ * Requires the same completed confirmation as Settings. Account, request and network failures stop discovery; a server
+ * error or a timeout is reported as overloaded, since Google overloads one model while others answer. A refused or
+ * malformed answer never establishes usability.
  */
 export async function probeGeminiModel({ apiKey, model, signal, fetch: fetcher }: { apiKey: string; model: string; signal?: AbortSignal; fetch?: typeof fetch }): Promise<ModelProbe> {
   try {
     await checkGeminiConnection(new GeminiClient({ apiKey, model, fetch: fetcher }), model, signal);
     return { status: "ok" };
   } catch (error) {
-    if (signal?.aborted || !(error instanceof GeminiError)) throw error;
+    if (signal?.aborted) throw error;
+    if (error instanceof Error && error.name === "TimeoutError") return { status: "overloaded" };
+    if (!(error instanceof GeminiError)) throw error;
     const { status, limitZero, retryDelaySeconds } = error.detail;
     if (status === undefined) return { status: "invalid-output" };
     if (status === 429) return limitZero ? { status: "no-quota" } : { status: "busy", retryDelaySeconds };
     if (status === 404) return { status: "unavailable" };
+    if (status >= 500) return { status: "overloaded" };
     throw error;
   }
 }

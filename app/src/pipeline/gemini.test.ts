@@ -210,7 +210,11 @@ it("sorts a refusal into no quota on the plan, rate-limited right now, or unavai
   expect(await probe(async () => new Response("x", { status: 404 }))).toEqual({ status: "unavailable" });
 });
 
-it.each([400, 401, 403, 500, 503])("preserves HTTP %s as a discovery failure rather than blaming the model", async status => {
+it.each([500, 502, 503, 504])("reports HTTP %s as an overloaded model, which discovery skips", async status => {
+  expect(await probe(async () => new Response("synthetic-private-detail", { status }))).toEqual({ status: "overloaded" });
+});
+
+it.each([400, 401, 403])("preserves HTTP %s as a discovery failure rather than blaming the model", async status => {
   await expect(probe(async () => new Response("synthetic-private-detail", { status }))).rejects.toThrow(/Gemini/);
 });
 
