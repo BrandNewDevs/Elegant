@@ -83,7 +83,7 @@ it("creates readable points and TLDR with original ordinal evidence and provider
   const output = await createGeminiSummariser({ model })(transcript);
   expect(output.tldr).toBe(transcript.segments[1]!.text);
   expect(output.evidence).toEqual({ revision: transcriptRevision(transcript), tldr: [1], participants: [{ speaker: "You", said: [[0]] }, { speaker: "Speaker 1", said: [[1]] }] });
-  expect(output.generation).toMatchObject({ provider: "gemini", promptVersion: "gemini-summary-v5", calls: 2 });
+  expect(output.generation).toMatchObject({ provider: "gemini", promptVersion: "gemini-summary-v6", calls: 2 });
   expect(model.requests.every(r => requestBytes(r) <= GEMINI_INPUT_BYTES)).toBe(true);
 });
 
