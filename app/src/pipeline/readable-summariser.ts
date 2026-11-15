@@ -1,4 +1,4 @@
-import { summaryMeaningKey, mergeEquivalent, repetitionEpoch } from './summary-equivalence.js';
+import { summaryMeaningKey, mergeEquivalent, repetitionEpoch, preferQualified } from './summary-equivalence.js';
 import { readableWording } from './readable-wording.js';
 import { contextualOverview, retainExchangeResponses } from './summary-exchanges.js';
 import { decisionChanges } from './decision-history.js';
@@ -95,9 +95,9 @@ function distinctClaims(claims: Claim[], passages: SummaryPassage[]): Claim[] {
   const atomKey = (atom: SourceStatement) => summaryMeaningKey(atom.speaker, atom.text, statementKey(atom));
   return mergeEquivalent(claims.filter(c => !acknowledgement.test(c.text)),
     claim => JSON.stringify([claim.speaker, repetitionEpoch(passages.map(p => p.text), Math.min(...claim.sources)), claim.atoms.map(atomKey).sort()]),
-    (first, next) => ({ ...first,
+    (first, next) => ({ ...preferQualified(first, next),
       sources: [...new Set([...first.sources, ...next.sources])].sort((a, b) => a - b),
-      atoms: mergeEquivalent([...first.atoms, ...next.atoms], atomKey, (a, b) => ({ ...a,
+      atoms: mergeEquivalent([...first.atoms, ...next.atoms], atomKey, (a, b) => ({ ...preferQualified(a, b),
         sources: [...new Set([...a.sources, ...b.sources])].sort((x, y) => x - y) })),
     })).sort((a, b) => Math.min(...a.sources) - Math.min(...b.sources));
 }
@@ -319,7 +319,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       const meaning = (candidate: typeof candidates[number]) => {
         const speaker = shortlist[candidate.id]!.speaker;
         const text = candidate.text.startsWith(speaker + ': ') ? candidate.text.slice(speaker.length + 2) : candidate.text;
-        return summaryMeaningKey(speaker, text, text);
+        return JSON.stringify([repetitionEpoch(passages.map(p => p.text), Math.min(...shortlist[candidate.id]!.sources)), summaryMeaningKey(speaker, text, JSON.stringify([candidate.id, text]))]);
       };
       for (const candidate of balanced) {
         if (packed.some(item => meaning(item) === meaning(candidate)) || count + sentenceCount(candidate.text) > 3 || used + words(candidate.text) > 90) continue;

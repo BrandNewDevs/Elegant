@@ -7,11 +7,12 @@ import { readableWording } from './readable-wording.js';
  */
 export function summaryMeaningKey(speaker: string, original: string, context: string): string {
   let text = readableWording(original).replace(/\s+/gu, ' ').trim();
-  const literal = () => JSON.stringify([speaker, text, context]);
+  const originalWording = text;
+  const literal = () => JSON.stringify([speaker, originalWording, context]);
   if (/["“”`]|\b(?:branch|file|path|variable|function|ticket|issue)\b/iu.test(text)) return literal();
   // Only an explicit individual promise with a concrete object is
   // independent of passage context. "I will test it" cannot identify a task.
-  text = text.replace(/\bI['’]ll\b/gu, 'I will');
+  text = text.replace(/^My only assignment: /u, '').replace(/\bI['’]ll\b/gu, 'I will');
   const weekday = '(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)';
   const front = text.match(new RegExp(`^By (${weekday}),? (I will .+)[.!]$`, 'u'));
   if (front) text = `${front[2]} by ${front[1]}.`;
@@ -44,4 +45,11 @@ export function repetitionEpoch(texts: string[], last: number): number {
     if (/\b(?:cancel\w*|withdraw\w*|replac\w*|supersed\w*|instead|no longer|changed?|new task|next week|following week)\b/iu.test(texts[i] ?? '')) epoch++;
   }
   return epoch;
+}
+
+/** Keep the explicitly exclusive assignment when merging its repeated promise.
+ * Equivalence may suppress the redundant promise, never its extra qualification.
+ */
+export function preferQualified<T extends { text: string }>(first: T, next: T): T {
+  return /^My only assignment: /u.test(next.text) && !/^My only assignment: /u.test(first.text) ? next : first;
 }

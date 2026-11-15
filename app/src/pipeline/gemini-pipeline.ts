@@ -1,4 +1,4 @@
-import { summaryMeaningKey, mergeEquivalent, repetitionEpoch } from './summary-equivalence.js';
+import { summaryMeaningKey, mergeEquivalent, repetitionEpoch, preferQualified } from './summary-equivalence.js';
 import { readableWording } from "./readable-wording.js";
 import { sourceStatements, matchStatements, assertSupportedCompression, UnsupportedSummaryRewrite } from "./summary-statements.js";
 import { contextualOverview, retainExchangeResponses } from "./summary-exchanges.js";
@@ -117,7 +117,7 @@ export function createGeminiSummariser({ model, deadlineMs = 15 * 60_000, observ
     const supportedPoint = (proposed: string, selected: SourceFragment[], stage: string) => {
       const atoms = mergeEquivalent(atomsFor(selected),
         a => JSON.stringify([repetitionEpoch(transcript.segments.map(s => s.text), Math.min(...a.sources.map(id => selected[id]!.ref))), summaryMeaningKey(a.speaker, a.text, a.context ?? JSON.stringify(a.sources))]),
-        (a, b) => ({ ...a, sources: [...new Set([...a.sources, ...b.sources])] }));
+        (a, b) => ({ ...preferQualified(a, b), sources: [...new Set([...a.sources, ...b.sources])] }));
       try { matchStatements(proposed, selected[0]!.speaker, atoms, 'update'); return readableWording(proposed); }
       catch (error) {
         if (!(error instanceof UnsupportedSummaryRewrite)) throw error;
@@ -153,9 +153,10 @@ export function createGeminiSummariser({ model, deadlineMs = 15 * 60_000, observ
         return points;
       }));
     }
-    draft = mergeEquivalent(draft,
+    const distinctPoints = (points: Point[]) => mergeEquivalent(points,
       p => JSON.stringify([repetitionEpoch(transcript.segments.map(s => s.text), Math.min(...sourceRefs(p.sources))), summaryMeaningKey(p.speaker, p.text, JSON.stringify(p.sources.map(s => s.id)))]),
-      (a, b) => ({ ...a, sources: unique([...a.sources, ...b.sources]) }));
+      (a, b) => ({ ...preferQualified(a, b), sources: unique([...a.sources, ...b.sources]) }));
+    draft = distinctPoints(draft);
     emit({ stage: "extraction", event: "checkpoint", data: draft });
     if (!draft.length) throw new Error("No substantive speech was found to summarise");
     const changes = decisionChanges(draft.map(p => ({ speaker: p.speaker,
@@ -203,7 +204,15 @@ export function createGeminiSummariser({ model, deadlineMs = 15 * 60_000, observ
         emit({ stage: 'tldr', event: 'fallback', reason: error.message, data: { rejected: tldr, retained, refs: sourceRefs(selected.flatMap(id => points[id]!.sources)) } });
         tldr = retained;
       }
-      return { points, tldr, refs: sourceRefs(selected.flatMap(id => points[id]!.sources)) };
+      // Only a single known owner permits equivalence of first-person sentences.
+      const owners = new Set(selected.map(id => points[id]!.speaker));
+      if (owners.size === 1 && new Set(selected.map(id => repetitionEpoch(transcript.segments.map(s => s.text), Math.min(...sourceRefs(points[id]!.sources))))).size === 1) {
+        const speaker = points[selected[0]!]!.speaker;
+        tldr = mergeEquivalent([...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(tldr)].map((s, id) => ({ text: s.segment.trim(), id })),
+          s => summaryMeaningKey(speaker, s.text.startsWith(speaker + ': ') ? s.text.slice(speaker.length + 2) : s.text, String(s.id)),
+          preferQualified).map(s => s.text).join(' ');
+      }
+      return { points: distinctPoints(points), tldr, refs: sourceRefs(selected.flatMap(id => points[id]!.sources)) };
     });
     run.signal.throwIfAborted();
     emit({ stage: "consolidation", event: "checkpoint", data: output.points });

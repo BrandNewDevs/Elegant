@@ -61,12 +61,13 @@ it('deduplicates Gemini draft commitments without discarding original evidence',
     return { text: JSON.stringify(requests === 1 ? { points: [
       { speaker: 'You', text: 'I will review the export by Friday.', sourceIds: ['0:0'] },
       { speaker: 'You', text: 'By Friday, I will review the export.', sourceIds: ['1:0'] },
-    ], omittedSourceIds: [] } : { points: [{ speaker: 'You', text: 'I will review the export by Friday.', covers: [0] }],
-      tldr: { text: 'I will review the export by Friday.', pointIds: [0] } }), metadata: { model: 'synthetic', elapsedMs: 1 } };
+    ], omittedSourceIds: [] } : { points: [0, 1].map(() => ({ speaker: 'You', text: 'I will review the export by Friday.', covers: [0] })),
+      tldr: { text: 'I will review the export by Friday. I will review the export by Friday.', pointIds: [0, 1] } }), metadata: { model: 'synthetic', elapsedMs: 1 } };
   } };
   const output = await createGeminiSummariser({ model })(transcript(['I will review the export by Friday.', 'By Friday, I will review the export.']));
   expect(output.participants[0]!.said).toEqual(['I will review the export by Friday.']);
   expect(output.evidence!.participants[0]!.said).toEqual([[0, 1]]);
+  expect([...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(output.tldr)]).toHaveLength(1);
 });
 
 it('recognizes action-noun paraphrases while preserving deadline and provenance', async () => {
@@ -114,4 +115,12 @@ it('merges explicit commitments without requiring a deadline', async () => {
   ]));
   expect(output.participants[0]!.said).toEqual(['I will review the export.']);
   expect(output.evidence!.participants[0]!.said).toEqual([[0, 1]]);
+});
+
+it.each([false, true])('keeps the stronger only-assignment qualifier regardless of mention order (%s)', async reverse => {
+  const texts = ['I will test the permission flow on the Mac by Thursday.', 'My only assignment: I will test the permission flow on the Mac by Thursday.'];
+  const output = await createReadableSummariser({ model: local })(transcript(reverse ? [...texts].reverse() : texts));
+  expect(output.participants[0]!.said).toEqual([texts[1]]);
+  expect(output.evidence!.participants[0]!.said).toEqual([[0, 1]]);
+  expect(output.tldr).toContain('My only assignment:');
 });
