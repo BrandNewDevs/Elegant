@@ -1,3 +1,4 @@
+import { summaryMeaningKey, mergeEquivalent, repetitionEpoch } from './summary-equivalence.js';
 import { readableWording } from './readable-wording.js';
 import { contextualOverview, retainExchangeResponses } from './summary-exchanges.js';
 import { decisionChanges } from './decision-history.js';
@@ -10,7 +11,7 @@ import { summaryPassages, type SummaryPassage } from './summary-passages.js';
 import { sourceStatements, matchStatements, assertSupportedCompression, statementKey, UnsupportedSummaryRewrite, type SourceStatement } from './summary-statements.js';
 import { InvalidSummaryError } from './validate-summary.js';
 
-export const SUMMARY_PROMPT_VERSION = 'readable-summary-v19';
+export const SUMMARY_PROMPT_VERSION = 'readable-summary-v20';
 interface Claim { speaker: string; text: string; sources: number[]; kind: string; atoms: SourceStatement[] }
 const kinds = ['update', 'decision', 'commitment', 'proposal', 'disagreement', 'unresolved'];
 const integers = { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'integer' } };
@@ -90,12 +91,15 @@ const acknowledgement = /^(?:yes|yeah|sure|okay|ok|absolutely|agreed|understood|
 function cleanPoint(text: string): string {
   return readableWording(text).replace(/;\s+(This|That|These|Those|One)\b/gu, (_, word: string) => '; ' + word.toLowerCase()).replace(/[.!?]*$/u, '.');
 }
-function distinctClaims(claims: Claim[]): Claim[] {
-  const unique = new Map<string, Claim>();
-  for (const claim of [...claims].filter(c => !acknowledgement.test(c.text)).sort((a, b) => Math.max(...a.sources) - Math.max(...b.sources))) {
-    unique.set(JSON.stringify([claim.speaker, claim.atoms.map(statementKey).sort()]), claim);
-  }
-  return [...unique.values()];
+function distinctClaims(claims: Claim[], passages: SummaryPassage[]): Claim[] {
+  const atomKey = (atom: SourceStatement) => summaryMeaningKey(atom.speaker, atom.text, statementKey(atom));
+  return mergeEquivalent(claims.filter(c => !acknowledgement.test(c.text)),
+    claim => JSON.stringify([claim.speaker, repetitionEpoch(passages.map(p => p.text), Math.min(...claim.sources)), claim.atoms.map(atomKey).sort()]),
+    (first, next) => ({ ...first,
+      sources: [...new Set([...first.sources, ...next.sources])].sort((a, b) => a - b),
+      atoms: mergeEquivalent([...first.atoms, ...next.atoms], atomKey, (a, b) => ({ ...a,
+        sources: [...new Set([...a.sources, ...b.sources])].sort((x, y) => x - y) })),
+    })).sort((a, b) => Math.min(...a.sources) - Math.min(...b.sources));
 }
 /** Prefer explicit affirmed outcomes over superseded proposals in the overview. */
 function finalDecisionIds(items: Claim[]): number[] {
@@ -183,7 +187,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
         claims.push(...await ask('extract', { evidence: wire(batch) }, text => parsePoints(text, batch), () => sourceStatements(batch).map(originalClaim)));
       }
     }
-    claims = distinctClaims(claims);
+    claims = distinctClaims(claims, passages);
     emit({ stage: 'extraction', event: 'checkpoint', data: claims });
     if (!claims.length) throw new Error('No meaningful speech was found to summarise');
     // Bound every reduction with original evidence; never silently discard a claim.
@@ -204,7 +208,7 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
         }
         next.push(...(batch.length === 1 ? batch : await ask('reduce', payload(batch), (text, attempt) => parsePoints(text, evidenceFor(batch), batch, attempt === 2), () => batch)));
       }
-      const changed = next.length < claims.length; claims = distinctClaims(next);
+      const changed = next.length < claims.length; claims = distinctClaims(next, passages);
       if (fits('tldr', overview(claims))) break;
       if (!changed || round >= 1) break;
     }
@@ -312,8 +316,13 @@ export function createReadableSummariser({ model, attempts = 3, maxCalls = 128, 
       const balanced = [...(final ? [final] : []),
         ...ranked.filter(c => commitments.includes(c.id)).slice(0, 1),
         ...ranked.filter(c => status.includes(c.id)), ...ranked];
+      const meaning = (candidate: typeof candidates[number]) => {
+        const speaker = shortlist[candidate.id]!.speaker;
+        const text = candidate.text.startsWith(speaker + ': ') ? candidate.text.slice(speaker.length + 2) : candidate.text;
+        return summaryMeaningKey(speaker, text, text);
+      };
       for (const candidate of balanced) {
-        if (packed.some(item => item.text.toLowerCase() === candidate.text.toLowerCase()) || count + sentenceCount(candidate.text) > 3 || used + words(candidate.text) > 90) continue;
+        if (packed.some(item => meaning(item) === meaning(candidate)) || count + sentenceCount(candidate.text) > 3 || used + words(candidate.text) > 90) continue;
         packed.push(candidate); used += words(candidate.text); count += sentenceCount(candidate.text);
       }
       if (!packed.length) return fail((unsupported ? unsupported + '. ' : '') + 'Copy a shorter complete clause within 90 words from the point; do not substitute synonyms');
