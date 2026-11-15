@@ -237,3 +237,22 @@ wording benefits too. Conditions, intent, uncertainty, actors, negation and valu
 are not removed; quoted/code/identifier passages stay literal. This improves common
 verbose phrasing, not arbitrary abstractive rewriting or semantic deduplication.
 No model calls are added. Broader paraphrases still need source verification.
+
+### Conservative Summary repetition handling
+
+Ollama v20 and Gemini v6 merge self-contained, same-Participant commitments
+using a shared, bounded equivalence relation. It recognizes contractions, definite
+articles, a fronted `by <weekday>` deadline, and `perform/conduct a review/test of`
+wording. The selected original claim supplies the displayed words; all supporting
+references survive. Ollama applies this across extraction batches before bounded
+consolidation; Gemini compacts its extracted drafts and grounding fallback atoms.
+TL;DR packing compares supported sentence meanings, allowing different facts from
+the same point while rejecting equivalent wording.
+
+Different actors, actions, objects, date values, `on` versus `by`, modality and
+negation remain distinct. Context-dependent objects, quoted/identifier passages,
+conditions and uncertain paraphrases stay separate. Correction/cancellation cues
+create a boundary so renewed commitments are not merged with earlier states.
+This is intentionally not embedding similarity or general paraphrase entailment;
+ambiguous abbreviated restatements may remain repetitive. No extra model requests,
+provider changes or Transcript/storage migrations are introduced.
