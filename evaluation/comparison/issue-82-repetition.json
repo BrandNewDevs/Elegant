@@ -1,0 +1,1358 @@
+{
+  "scope": "Synthetic local Ollama comparison; agent source review, not human benchmark acceptance or target-device validation. Gemini verified with simulated production-seam tests only.",
+  "before": {
+    "metadata": {
+      "sourceCommit": "b9f30982bfa9240ecfe85bc87f62c49fe3c2c1f2",
+      "sourceDirty": false,
+      "recordedAt": "2026-11-15T11:31:27.025Z",
+      "implementation": "current",
+      "model": {
+        "name": "gemma3:4b-it-q4_K_M",
+        "model": "gemma3:4b-it-q4_K_M",
+        "modified_at": "2026-10-05T05:47:50.046802317+05:30",
+        "size": 3338801804,
+        "digest": "a2af6cc3eb7fa8be8504abaf9b04e88f17a119ec3f04a3addf55f92841195f5a",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "gemma3",
+          "families": [
+            "gemma3"
+          ],
+          "parameter_size": "4.3B",
+          "quantization_level": "Q4_K_M"
+        },
+        "capabilities": [
+          "completion"
+        ]
+      },
+      "ollama": {
+        "version": "0.34.0"
+      },
+      "hardware": {
+        "platform": "linux",
+        "release": "7.0.0-43-generic",
+        "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+        "memoryBytes": 15950884864,
+        "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU, 4096 MiB"
+      },
+      "settings": {
+        "numCtx": 8192,
+        "temperature": 0,
+        "maxInputBytes": 5500,
+        "maxOutputTokens": 2048,
+        "think": false
+      },
+      "promptVersion": "readable-summary-v19",
+      "memoryScope": "Node peak RSS only. Ollama, Swift, peak total memory and swap need external observation.",
+      "runCondition": "uncontrolled",
+      "summaryDeadlineMs": 900000,
+      "evaluationDeadlineOverride": false,
+      "chatPromptVersion": "meeting-chat-v14",
+      "evidencePromptVersion": "meeting-evidence-v8"
+    },
+    "runs": [
+      {
+        "id": "ambiguous-ownership",
+        "split": "reserved",
+        "synthetic": true,
+        "summary": {
+          "tldr": "You: I will ask the team about ownership tomorrow. The guide is unassigned. We have not set a deadline.",
+          "participants": [
+            {
+              "speaker": "You",
+              "said": [
+                "The permission guide needs an update before the demo, but I cannot take it on.",
+                "The guide is unassigned.",
+                "We have not set a deadline.",
+                "I will ask the team about ownership tomorrow."
+              ]
+            },
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                "Maybe Speaker 2 could update it, if they have time; that is a suggestion, not an assignment.",
+                "I can commit to reviewing the guide after someone writes it.",
+                "I am not committing to writing it."
+              ]
+            },
+            {
+              "speaker": "Speaker 2",
+              "said": [
+                "I need to check my workload before I can say yes.",
+                "Please do not list me as the owner."
+              ]
+            }
+          ],
+          "evidence": {
+            "revision": "7cfca967e449cd0388215977304a973996484fa6d428e4bfb6d4dcd85bdd6fdf",
+            "tldr": [
+              3
+            ],
+            "participants": [
+              {
+                "speaker": "You",
+                "said": [
+                  [
+                    0
+                  ],
+                  [
+                    3
+                  ],
+                  [
+                    3
+                  ],
+                  [
+                    3
+                  ]
+                ]
+              },
+              {
+                "speaker": "Speaker 1",
+                "said": [
+                  [
+                    1
+                  ],
+                  [
+                    4
+                  ],
+                  [
+                    4
+                  ]
+                ]
+              },
+              {
+                "speaker": "Speaker 2",
+                "said": [
+                  [
+                    2
+                  ],
+                  [
+                    2
+                  ]
+                ]
+              }
+            ]
+          },
+          "generation": {
+            "promptVersion": "readable-summary-v19",
+            "model": "gemma3:4b-it-q4_K_M",
+            "elapsedMs": 122464.740181,
+            "calls": 7,
+            "promptTokens": 2971,
+            "outputTokens": 911,
+            "fallbacks": 9,
+            "requests": [
+              {
+                "stage": "extract",
+                "bytes": 2147,
+                "attempt": 1,
+                "elapsedMs": 85876.359587
+              },
+              {
+                "stage": "extract",
+                "bytes": 2161,
+                "attempt": 1,
+                "elapsedMs": 6633.377187999999
+              },
+              {
+                "stage": "extract",
+                "bytes": 2006,
+                "attempt": 1,
+                "elapsedMs": 4249.672179000001
+              },
+              {
+                "stage": "reduce",
+                "bytes": 2979,
+                "attempt": 1,
+                "elapsedMs": 8535.763508999997
+              },
+              {
+                "stage": "reduce",
+                "bytes": 2945,
+                "attempt": 1,
+                "elapsedMs": 6988.623464999997
+              },
+              {
+                "stage": "reduce",
+                "bytes": 2599,
+                "attempt": 1,
+                "elapsedMs": 4405.050052000006
+              },
+              {
+                "stage": "tldr",
+                "bytes": 3535,
+                "attempt": 1,
+                "elapsedMs": 5698.967739
+              }
+            ]
+          }
+        },
+        "chat": [
+          {
+            "questionId": "guide-owner",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "guide-deadline",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "reviewer",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "acceptance",
+            "skipped": "Chat was not selected for this evaluation"
+          }
+        ],
+        "summarySkipped": false,
+        "elapsedMs": 122466.356205,
+        "calls": 7,
+        "summaryElapsedMs": 122466.322626,
+        "summaryCalls": 7,
+        "peakRssKiB": 262164
+      },
+      {
+        "id": "changed-decision",
+        "split": "reserved",
+        "synthetic": true,
+        "summary": {
+          "tldr": "Friday replaces Monday, and Markdown replaces PDF; these are the final decisions. Speaker 1: I will run the offline test again on Wednesday. We did not set a calendar date for Friday.",
+          "participants": [
+            {
+              "speaker": "You",
+              "said": [
+                "Earlier position (superseded): My initial proposal is to launch on Monday with PDF export.",
+                "The offline test failed.",
+                "We need to revise both choices.",
+                "Agreed; Friday replaces Monday, and Markdown replaces PDF; these are the final decisions."
+              ]
+            },
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                "Earlier position (superseded): I agree with Monday and PDF for now, provided the offline test passes.",
+                "Then I propose Friday instead, and Markdown export because that already works without an external service.",
+                "I will run the offline test again on Wednesday.",
+                "We did not set a calendar date for Friday."
+              ]
+            }
+          ],
+          "evidence": {
+            "revision": "d3cd156a565b4106c58f9d88252536f532ae4b6f347840d4f183717f563041a4",
+            "tldr": [
+              4,
+              5
+            ],
+            "participants": [
+              {
+                "speaker": "You",
+                "said": [
+                  [
+                    0,
+                    4
+                  ],
+                  [
+                    2
+                  ],
+                  [
+                    2
+                  ],
+                  [
+                    4
+                  ]
+                ]
+              },
+              {
+                "speaker": "Speaker 1",
+                "said": [
+                  [
+                    1,
+                    4
+                  ],
+                  [
+                    3
+                  ],
+                  [
+                    5
+                  ],
+                  [
+                    5
+                  ]
+                ]
+              }
+            ]
+          },
+          "generation": {
+            "promptVersion": "readable-summary-v19",
+            "model": "gemma3:4b-it-q4_K_M",
+            "elapsedMs": 41022.04471000002,
+            "calls": 5,
+            "promptTokens": 2256,
+            "outputTokens": 807,
+            "fallbacks": 7,
+            "requests": [
+              {
+                "stage": "extract",
+                "bytes": 2207,
+                "attempt": 1,
+                "elapsedMs": 7743.554279000004
+              },
+              {
+                "stage": "extract",
+                "bytes": 2293,
+                "attempt": 1,
+                "elapsedMs": 8581.007058000017
+              },
+              {
+                "stage": "reduce",
+                "bytes": 3067,
+                "attempt": 1,
+                "elapsedMs": 8577.48062799999
+              },
+              {
+                "stage": "reduce",
+                "bytes": 3245,
+                "attempt": 1,
+                "elapsedMs": 11340.960069000022
+              },
+              {
+                "stage": "tldr",
+                "bytes": 3041,
+                "attempt": 1,
+                "elapsedMs": 4763.331420000002
+              }
+            ]
+          }
+        },
+        "chat": [
+          {
+            "questionId": "launch",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "export",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "retest-owner",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "retest-when",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "date",
+            "skipped": "Chat was not selected for this evaluation"
+          }
+        ],
+        "summarySkipped": false,
+        "elapsedMs": 41022.48177300001,
+        "calls": 5,
+        "summaryElapsedMs": 41022.456645,
+        "summaryCalls": 5,
+        "peakRssKiB": 262164
+      },
+      {
+        "id": "disagreement",
+        "split": "tuning",
+        "synthetic": true,
+        "summary": {
+          "tldr": "Speaker 2: I will prepare a list of the privacy tradeoffs by Tuesday. There is no agreed audio retention default. Speaker 1: I prefer keeping audio by default so people can check transcription errors.",
+          "participants": [
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                "I prefer keeping audio by default so people can check transcription errors.",
+                "I still prefer keeping audio.",
+                "I do not agree to deletion by default."
+              ]
+            },
+            {
+              "speaker": "Speaker 2",
+              "said": [
+                "I disagree.",
+                "Audio should be deleted after transcription to reduce retained sensitive data.",
+                "I still prefer deletion.",
+                "I will prepare a list of the privacy tradeoffs by Tuesday."
+              ]
+            },
+            {
+              "speaker": "You",
+              "said": [
+                "Both arguments are on the table.",
+                "We will not settle the default today.",
+                "There is no agreed audio retention default.",
+                "The only agreement is to review that list next time."
+              ]
+            }
+          ],
+          "evidence": {
+            "revision": "acb1009c60a83997b89251dbf64f731e9c4ec72ee20ac8599458357673658c03",
+            "tldr": [
+              0,
+              4,
+              5
+            ],
+            "participants": [
+              {
+                "speaker": "Speaker 1",
+                "said": [
+                  [
+                    0
+                  ],
+                  [
+                    3
+                  ],
+                  [
+                    3
+                  ]
+                ]
+              },
+              {
+                "speaker": "Speaker 2",
+                "said": [
+                  [
+                    1
+                  ],
+                  [
+                    1
+                  ],
+                  [
+                    4
+                  ],
+                  [
+                    4
+                  ]
+                ]
+              },
+              {
+                "speaker": "You",
+                "said": [
+                  [
+                    2
+                  ],
+                  [
+                    2
+                  ],
+                  [
+                    5
+                  ],
+                  [
+                    5
+                  ]
+                ]
+              }
+            ]
+          },
+          "generation": {
+            "promptVersion": "readable-summary-v19",
+            "model": "gemma3:4b-it-q4_K_M",
+            "elapsedMs": 53993.42632500001,
+            "calls": 7,
+            "promptTokens": 3042,
+            "outputTokens": 894,
+            "fallbacks": 8,
+            "requests": [
+              {
+                "stage": "extract",
+                "bytes": 2117,
+                "attempt": 1,
+                "elapsedMs": 4702.7421739999845
+              },
+              {
+                "stage": "extract",
+                "bytes": 2147,
+                "attempt": 1,
+                "elapsedMs": 7583.040589000011
+              },
+              {
+                "stage": "extract",
+                "bytes": 2122,
+                "attempt": 1,
+                "elapsedMs": 8973.032433000015
+              },
+              {
+                "stage": "reduce",
+                "bytes": 2857,
+                "attempt": 1,
+                "elapsedMs": 7484.442897000001
+              },
+              {
+                "stage": "reduce",
+                "bytes": 3007,
+                "attempt": 1,
+                "elapsedMs": 10806.033843000012
+              },
+              {
+                "stage": "reduce",
+                "bytes": 2945,
+                "attempt": 1,
+                "elapsedMs": 8953.718074000004
+              },
+              {
+                "stage": "tldr",
+                "bytes": 3762,
+                "attempt": 1,
+                "elapsedMs": 5471.752577999985
+              }
+            ]
+          }
+        },
+        "chat": [
+          {
+            "questionId": "default",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "keep",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "list",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "list-deadline",
+            "skipped": "Chat was not selected for this evaluation"
+          }
+        ],
+        "summarySkipped": false,
+        "elapsedMs": 53994.00568599999,
+        "calls": 7,
+        "summaryElapsedMs": 53993.927463,
+        "summaryCalls": 7,
+        "peakRssKiB": 262164
+      },
+      {
+        "id": "repeated-points",
+        "split": "tuning",
+        "synthetic": true,
+        "summary": {
+          "tldr": "You: I will test the permission flow on the Mac by Thursday. Speaker 1: I will review the Markdown export on Friday. You: My only assignment: I will test the permission flow on the Mac by Thursday.",
+          "participants": [
+            {
+              "speaker": "You",
+              "said": [
+                "I will test the permission flow on the Mac by Thursday.",
+                "My only assignment: I will test the permission flow on the Mac by Thursday.",
+                "This is the same task, not another one.",
+                "The permission test remains my Thursday task.",
+                "No additional task has been added."
+              ]
+            },
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                "I will review the Markdown export on Friday.",
+                "I will review Markdown export on Friday.",
+                "There is only one export review.",
+                "The Friday review is not the release date.",
+                "Our release date is not set."
+              ]
+            }
+          ],
+          "evidence": {
+            "revision": "35a569b82f4b6596333a2cf53cdfd9abd43af5375dc35fe605837c6ce9479c32",
+            "tldr": [
+              0,
+              1,
+              2
+            ],
+            "participants": [
+              {
+                "speaker": "You",
+                "said": [
+                  [
+                    0
+                  ],
+                  [
+                    2
+                  ],
+                  [
+                    2
+                  ],
+                  [
+                    4
+                  ],
+                  [
+                    4
+                  ]
+                ]
+              },
+              {
+                "speaker": "Speaker 1",
+                "said": [
+                  [
+                    1
+                  ],
+                  [
+                    3
+                  ],
+                  [
+                    3
+                  ],
+                  [
+                    5
+                  ],
+                  [
+                    5
+                  ]
+                ]
+              }
+            ]
+          },
+          "generation": {
+            "promptVersion": "readable-summary-v19",
+            "model": "gemma3:4b-it-q4_K_M",
+            "elapsedMs": 47138.18715000001,
+            "calls": 5,
+            "promptTokens": 2447,
+            "outputTokens": 641,
+            "fallbacks": 7,
+            "requests": [
+              {
+                "stage": "extract",
+                "bytes": 2263,
+                "attempt": 1,
+                "elapsedMs": 5080.177907000005
+              },
+              {
+                "stage": "extract",
+                "bytes": 2248,
+                "attempt": 1,
+                "elapsedMs": 7198.736252000002
+              },
+              {
+                "stage": "reduce",
+                "bytes": 3253,
+                "attempt": 1,
+                "elapsedMs": 16568.031986000016
+              },
+              {
+                "stage": "reduce",
+                "bytes": 3212,
+                "attempt": 1,
+                "elapsedMs": 11769.188133999996
+              },
+              {
+                "stage": "tldr",
+                "bytes": 3591,
+                "attempt": 1,
+                "elapsedMs": 6508.869571999967
+              }
+            ]
+          }
+        },
+        "chat": [
+          {
+            "questionId": "tasks",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "release",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "review-day",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "review-owner",
+            "skipped": "Chat was not selected for this evaluation"
+          }
+        ],
+        "summarySkipped": false,
+        "elapsedMs": 47138.31685200002,
+        "calls": 5,
+        "summaryElapsedMs": 47138.26900999999,
+        "summaryCalls": 5,
+        "peakRssKiB": 262164
+      }
+    ]
+  },
+  "after": {
+    "metadata": {
+      "sourceCommit": "ce81cca0585c8fc5ef34489071aef723ef305b8f",
+      "sourceDirty": false,
+      "recordedAt": "2026-11-15T11:38:50.981Z",
+      "implementation": "current",
+      "model": {
+        "name": "gemma3:4b-it-q4_K_M",
+        "model": "gemma3:4b-it-q4_K_M",
+        "modified_at": "2026-10-05T05:47:50.046802317+05:30",
+        "size": 3338801804,
+        "digest": "a2af6cc3eb7fa8be8504abaf9b04e88f17a119ec3f04a3addf55f92841195f5a",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "gemma3",
+          "families": [
+            "gemma3"
+          ],
+          "parameter_size": "4.3B",
+          "quantization_level": "Q4_K_M"
+        },
+        "capabilities": [
+          "completion"
+        ]
+      },
+      "ollama": {
+        "version": "0.34.0"
+      },
+      "hardware": {
+        "platform": "linux",
+        "release": "7.0.0-43-generic",
+        "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+        "memoryBytes": 15950884864,
+        "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU, 4096 MiB"
+      },
+      "settings": {
+        "numCtx": 8192,
+        "temperature": 0,
+        "maxInputBytes": 5500,
+        "maxOutputTokens": 2048,
+        "think": false
+      },
+      "promptVersion": "readable-summary-v20",
+      "memoryScope": "Node peak RSS only. Ollama, Swift, peak total memory and swap need external observation.",
+      "runCondition": "uncontrolled",
+      "summaryDeadlineMs": 900000,
+      "evaluationDeadlineOverride": false,
+      "chatPromptVersion": "meeting-chat-v14",
+      "evidencePromptVersion": "meeting-evidence-v8"
+    },
+    "runs": [
+      {
+        "id": "ambiguous-ownership",
+        "split": "reserved",
+        "synthetic": true,
+        "summary": {
+          "tldr": "You: I will ask the team about ownership tomorrow. The guide is unassigned. We have not set a deadline.",
+          "participants": [
+            {
+              "speaker": "You",
+              "said": [
+                "The permission guide needs an update before the demo, but I cannot take it on.",
+                "The guide is unassigned.",
+                "We have not set a deadline.",
+                "I will ask the team about ownership tomorrow."
+              ]
+            },
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                "Maybe Speaker 2 could update it, if they have time; that is a suggestion, not an assignment.",
+                "I can commit to reviewing the guide after someone writes it.",
+                "I am not committing to writing it."
+              ]
+            },
+            {
+              "speaker": "Speaker 2",
+              "said": [
+                "I need to check my workload before I can say yes.",
+                "Please do not list me as the owner."
+              ]
+            }
+          ],
+          "evidence": {
+            "revision": "7cfca967e449cd0388215977304a973996484fa6d428e4bfb6d4dcd85bdd6fdf",
+            "tldr": [
+              3
+            ],
+            "participants": [
+              {
+                "speaker": "You",
+                "said": [
+                  [
+                    0
+                  ],
+                  [
+                    3
+                  ],
+                  [
+                    3
+                  ],
+                  [
+                    3
+                  ]
+                ]
+              },
+              {
+                "speaker": "Speaker 1",
+                "said": [
+                  [
+                    1
+                  ],
+                  [
+                    4
+                  ],
+                  [
+                    4
+                  ]
+                ]
+              },
+              {
+                "speaker": "Speaker 2",
+                "said": [
+                  [
+                    2
+                  ],
+                  [
+                    2
+                  ]
+                ]
+              }
+            ]
+          },
+          "generation": {
+            "promptVersion": "readable-summary-v20",
+            "model": "gemma3:4b-it-q4_K_M",
+            "elapsedMs": 50258.226259,
+            "calls": 7,
+            "promptTokens": 2971,
+            "outputTokens": 909,
+            "fallbacks": 9,
+            "requests": [
+              {
+                "stage": "extract",
+                "bytes": 2147,
+                "attempt": 1,
+                "elapsedMs": 11935.931151
+              },
+              {
+                "stage": "extract",
+                "bytes": 2161,
+                "attempt": 1,
+                "elapsedMs": 9229.236490000001
+              },
+              {
+                "stage": "extract",
+                "bytes": 2006,
+                "attempt": 1,
+                "elapsedMs": 4120.825596999999
+              },
+              {
+                "stage": "reduce",
+                "bytes": 2979,
+                "attempt": 1,
+                "elapsedMs": 9034.886761000002
+              },
+              {
+                "stage": "reduce",
+                "bytes": 2945,
+                "attempt": 1,
+                "elapsedMs": 6778.903119000002
+              },
+              {
+                "stage": "reduce",
+                "bytes": 2599,
+                "attempt": 1,
+                "elapsedMs": 3852.8330330000026
+              },
+              {
+                "stage": "tldr",
+                "bytes": 3535,
+                "attempt": 1,
+                "elapsedMs": 5146.614780999997
+              }
+            ]
+          }
+        },
+        "chat": [
+          {
+            "questionId": "guide-owner",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "guide-deadline",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "reviewer",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "acceptance",
+            "skipped": "Chat was not selected for this evaluation"
+          }
+        ],
+        "summarySkipped": false,
+        "elapsedMs": 50261.480644,
+        "calls": 7,
+        "summaryElapsedMs": 50261.436542,
+        "summaryCalls": 7,
+        "peakRssKiB": 262164
+      },
+      {
+        "id": "changed-decision",
+        "split": "reserved",
+        "synthetic": true,
+        "summary": {
+          "tldr": "Friday replaces Monday, and Markdown replaces PDF; these are the final decisions. Speaker 1: I will run the offline test again on Wednesday. The offline test failed.",
+          "participants": [
+            {
+              "speaker": "You",
+              "said": [
+                "Earlier position (superseded): My initial proposal is to launch on Monday with PDF export.",
+                "The offline test failed.",
+                "We need to revise both choices.",
+                "Agreed; Friday replaces Monday, and Markdown replaces PDF; these are the final decisions."
+              ]
+            },
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                "Earlier position (superseded): I agree with Monday and PDF for now, provided the offline test passes.",
+                "Then I propose Friday instead, and Markdown export because that already works without an external service.",
+                "I will run the offline test again on Wednesday.",
+                "We did not set a calendar date for Friday."
+              ]
+            }
+          ],
+          "evidence": {
+            "revision": "d3cd156a565b4106c58f9d88252536f532ae4b6f347840d4f183717f563041a4",
+            "tldr": [
+              2,
+              4,
+              5
+            ],
+            "participants": [
+              {
+                "speaker": "You",
+                "said": [
+                  [
+                    0,
+                    4
+                  ],
+                  [
+                    2
+                  ],
+                  [
+                    2
+                  ],
+                  [
+                    4
+                  ]
+                ]
+              },
+              {
+                "speaker": "Speaker 1",
+                "said": [
+                  [
+                    1,
+                    4
+                  ],
+                  [
+                    3
+                  ],
+                  [
+                    5
+                  ],
+                  [
+                    5
+                  ]
+                ]
+              }
+            ]
+          },
+          "generation": {
+            "promptVersion": "readable-summary-v20",
+            "model": "gemma3:4b-it-q4_K_M",
+            "elapsedMs": 54755.409851,
+            "calls": 7,
+            "promptTokens": 3382,
+            "outputTokens": 1103,
+            "fallbacks": 6,
+            "requests": [
+              {
+                "stage": "extract",
+                "bytes": 2207,
+                "attempt": 1,
+                "elapsedMs": 7363.001044000004
+              },
+              {
+                "stage": "extract",
+                "bytes": 2293,
+                "attempt": 1,
+                "elapsedMs": 8073.653785000002
+              },
+              {
+                "stage": "reduce",
+                "bytes": 3067,
+                "attempt": 1,
+                "elapsedMs": 8950.157652999987
+              },
+              {
+                "stage": "reduce",
+                "bytes": 3245,
+                "attempt": 1,
+                "elapsedMs": 10533.422628
+              },
+              {
+                "stage": "tldr",
+                "bytes": 3041,
+                "attempt": 1,
+                "elapsedMs": 6300.840964000003
+              },
+              {
+                "stage": "tldr",
+                "bytes": 3107,
+                "attempt": 2,
+                "elapsedMs": 6800.588125000009
+              },
+              {
+                "stage": "tldr",
+                "bytes": 3107,
+                "attempt": 3,
+                "elapsedMs": 6715.660512000002
+              }
+            ]
+          }
+        },
+        "chat": [
+          {
+            "questionId": "launch",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "export",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "retest-owner",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "retest-when",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "date",
+            "skipped": "Chat was not selected for this evaluation"
+          }
+        ],
+        "summarySkipped": false,
+        "elapsedMs": 54755.989374,
+        "calls": 7,
+        "summaryElapsedMs": 54755.952193000005,
+        "summaryCalls": 7,
+        "peakRssKiB": 262164
+      },
+      {
+        "id": "disagreement",
+        "split": "tuning",
+        "synthetic": true,
+        "summary": {
+          "tldr": "Speaker 2: I will prepare a list of the privacy tradeoffs by Tuesday. The only agreement is to review that list next time. Speaker 1: I prefer keeping audio by default so people can check transcription errors.",
+          "participants": [
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                "I prefer keeping audio by default so people can check transcription errors.",
+                "I still prefer keeping audio.",
+                "I do not agree to deletion by default."
+              ]
+            },
+            {
+              "speaker": "Speaker 2",
+              "said": [
+                "I disagree.",
+                "Audio should be deleted after transcription to reduce retained sensitive data.",
+                "I still prefer deletion.",
+                "I will prepare a list of the privacy tradeoffs by Tuesday."
+              ]
+            },
+            {
+              "speaker": "You",
+              "said": [
+                "Both arguments are on the table.",
+                "We will not settle the default today.",
+                "There is no agreed audio retention default.",
+                "The only agreement is to review that list next time."
+              ]
+            }
+          ],
+          "evidence": {
+            "revision": "acb1009c60a83997b89251dbf64f731e9c4ec72ee20ac8599458357673658c03",
+            "tldr": [
+              0,
+              4,
+              5
+            ],
+            "participants": [
+              {
+                "speaker": "Speaker 1",
+                "said": [
+                  [
+                    0
+                  ],
+                  [
+                    3
+                  ],
+                  [
+                    3
+                  ]
+                ]
+              },
+              {
+                "speaker": "Speaker 2",
+                "said": [
+                  [
+                    1
+                  ],
+                  [
+                    1
+                  ],
+                  [
+                    4
+                  ],
+                  [
+                    4
+                  ]
+                ]
+              },
+              {
+                "speaker": "You",
+                "said": [
+                  [
+                    2
+                  ],
+                  [
+                    2
+                  ],
+                  [
+                    5
+                  ],
+                  [
+                    5
+                  ]
+                ]
+              }
+            ]
+          },
+          "generation": {
+            "promptVersion": "readable-summary-v20",
+            "model": "gemma3:4b-it-q4_K_M",
+            "elapsedMs": 62204.775357000006,
+            "calls": 7,
+            "promptTokens": 3042,
+            "outputTokens": 970,
+            "fallbacks": 9,
+            "requests": [
+              {
+                "stage": "extract",
+                "bytes": 2117,
+                "attempt": 1,
+                "elapsedMs": 5447.412248000008
+              },
+              {
+                "stage": "extract",
+                "bytes": 2147,
+                "attempt": 1,
+                "elapsedMs": 7073.239032999991
+              },
+              {
+                "stage": "extract",
+                "bytes": 2122,
+                "attempt": 1,
+                "elapsedMs": 9379.476245000013
+              },
+              {
+                "stage": "reduce",
+                "bytes": 2857,
+                "attempt": 1,
+                "elapsedMs": 7596.273375000004
+              },
+              {
+                "stage": "reduce",
+                "bytes": 3007,
+                "attempt": 1,
+                "elapsedMs": 8249.598425000004
+              },
+              {
+                "stage": "reduce",
+                "bytes": 2945,
+                "attempt": 1,
+                "elapsedMs": 7671.268609999999
+              },
+              {
+                "stage": "tldr",
+                "bytes": 3762,
+                "attempt": 1,
+                "elapsedMs": 16767.791739000008
+              }
+            ]
+          }
+        },
+        "chat": [
+          {
+            "questionId": "default",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "keep",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "list",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "list-deadline",
+            "skipped": "Chat was not selected for this evaluation"
+          }
+        ],
+        "summarySkipped": false,
+        "elapsedMs": 62205.69541700001,
+        "calls": 7,
+        "summaryElapsedMs": 62205.605862,
+        "summaryCalls": 7,
+        "peakRssKiB": 262164
+      },
+      {
+        "id": "repeated-points",
+        "split": "tuning",
+        "synthetic": true,
+        "summary": {
+          "tldr": "You: My only assignment: I will test the permission flow on the Mac by Thursday. Speaker 1: I will review the Markdown export on Friday. The Friday review is not the release date.",
+          "participants": [
+            {
+              "speaker": "You",
+              "said": [
+                "My only assignment: I will test the permission flow on the Mac by Thursday.",
+                "This is the same task, not another one.",
+                "The permission test remains my Thursday task.",
+                "No additional task has been added."
+              ]
+            },
+            {
+              "speaker": "Speaker 1",
+              "said": [
+                "I will review the Markdown export on Friday.",
+                "There is only one export review.",
+                "The Friday review is not the release date.",
+                "Our release date is not set."
+              ]
+            }
+          ],
+          "evidence": {
+            "revision": "35a569b82f4b6596333a2cf53cdfd9abd43af5375dc35fe605837c6ce9479c32",
+            "tldr": [
+              0,
+              1,
+              2,
+              3,
+              5
+            ],
+            "participants": [
+              {
+                "speaker": "You",
+                "said": [
+                  [
+                    0,
+                    2
+                  ],
+                  [
+                    2
+                  ],
+                  [
+                    4
+                  ],
+                  [
+                    4
+                  ]
+                ]
+              },
+              {
+                "speaker": "Speaker 1",
+                "said": [
+                  [
+                    1,
+                    3
+                  ],
+                  [
+                    3
+                  ],
+                  [
+                    5
+                  ],
+                  [
+                    5
+                  ]
+                ]
+              }
+            ]
+          },
+          "generation": {
+            "promptVersion": "readable-summary-v20",
+            "model": "gemma3:4b-it-q4_K_M",
+            "elapsedMs": 37202.04255700001,
+            "calls": 5,
+            "promptTokens": 2314,
+            "outputTokens": 639,
+            "fallbacks": 7,
+            "requests": [
+              {
+                "stage": "extract",
+                "bytes": 2263,
+                "attempt": 1,
+                "elapsedMs": 5133.5009900000005
+              },
+              {
+                "stage": "extract",
+                "bytes": 2248,
+                "attempt": 1,
+                "elapsedMs": 6816.708649999986
+              },
+              {
+                "stage": "reduce",
+                "bytes": 3115,
+                "attempt": 1,
+                "elapsedMs": 9124.832819000003
+              },
+              {
+                "stage": "reduce",
+                "bytes": 3083,
+                "attempt": 1,
+                "elapsedMs": 9509.220418000012
+              },
+              {
+                "stage": "tldr",
+                "bytes": 3287,
+                "attempt": 1,
+                "elapsedMs": 6604.3928120000055
+              }
+            ]
+          }
+        },
+        "chat": [
+          {
+            "questionId": "tasks",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "release",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "review-day",
+            "skipped": "Chat was not selected for this evaluation"
+          },
+          {
+            "questionId": "review-owner",
+            "skipped": "Chat was not selected for this evaluation"
+          }
+        ],
+        "summarySkipped": false,
+        "elapsedMs": 37202.17520500001,
+        "calls": 5,
+        "summaryElapsedMs": 37202.12768400001,
+        "summaryCalls": 5,
+        "peakRssKiB": 262164
+      }
+    ]
+  }
+}

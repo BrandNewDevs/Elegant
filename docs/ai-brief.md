@@ -244,8 +244,8 @@ Ollama v20 and Gemini v6 merge self-contained, same-Participant commitments
 using a shared, bounded equivalence relation. It recognizes contractions, definite
 articles, a fronted `by <weekday>` deadline, and `perform/conduct a review/test of`
 wording. A repeated promise introduced with `My only assignment:` retains that
-stronger qualification rather than the bare promise. The selected original claim supplies the displayed words; all supporting
-references survive. Ollama applies this across extraction batches before bounded
+stronger qualification rather than the bare promise. The selected original claim
+supplies the displayed words; all supporting references survive. Ollama applies this across extraction batches before bounded
 consolidation; Gemini compacts its extracted drafts and grounding fallback atoms.
 TL;DR packing compares supported sentence meanings, allowing different facts from
 the same point while rejecting equivalent wording.
